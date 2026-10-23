@@ -57,7 +57,11 @@ func (s *Service) makePromise(ctx context.Context, cmd MakePromiseCommand) (Make
 		return MakePromiseResult{}, err
 	}
 	if o.State() == offer.StateConsumed {
-		if existing, gerr := s.Promises.GetByOffer(ctx, cmd.OfferID); gerr == nil && shared.SameLines(existing.Lines(), cmd.Lines) {
+		existing, gerr := s.Promises.GetByOffer(ctx, cmd.OfferID)
+		if err := missingOrFailed(gerr); err != nil {
+			return MakePromiseResult{}, err
+		}
+		if gerr == nil && shared.SameLines(existing.Lines(), cmd.Lines) {
 			return MakePromiseResult{Promise: views.FromPromise(existing)}, nil
 		}
 	}
@@ -114,6 +118,9 @@ func refusal(format string, args ...any) error {
 // exist, are not cancelled and have room. A NOMINAL path has only the node.
 func (s *Service) revalidate(ctx context.Context, w shared.Witness, pol *policy.Policy) error {
 	n, err := s.Network.GetNode(ctx, w.NodeID)
+	if err := missingOrFailed(err); err != nil {
+		return err
+	}
 	if err != nil || n.State != readmodel.NodeActive {
 		return refusal("node %s is not available", w.NodeID)
 	}
@@ -121,14 +128,41 @@ func (s *Service) revalidate(ctx context.Context, w shared.Witness, pol *policy.
 		return nil
 	}
 	for _, id := range append([]string{w.PickupDepartureID}, w.Legs...) {
-		d, err := s.Network.GetDeparture(ctx, id)
-		if err != nil || !d.Scheduled || d.Cancelled || d.Remaining < pol.PackagesPerOrder() {
-			return refusal("departure %s is no longer available", id)
+		if err := s.revalidateDeparture(ctx, id, pol); err != nil {
+			return err
 		}
 	}
-	wave, err := s.Network.GetWave(ctx, w.DeliveryWaveID)
+	return s.revalidateWave(ctx, w.DeliveryWaveID)
+}
+
+func (s *Service) revalidateDeparture(ctx context.Context, id string, pol *policy.Policy) error {
+	d, err := s.Network.GetDeparture(ctx, id)
+	if err := missingOrFailed(err); err != nil {
+		return err
+	}
+	if err != nil || !d.Scheduled || d.Cancelled || d.Remaining < pol.PackagesPerOrder() {
+		return refusal("departure %s is no longer available", id)
+	}
+	return nil
+}
+
+func (s *Service) revalidateWave(ctx context.Context, id string) error {
+	wave, err := s.Network.GetWave(ctx, id)
+	if err := missingOrFailed(err); err != nil {
+		return err
+	}
 	if err != nil || !wave.Scheduled || wave.Cancelled || wave.Remaining < 1 {
-		return refusal("wave %s is no longer available", w.DeliveryWaveID)
+		return refusal("wave %s is no longer available", id)
+	}
+	return nil
+}
+
+// missingOrFailed lets a read model miss (the row is gone, so the witness is
+// refused by the caller) pass as nil and returns any other read failure, which
+// must not be mistaken for a full book.
+func missingOrFailed(err error) error {
+	if err != nil && !errors.Is(err, ports.ErrNotFound) {
+		return err
 	}
 	return nil
 }

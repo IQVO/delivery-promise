@@ -215,7 +215,14 @@ func (s *Service) moveCapacity(ctx context.Context, p *promise.Promise, c search
 	if err != nil {
 		return nil, err
 	}
+	// Save accepts only the next version, so each command is saved on its own.
+	if err := s.Books.Save(ctx, nb); err != nil {
+		return nil, err
+	}
 	if err := nb.ConfirmHold(); err != nil {
+		return nil, err
+	}
+	if err := s.Books.Save(ctx, nb); err != nil {
 		return nil, err
 	}
 	old, err := s.Books.Get(ctx, book.ID(p.BookID()))
@@ -223,9 +230,6 @@ func (s *Service) moveCapacity(ctx context.Context, p *promise.Promise, c search
 		return nil, err
 	}
 	if err := old.ReleaseConfirmed(); err != nil {
-		return nil, err
-	}
-	if err := s.Books.Save(ctx, nb); err != nil {
 		return nil, err
 	}
 	return events, s.Books.Save(ctx, old)

@@ -28,6 +28,7 @@ type env struct {
 	svc    *usecases.Service
 	store  *memory.Store
 	clock  *memory.FakeClock
+	ids    *memory.SeqIDs
 	events int
 }
 
@@ -35,10 +36,10 @@ func newEnv(t *testing.T) *env {
 	t.Helper()
 	store := memory.NewStore()
 	clock := memory.NewFakeClock(at(22, 14, 5))
-	e := &env{t: t, store: store, clock: clock}
+	e := &env{t: t, store: store, clock: clock, ids: &memory.SeqIDs{}}
 	e.svc = usecases.New(usecases.Deps{
 		UoW: store.UnitOfWork(), Offers: store.Offers(), Promises: store.Promises(), Books: store.Books(), Policies: store.Policies(),
-		Network: store.Network(), Shipments: store.Shipments(), Outbox: store.Outbox(), Inbox: store.Inbox(), Clock: clock, IDs: &memory.SeqIDs{},
+		Network: store.Network(), Shipments: store.Shipments(), Outbox: store.Outbox(), Inbox: store.Inbox(), Clock: clock, IDs: e.ids,
 	})
 	e.seedWorkedExample()
 	return e
