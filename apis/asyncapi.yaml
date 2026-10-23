@@ -1,0 +1,2776 @@
+asyncapi: 3.0.0
+info:
+  title: delivery-promise Domain Events
+  version: 1.0.0
+  description: 'Event catalog for the **delivery-promise** bounded context of the retail network (commerce tier, Core): it
+    quotes delivery offers from a feasible witness path, holds capacity in PromiseBooks, makes and judges promises (ADR 0002,
+    ADR 0003).
+
+
+    **Published.** Twelve events through a **transactional outbox** (the aggregate rows and the already-encoded events are
+    written in ONE database transaction and an always-on relay drains them to Kafka, at-least-once, the CloudEvents `id` is
+    stored with the outbox row). Six integration events go to `retailnetwork.delivery-promise.events` (PromiseAtRisk, PromiseRevised,
+    PromiseKept, PromiseBroken, PromiseUnkeepable, PromiseBookExhausted); six analytics-only events go ONLY to `retailnetwork.delivery-promise.analytics`
+    (PromiseMade, PromiseConfirmed, PromiseReleased, PromiseCancelled, DeliveryOfferQuoted, PromisePolicyPublished). The types
+    are catalogued in ADR 0004.
+
+
+    **Consumed.** Events of nine producers, kept as event-fed local read models or driving RepromiseOnRisk, JudgeOnDelivery
+    and CancelPromise (ADR 0003). The consumed messages below are a tolerant local copy of the fields this service relies
+    on; the producer''s own AsyncAPI is authoritative. Every consumer is idempotent on the CloudEvents `id` (inbox table)
+    and dispatches on the full `type`.
+
+
+    **Envelope (mandatory).** CloudEvents 1.0, structured content mode, Kafka header `content-type: application/cloudevents+json;
+    charset=UTF-8`. `specversion`, `id`, `source` (`/retailnetwork/delivery-promise`), `type`, `subject` (the aggregate root
+    id), `time`, `datacontenttype` (`application/json`) and `dataschema` (`urn:retailnetwork:delivery-promise:<stream>:<EventName>:v1`)
+    are all required. Kafka key = the subject. Type = `com.retailnetwork.commerce.delivery-promise.<entity>.<EventName>` with
+    entity `promise`, `promisebook`, `deliveryoffer` or `promisepolicy`. A breaking payload change is a new `.v2` type, never
+    a mutation.
+
+
+    **Conventions.** `data` is camelCase; ids are strings; instants are RFC 3339 UTC; optional fields are omitted when unset
+    (never null); arrays are always present.'
+  contact:
+    name: delivery-promise maintainers
+    url: https://github.com/IQVO/delivery-promise
+    email: delivery-promise@iqvo.example.com
+  license:
+    name: UNLICENSED
+  tags:
+  - name: delivery-promise
+    description: The delivery-promise bounded context (retail network, commerce tier).
+  - name: promise
+    description: Events raised by the promise aggregate.
+  - name: promisebook
+    description: Events raised by the promisebook aggregate.
+  - name: deliveryoffer
+    description: Events raised by the deliveryoffer aggregate.
+  - name: promisepolicy
+    description: Events raised by the promisepolicy aggregate.
+  - name: consumed-customer-ordering
+    description: Events consumed from customer-ordering.
+  - name: consumed-last-mile-delivery
+    description: Events consumed from last-mile-delivery.
+  - name: consumed-linehaul-transportation
+    description: Events consumed from linehaul-transportation.
+  - name: consumed-node-performance
+    description: Events consumed from node-performance.
+  - name: consumed-node-topology
+    description: Events consumed from node-topology.
+  - name: consumed-offer-availability
+    description: Events consumed from offer-availability.
+  - name: consumed-order-sourcing
+    description: Events consumed from order-sourcing.
+  - name: consumed-shipping-and-tracking
+    description: Events consumed from shipping-and-tracking.
+servers:
+  production:
+    host: '{brokers}'
+    protocol: kafka
+    description: Retail-network Kafka broker (host supplied by the deployment environment via KAFKA_BROKERS).
+    variables:
+      brokers:
+        default: kafka.retail-network.internal:9092
+defaultContentType: application/cloudevents+json
+channels:
+  deliveryPromiseEvents:
+    address: retailnetwork.delivery-promise.events
+    title: delivery-promise integration topic
+    description: This service's integration topic. Written by the outbox relay; key = subject. Every message carries the CloudEvents
+      content-type header. Dispatch on the full `type`, ignore unknown types, dedupe on `id`.
+    messages:
+      PromiseAtRisk:
+        $ref: '#/components/messages/PromiseAtRisk'
+      PromiseRevised:
+        $ref: '#/components/messages/PromiseRevised'
+      PromiseKept:
+        $ref: '#/components/messages/PromiseKept'
+      PromiseBroken:
+        $ref: '#/components/messages/PromiseBroken'
+      PromiseUnkeepable:
+        $ref: '#/components/messages/PromiseUnkeepable'
+      PromiseBookExhausted:
+        $ref: '#/components/messages/PromiseBookExhausted'
+  deliveryPromiseAnalytics:
+    address: retailnetwork.delivery-promise.analytics
+    title: delivery-promise analytics topic
+    description: 'This service''s analytics-only topic: events no other context consumes. Written by the outbox relay; key
+      = subject. Every message carries the CloudEvents content-type header. Dispatch on the full `type`, ignore unknown types,
+      dedupe on `id`.'
+    messages:
+      PromiseMade:
+        $ref: '#/components/messages/PromiseMade'
+      PromiseConfirmed:
+        $ref: '#/components/messages/PromiseConfirmed'
+      PromiseReleased:
+        $ref: '#/components/messages/PromiseReleased'
+      PromiseCancelled:
+        $ref: '#/components/messages/PromiseCancelled'
+      DeliveryOfferQuoted:
+        $ref: '#/components/messages/DeliveryOfferQuoted'
+      PromisePolicyPublished:
+        $ref: '#/components/messages/PromisePolicyPublished'
+  customerOrderingEvents:
+    address: retailnetwork.customer-ordering.events
+    title: customer-ordering integration topic (consumed)
+    description: 'The integration topic of customer-ordering, consumed by the delivery-promise consumer group (DELIVERY_PROMISE_CONSUMER_GROUP).
+      Tolerant decoding: unknown types and unknown fields are ignored; every message is deduplicated on the CloudEvents `id`
+      in the inbox.'
+    messages:
+      CustomerOrderPlaced:
+        $ref: '#/components/messages/CustomerOrderPlaced'
+      CustomerOrderCancelled:
+        $ref: '#/components/messages/CustomerOrderCancelled'
+  orderSourcingEvents:
+    address: retailnetwork.order-sourcing.events
+    title: order-sourcing integration topic (consumed)
+    description: 'The integration topic of order-sourcing, consumed by the delivery-promise consumer group (DELIVERY_PROMISE_CONSUMER_GROUP).
+      Tolerant decoding: unknown types and unknown fields are ignored; every message is deduplicated on the CloudEvents `id`
+      in the inbox.'
+    messages:
+      FulfillmentLocked:
+        $ref: '#/components/messages/FulfillmentLocked'
+      FulfillmentShipped:
+        $ref: '#/components/messages/FulfillmentShipped'
+      FulfillmentUnsourceable:
+        $ref: '#/components/messages/FulfillmentUnsourceable'
+  shippingAndTrackingEvents:
+    address: retailnetwork.shipping-and-tracking.events
+    title: shipping-and-tracking integration topic (consumed)
+    description: 'The integration topic of shipping-and-tracking, consumed by the delivery-promise consumer group (DELIVERY_PROMISE_CONSUMER_GROUP).
+      Tolerant decoding: unknown types and unknown fields are ignored; every message is deduplicated on the CloudEvents `id`
+      in the inbox.'
+    messages:
+      PackageDelivered:
+        $ref: '#/components/messages/PackageDelivered'
+      PackageExceptionRaised:
+        $ref: '#/components/messages/PackageExceptionRaised'
+      PackageLost:
+        $ref: '#/components/messages/PackageLost'
+      PackageReturned:
+        $ref: '#/components/messages/PackageReturned'
+  linehaulEvents:
+    address: retailnetwork.linehaul-transportation.events
+    title: linehaul-transportation integration topic (consumed)
+    description: 'The integration topic of linehaul-transportation, consumed by the delivery-promise consumer group (DELIVERY_PROMISE_CONSUMER_GROUP).
+      Tolerant decoding: unknown types and unknown fields are ignored; every message is deduplicated on the CloudEvents `id`
+      in the inbox.'
+    messages:
+      DepartureScheduled:
+        $ref: '#/components/messages/DepartureScheduled'
+      DepartureCapacityChanged:
+        $ref: '#/components/messages/DepartureCapacityChanged'
+      DepartureCancelled:
+        $ref: '#/components/messages/DepartureCancelled'
+      BookingMoved:
+        $ref: '#/components/messages/BookingMoved'
+      BookingFailed:
+        $ref: '#/components/messages/BookingFailed'
+  lastMileEvents:
+    address: retailnetwork.last-mile-delivery.events
+    title: last-mile-delivery integration topic (consumed)
+    description: 'The integration topic of last-mile-delivery, consumed by the delivery-promise consumer group (DELIVERY_PROMISE_CONSUMER_GROUP).
+      Tolerant decoding: unknown types and unknown fields are ignored; every message is deduplicated on the CloudEvents `id`
+      in the inbox.'
+    messages:
+      DeliveryWaveScheduled:
+        $ref: '#/components/messages/DeliveryWaveScheduled'
+      DeliveryWaveCapacityChanged:
+        $ref: '#/components/messages/DeliveryWaveCapacityChanged'
+      DeliveryWaveCancelled:
+        $ref: '#/components/messages/DeliveryWaveCancelled'
+      PackageInductionDeferred:
+        $ref: '#/components/messages/PackageInductionDeferred'
+  nodePerformanceEvents:
+    address: retailnetwork.node-performance.events
+    title: node-performance integration topic (consumed)
+    description: 'The integration topic of node-performance, consumed by the delivery-promise consumer group (DELIVERY_PROMISE_CONSUMER_GROUP).
+      Tolerant decoding: unknown types and unknown fields are ignored; every message is deduplicated on the CloudEvents `id`
+      in the inbox.'
+    messages:
+      NodeScorecardUpdated:
+        $ref: '#/components/messages/NodeScorecardUpdated'
+  nodeTopologyEvents:
+    address: retailnetwork.node-topology.events
+    title: node-topology integration topic (consumed)
+    description: 'The integration topic of node-topology, consumed by the delivery-promise consumer group (DELIVERY_PROMISE_CONSUMER_GROUP).
+      Tolerant decoding: unknown types and unknown fields are ignored; every message is deduplicated on the CloudEvents `id`
+      in the inbox.'
+    messages:
+      NodeRegistered:
+        $ref: '#/components/messages/NodeRegistered'
+      NodeOperationalProfileDeclared:
+        $ref: '#/components/messages/NodeOperationalProfileDeclared'
+      NodeActivated:
+        $ref: '#/components/messages/NodeActivated'
+      NodeSuspended:
+        $ref: '#/components/messages/NodeSuspended'
+      NodeRetired:
+        $ref: '#/components/messages/NodeRetired'
+      LaneOpened:
+        $ref: '#/components/messages/LaneOpened'
+      LaneClosed:
+        $ref: '#/components/messages/LaneClosed'
+      ServiceAreaAssigned:
+        $ref: '#/components/messages/ServiceAreaAssigned'
+      RegionDefined:
+        $ref: '#/components/messages/RegionDefined'
+  offerAvailabilityEvents:
+    address: retailnetwork.offer-availability.events
+    title: offer-availability integration topic (consumed)
+    description: 'The integration topic of offer-availability, consumed by the delivery-promise consumer group (DELIVERY_PROMISE_CONSUMER_GROUP).
+      Tolerant decoding: unknown types and unknown fields are ignored; every message is deduplicated on the CloudEvents `id`
+      in the inbox.'
+    messages:
+      CatalogItemCreated:
+        $ref: '#/components/messages/CatalogItemCreated'
+      CatalogItemDiscontinued:
+        $ref: '#/components/messages/CatalogItemDiscontinued'
+      ListingCreated:
+        $ref: '#/components/messages/ListingCreated'
+      ListingAvailabilityChanged:
+        $ref: '#/components/messages/ListingAvailabilityChanged'
+      ListingSuppressed:
+        $ref: '#/components/messages/ListingSuppressed'
+      ListingRestored:
+        $ref: '#/components/messages/ListingRestored'
+operations:
+  publishDeliveryPromiseEvents:
+    action: send
+    channel:
+      $ref: '#/channels/deliveryPromiseEvents'
+    title: Publish delivery-promise events events
+    summary: Publish the 6 events events through the transactional outbox.
+    description: The service sends PromiseAtRisk, PromiseRevised, PromiseKept, PromiseBroken, PromiseUnkeepable, PromiseBookExhausted
+      to `retailnetwork.delivery-promise.events`. Consumers route on the full `type`.
+    tags:
+    - name: delivery-promise
+    messages:
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseAtRisk'
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseRevised'
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseKept'
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseBroken'
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseUnkeepable'
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseBookExhausted'
+  publishDeliveryPromiseAnalytics:
+    action: send
+    channel:
+      $ref: '#/channels/deliveryPromiseAnalytics'
+    title: Publish delivery-promise analytics events
+    summary: Publish the 6 analytics events through the transactional outbox.
+    description: The service sends PromiseMade, PromiseConfirmed, PromiseReleased, PromiseCancelled, DeliveryOfferQuoted,
+      PromisePolicyPublished to `retailnetwork.delivery-promise.analytics`. Consumers route on the full `type`.
+    tags:
+    - name: delivery-promise
+    messages:
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromiseMade'
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromiseConfirmed'
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromiseReleased'
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromiseCancelled'
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/DeliveryOfferQuoted'
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromisePolicyPublished'
+  receiveCustomerOrderingEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/customerOrderingEvents'
+    title: Consume customer-ordering events
+    summary: Consume CustomerOrderPlaced, CustomerOrderCancelled from customer-ordering.
+    description: The service consumes CustomerOrderPlaced, CustomerOrderCancelled from `retailnetwork.customer-ordering.events`
+      to keep its local read models and to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls customer-ordering
+      synchronously.
+    tags:
+    - name: consumed-customer-ordering
+    messages:
+    - $ref: '#/channels/customerOrderingEvents/messages/CustomerOrderPlaced'
+    - $ref: '#/channels/customerOrderingEvents/messages/CustomerOrderCancelled'
+  receiveOrderSourcingEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/orderSourcingEvents'
+    title: Consume order-sourcing events
+    summary: Consume FulfillmentLocked, FulfillmentShipped, FulfillmentUnsourceable from order-sourcing.
+    description: The service consumes FulfillmentLocked, FulfillmentShipped, FulfillmentUnsourceable from `retailnetwork.order-sourcing.events`
+      to keep its local read models and to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls order-sourcing
+      synchronously.
+    tags:
+    - name: consumed-order-sourcing
+    messages:
+    - $ref: '#/channels/orderSourcingEvents/messages/FulfillmentLocked'
+    - $ref: '#/channels/orderSourcingEvents/messages/FulfillmentShipped'
+    - $ref: '#/channels/orderSourcingEvents/messages/FulfillmentUnsourceable'
+  receiveShippingAndTrackingEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/shippingAndTrackingEvents'
+    title: Consume shipping-and-tracking events
+    summary: Consume PackageDelivered, PackageExceptionRaised, PackageLost, PackageReturned from shipping-and-tracking.
+    description: The service consumes PackageDelivered, PackageExceptionRaised, PackageLost, PackageReturned from `retailnetwork.shipping-and-tracking.events`
+      to keep its local read models and to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls shipping-and-tracking
+      synchronously.
+    tags:
+    - name: consumed-shipping-and-tracking
+    messages:
+    - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageDelivered'
+    - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageExceptionRaised'
+    - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageLost'
+    - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageReturned'
+  receiveLinehaulEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/linehaulEvents'
+    title: Consume linehaul-transportation events
+    summary: Consume DepartureScheduled, DepartureCapacityChanged, DepartureCancelled, BookingMoved, BookingFailed from linehaul-transportation.
+    description: The service consumes DepartureScheduled, DepartureCapacityChanged, DepartureCancelled, BookingMoved, BookingFailed
+      from `retailnetwork.linehaul-transportation.events` to keep its local read models and to drive RepromiseOnRisk, JudgeOnDelivery
+      and CancelPromise. It never calls linehaul-transportation synchronously.
+    tags:
+    - name: consumed-linehaul-transportation
+    messages:
+    - $ref: '#/channels/linehaulEvents/messages/DepartureScheduled'
+    - $ref: '#/channels/linehaulEvents/messages/DepartureCapacityChanged'
+    - $ref: '#/channels/linehaulEvents/messages/DepartureCancelled'
+    - $ref: '#/channels/linehaulEvents/messages/BookingMoved'
+    - $ref: '#/channels/linehaulEvents/messages/BookingFailed'
+  receiveLastMileEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/lastMileEvents'
+    title: Consume last-mile-delivery events
+    summary: Consume DeliveryWaveScheduled, DeliveryWaveCapacityChanged, DeliveryWaveCancelled, PackageInductionDeferred from
+      last-mile-delivery.
+    description: The service consumes DeliveryWaveScheduled, DeliveryWaveCapacityChanged, DeliveryWaveCancelled, PackageInductionDeferred
+      from `retailnetwork.last-mile-delivery.events` to keep its local read models and to drive RepromiseOnRisk, JudgeOnDelivery
+      and CancelPromise. It never calls last-mile-delivery synchronously.
+    tags:
+    - name: consumed-last-mile-delivery
+    messages:
+    - $ref: '#/channels/lastMileEvents/messages/DeliveryWaveScheduled'
+    - $ref: '#/channels/lastMileEvents/messages/DeliveryWaveCapacityChanged'
+    - $ref: '#/channels/lastMileEvents/messages/DeliveryWaveCancelled'
+    - $ref: '#/channels/lastMileEvents/messages/PackageInductionDeferred'
+  receiveNodePerformanceEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/nodePerformanceEvents'
+    title: Consume node-performance events
+    summary: Consume NodeScorecardUpdated from node-performance.
+    description: The service consumes NodeScorecardUpdated from `retailnetwork.node-performance.events` to keep its local
+      read models and to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls node-performance synchronously.
+    tags:
+    - name: consumed-node-performance
+    messages:
+    - $ref: '#/channels/nodePerformanceEvents/messages/NodeScorecardUpdated'
+  receiveNodeTopologyEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/nodeTopologyEvents'
+    title: Consume node-topology events
+    summary: Consume NodeRegistered, NodeOperationalProfileDeclared, NodeActivated, NodeSuspended, NodeRetired, LaneOpened,
+      LaneClosed, ServiceAreaAssigned, RegionDefined from node-topology.
+    description: The service consumes NodeRegistered, NodeOperationalProfileDeclared, NodeActivated, NodeSuspended, NodeRetired,
+      LaneOpened, LaneClosed, ServiceAreaAssigned, RegionDefined from `retailnetwork.node-topology.events` to keep its local
+      read models and to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls node-topology synchronously.
+    tags:
+    - name: consumed-node-topology
+    messages:
+    - $ref: '#/channels/nodeTopologyEvents/messages/NodeRegistered'
+    - $ref: '#/channels/nodeTopologyEvents/messages/NodeOperationalProfileDeclared'
+    - $ref: '#/channels/nodeTopologyEvents/messages/NodeActivated'
+    - $ref: '#/channels/nodeTopologyEvents/messages/NodeSuspended'
+    - $ref: '#/channels/nodeTopologyEvents/messages/NodeRetired'
+    - $ref: '#/channels/nodeTopologyEvents/messages/LaneOpened'
+    - $ref: '#/channels/nodeTopologyEvents/messages/LaneClosed'
+    - $ref: '#/channels/nodeTopologyEvents/messages/ServiceAreaAssigned'
+    - $ref: '#/channels/nodeTopologyEvents/messages/RegionDefined'
+  receiveOfferAvailabilityEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/offerAvailabilityEvents'
+    title: Consume offer-availability events
+    summary: Consume CatalogItemCreated, CatalogItemDiscontinued, ListingCreated, ListingAvailabilityChanged, ListingSuppressed,
+      ListingRestored from offer-availability.
+    description: The service consumes CatalogItemCreated, CatalogItemDiscontinued, ListingCreated, ListingAvailabilityChanged,
+      ListingSuppressed, ListingRestored from `retailnetwork.offer-availability.events` to keep its local read models and
+      to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls offer-availability synchronously.
+    tags:
+    - name: consumed-offer-availability
+    messages:
+    - $ref: '#/channels/offerAvailabilityEvents/messages/CatalogItemCreated'
+    - $ref: '#/channels/offerAvailabilityEvents/messages/CatalogItemDiscontinued'
+    - $ref: '#/channels/offerAvailabilityEvents/messages/ListingCreated'
+    - $ref: '#/channels/offerAvailabilityEvents/messages/ListingAvailabilityChanged'
+    - $ref: '#/channels/offerAvailabilityEvents/messages/ListingSuppressed'
+    - $ref: '#/channels/offerAvailabilityEvents/messages/ListingRestored'
+components:
+  messages:
+    PromiseMade:
+      name: PromiseMade
+      title: Promise made
+      summary: A provisional promise was made for one shipment group and capacity was held.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseMade`; `dataschema` = `urn:retailnetwork:delivery-promise:analytics:PromiseMade:v1`;
+        subject and key = the promiseId. Topic: retailnetwork.delivery-promise.analytics. Raised by MakePromise. ANALYTICS
+        ONLY (model: consumers analytics only). The offer is CONSUMED and the book hold taken in the same transaction. `lines`
+        always has at least one entry.'
+      tags:
+      - name: promise
+      payload:
+        $ref: '#/components/schemas/PromiseMadeEvent'
+      examples:
+      - name: promiseMade
+        summary: A provisional promise was made for one shipment group and capacity was held.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0001
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promise.PromiseMade
+          subject: prm-7f3a21
+          time: '2026-10-22T19:09:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:analytics:PromiseMade:v1
+          data:
+            promiseId: prm-7f3a21
+            offerId: off-19c4d0
+            tier: NEXT_DAY
+            nodeId: N-VWS-AUS3
+            pickupDepartureId: dep-AUS3-1800
+            shipBy: '2026-10-22T23:00:00Z'
+            deliverByEarliest: '2026-10-23T14:00:00Z'
+            deliverByLatest: '2026-10-24T02:00:00Z'
+            basis: SCHEDULED
+            policyVersion: v3
+            holdExpiresAt: '2026-10-22T19:24:00Z'
+            lines:
+            - catalogItemId: ci-1001
+              quantity: 2
+    PromiseConfirmed:
+      name: PromiseConfirmed
+      title: Promise confirmed
+      summary: A provisional promise became CONFIRMED for a placed order.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseConfirmed`; `dataschema` = `urn:retailnetwork:delivery-promise:analytics:PromiseConfirmed:v1`;
+        subject and key = the promiseId. Topic: retailnetwork.delivery-promise.analytics. Raised by ConfirmPromise (the synchronous
+        POST /promises/{promiseId}:confirm that customer-ordering calls inside checkout, or the reconciling consumer of CustomerOrderPlaced).
+        ANALYTICS ONLY. A repeated confirm raises nothing.'
+      tags:
+      - name: promise
+      payload:
+        $ref: '#/components/schemas/PromiseConfirmedEvent'
+      examples:
+      - name: promiseConfirmed
+        summary: A provisional promise became CONFIRMED for a placed order.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0002
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promise.PromiseConfirmed
+          subject: prm-7f3a21
+          time: '2026-10-22T19:10:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:analytics:PromiseConfirmed:v1
+          data:
+            promiseId: prm-7f3a21
+            orderId: ord-55a901
+            groupNo: 1
+    PromiseAtRisk:
+      name: PromiseAtRisk
+      title: Promise at risk
+      summary: A confirmed promise's witness path stopped being feasible.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseAtRisk`; `dataschema` = `urn:retailnetwork:delivery-promise:events:PromiseAtRisk:v1`;
+        subject and key = the promiseId. Topic: retailnetwork.delivery-promise.events. Raised by FlagPromiseAtRisk (RepromiseOnRisk)
+        on FulfillmentUnsourceable, PackageExceptionRaised, PackageInductionDeferred, DepartureCancelled, DeliveryWaveCancelled,
+        BookingFailed or BookingMoved affecting the witness path. Consumed by customer-ordering. `reason` is one of NODE_UNSOURCEABLE,
+        PACKAGE_EXCEPTION, INDUCTION_DEFERRED, DEPARTURE_CANCELLED, WAVE_CANCELLED, BOOKING_FAILED, BOOKING_MOVED.'
+      tags:
+      - name: promise
+      payload:
+        $ref: '#/components/schemas/PromiseAtRiskEvent'
+      examples:
+      - name: promiseAtRisk
+        summary: A confirmed promise's witness path stopped being feasible.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0003
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promise.PromiseAtRisk
+          subject: prm-7f3a21
+          time: '2026-10-22T21:40:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:events:PromiseAtRisk:v1
+          data:
+            promiseId: prm-7f3a21
+            orderId: ord-55a901
+            reason: DEPARTURE_CANCELLED
+            detectedAt: '2026-10-22T21:40:00Z'
+    PromiseRevised:
+      name: PromiseRevised
+      title: Promise revised
+      summary: A promise moved to a later window (re-promise), never earlier.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseRevised`; `dataschema` = `urn:retailnetwork:delivery-promise:events:PromiseRevised:v1`;
+        subject and key = the promiseId. Topic: retailnetwork.delivery-promise.events. Raised by RevisePromise (RepromiseOnRisk).
+        `revisionNo` strictly increases per promise from 1. Consumed by customer-ordering (shows the new window) and order-sourcing
+        (FulfillmentConstraintRevised). `deliverByLatest` is never earlier than `previousDeliverByLatest`. `nodeId` is the
+        new witness node; when it changed the book hold moved in the same transaction.'
+      tags:
+      - name: promise
+      payload:
+        $ref: '#/components/schemas/PromiseRevisedEvent'
+      examples:
+      - name: promiseRevised
+        summary: A promise moved to a later window (re-promise), never earlier.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0004
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promise.PromiseRevised
+          subject: prm-7f3a21
+          time: '2026-10-22T21:41:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:events:PromiseRevised:v1
+          data:
+            promiseId: prm-7f3a21
+            orderId: ord-55a901
+            revisionNo: 1
+            previousDeliverByLatest: '2026-10-24T02:00:00Z'
+            deliverByEarliest: '2026-10-24T14:00:00Z'
+            deliverByLatest: '2026-10-25T02:00:00Z'
+            shipBy: '2026-10-23T23:00:00Z'
+            nodeId: N-VWS-AUS3
+            reason: DEPARTURE_CANCELLED
+    PromiseKept:
+      name: PromiseKept
+      title: Promise kept
+      summary: The group was delivered on or before deliverByLatest.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseKept`; `dataschema` = `urn:retailnetwork:delivery-promise:events:PromiseKept:v1`;
+        subject and key = the promiseId. Topic: retailnetwork.delivery-promise.events. Raised by JudgePromise when the LAST
+        package of the group is delivered (G1). Consumed by node-performance and customer-ordering.'
+      tags:
+      - name: promise
+      payload:
+        $ref: '#/components/schemas/PromiseKeptEvent'
+      examples:
+      - name: promiseKept
+        summary: The group was delivered on or before deliverByLatest.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0005
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promise.PromiseKept
+          subject: prm-7f3a21
+          time: '2026-10-23T18:30:05Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:events:PromiseKept:v1
+          data:
+            promiseId: prm-7f3a21
+            orderId: ord-55a901
+            nodeId: N-VWS-AUS3
+            deliveredAt: '2026-10-23T18:30:00Z'
+            deliverByLatest: '2026-10-24T02:00:00Z'
+    PromiseBroken:
+      name: PromiseBroken
+      title: Promise broken
+      summary: The group was delivered late, lost or returned.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseBroken`; `dataschema` = `urn:retailnetwork:delivery-promise:events:PromiseBroken:v1`;
+        subject and key = the promiseId. Topic: retailnetwork.delivery-promise.events. Raised by JudgePromise. `cause` is
+        LATE (delivered after deliverByLatest), LOST (first package lost, E6) or RETURNED (first package returned before delivery,
+        E6). For LOST and RETURNED `deliveredAt` is omitted and `lateByMinutes` is the whole minutes from deliverByLatest
+        to the loss/return instant, 0 when that instant is not later. Consumed by node-performance and customer-ordering.'
+      tags:
+      - name: promise
+      payload:
+        $ref: '#/components/schemas/PromiseBrokenEvent'
+      examples:
+      - name: promiseBroken
+        summary: The group was delivered late, lost or returned.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0006
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promise.PromiseBroken
+          subject: prm-7f3a21
+          time: '2026-10-24T03:00:05Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:events:PromiseBroken:v1
+          data:
+            promiseId: prm-7f3a21
+            orderId: ord-55a901
+            nodeId: N-VWS-AUS3
+            deliveredAt: '2026-10-24T03:00:00Z'
+            deliverByLatest: '2026-10-24T02:00:00Z'
+            lateByMinutes: 60
+            cause: LATE
+    PromiseReleased:
+      name: PromiseReleased
+      title: Promise released
+      summary: A provisional hold expired and its capacity was released.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseReleased`; `dataschema` = `urn:retailnetwork:delivery-promise:analytics:PromiseReleased:v1`;
+        subject and key = the promiseId. Topic: retailnetwork.delivery-promise.analytics. Raised by ReleaseExpiredHolds. ANALYTICS
+        ONLY. `reason` is HOLD_EXPIRED. The synchronous confirm (E7) makes a dead promise visible to checkout, so no integration
+        consumer needs this event.'
+      tags:
+      - name: promise
+      payload:
+        $ref: '#/components/schemas/PromiseReleasedEvent'
+      examples:
+      - name: promiseReleased
+        summary: A provisional hold expired and its capacity was released.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0007
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promise.PromiseReleased
+          subject: prm-7f3a21
+          time: '2026-10-22T19:25:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:analytics:PromiseReleased:v1
+          data:
+            promiseId: prm-7f3a21
+            reason: HOLD_EXPIRED
+    PromiseCancelled:
+      name: PromiseCancelled
+      title: Promise cancelled
+      summary: A confirmed or at-risk promise was cancelled and its confirmed capacity released.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseCancelled`; `dataschema` = `urn:retailnetwork:delivery-promise:analytics:PromiseCancelled:v1`;
+        subject and key = the promiseId. Topic: retailnetwork.delivery-promise.analytics. Raised by CancelPromise on CustomerOrderCancelled
+        (G21). ANALYTICS ONLY. `reason` is the cancellation reason of the order.'
+      tags:
+      - name: promise
+      payload:
+        $ref: '#/components/schemas/PromiseCancelledEvent'
+      examples:
+      - name: promiseCancelled
+        summary: A confirmed or at-risk promise was cancelled and its confirmed capacity released.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0008
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promise.PromiseCancelled
+          subject: prm-7f3a21
+          time: '2026-10-22T20:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:analytics:PromiseCancelled:v1
+          data:
+            promiseId: prm-7f3a21
+            orderId: ord-55a901
+            reason: CUSTOMER_REQUEST
+    PromiseUnkeepable:
+      name: PromiseUnkeepable
+      title: Promise unkeepable
+      summary: Re-promising found no feasible path at any tier.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseUnkeepable`; `dataschema` = `urn:retailnetwork:delivery-promise:events:PromiseUnkeepable:v1`;
+        subject and key = the promiseId. Topic: retailnetwork.delivery-promise.events. Raised by RevisePromise when RepromiseOnRisk
+        finds no path even at STANDARD (E9, G10). The promise stays AT_RISK. customer-ordering consumes it and cancels the
+        group; its CustomerOrderCancelled then cancels the promise. At most once per promise (a repeated trigger raises nothing).
+        `reason` repeats the risk reason that started the re-promise.'
+      tags:
+      - name: promise
+      payload:
+        $ref: '#/components/schemas/PromiseUnkeepableEvent'
+      examples:
+      - name: promiseUnkeepable
+        summary: Re-promising found no feasible path at any tier.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0009
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promise.PromiseUnkeepable
+          subject: prm-7f3a21
+          time: '2026-10-22T21:42:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:events:PromiseUnkeepable:v1
+          data:
+            promiseId: prm-7f3a21
+            orderId: ord-55a901
+            groupNo: 1
+            reason: NODE_UNSOURCEABLE
+    PromiseBookExhausted:
+      name: PromiseBookExhausted
+      title: Promise book exhausted
+      summary: A node pickup cutoff has no promise capacity left.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promisebook.PromiseBookExhausted`; `dataschema`
+        = `urn:retailnetwork:delivery-promise:events:PromiseBookExhausted:v1`; subject and key = the bookId. Topic: retailnetwork.delivery-promise.events.
+        Raised by HoldCapacity when provisional + confirmed reaches share. Consumed by order-sourcing. `share` is the orders
+        the book may hold (G9).'
+      tags:
+      - name: promisebook
+      payload:
+        $ref: '#/components/schemas/PromiseBookExhaustedEvent'
+      examples:
+      - name: promiseBookExhausted
+        summary: A node pickup cutoff has no promise capacity left.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a000a
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promisebook.PromiseBookExhausted
+          subject: N-VWS-AUS3:dep-AUS3-1800
+          time: '2026-10-22T19:09:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:events:PromiseBookExhausted:v1
+          data:
+            bookId: N-VWS-AUS3:dep-AUS3-1800
+            nodeId: N-VWS-AUS3
+            pickupDepartureId: dep-AUS3-1800
+            share: 2500
+    DeliveryOfferQuoted:
+      name: DeliveryOfferQuoted
+      title: Delivery offer quoted
+      summary: A delivery offer was quoted (one event per offer).
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.deliveryoffer.DeliveryOfferQuoted`; `dataschema`
+        = `urn:retailnetwork:delivery-promise:analytics:DeliveryOfferQuoted:v1`; subject and key = the offerId. Topic: retailnetwork.delivery-promise.analytics.
+        Raised by QuoteDeliveryOffers, one per persisted offer. ANALYTICS ONLY (model notes on DeliveryOffer). Not an integration
+        event.'
+      tags:
+      - name: deliveryoffer
+      payload:
+        $ref: '#/components/schemas/DeliveryOfferQuotedEvent'
+      examples:
+      - name: deliveryOfferQuoted
+        summary: A delivery offer was quoted (one event per offer).
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a000b
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.deliveryoffer.DeliveryOfferQuoted
+          subject: off-19c4d0
+          time: '2026-10-22T19:05:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:analytics:DeliveryOfferQuoted:v1
+          data:
+            offerId: off-19c4d0
+            tier: NEXT_DAY
+            destinationPostalPrefix: '787'
+            nodeId: N-VWS-AUS3
+            deliverByEarliest: '2026-10-23T14:00:00Z'
+            deliverByLatest: '2026-10-24T02:00:00Z'
+            basis: SCHEDULED
+            policyVersion: v3
+            expiresAt: '2026-10-22T19:15:00Z'
+    PromisePolicyPublished:
+      name: PromisePolicyPublished
+      title: Promise policy published
+      summary: A new promise policy version was published.
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.promisepolicy.PromisePolicyPublished`; `dataschema`
+        = `urn:retailnetwork:delivery-promise:analytics:PromisePolicyPublished:v1`; subject and key = the policyVersion. Topic:
+        retailnetwork.delivery-promise.analytics. Raised by PublishPromisePolicy (G19). ANALYTICS ONLY. `policyVersion` is
+        ''v'' + version; `orderDeadlines[].localTime` is HH:mm in the destination delivery station''s time zone.'
+      tags:
+      - name: promisepolicy
+      payload:
+        $ref: '#/components/schemas/PromisePolicyPublishedEvent'
+      examples:
+      - name: promisePolicyPublished
+        summary: A new promise policy version was published.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a000c
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.promisepolicy.PromisePolicyPublished
+          subject: v3
+          time: '2026-10-22T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:analytics:PromisePolicyPublished:v1
+          data:
+            policyVersion: v3
+            version: 3
+            offerTtlMinutes: 10
+            holdTtlMinutes: 15
+            packagesPerOrder: 1
+            capacitySharePercent: 100
+            orderDeadlines:
+            - tier: NEXT_DAY
+              regionId: R-SC
+              localTime: '23:59'
+            publishedAt: '2026-10-22T12:00:00Z'
+    CustomerOrderPlaced:
+      name: CustomerOrderPlaced
+      title: An order was placed
+      summary: An order was placed.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.customer-ordering.events`; `type` = `com.retailnetwork.commerce.customer-ordering.customerorder.CustomerOrderPlaced`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Reconciling confirm: a promise still PROVISIONAL inside its hold is confirmed (a repeated
+        confirm after the synchronous one is a no-op); orderId/groupNo are recorded on the promise.'
+      tags:
+      - name: consumed-customer-ordering
+      payload:
+        $ref: '#/components/schemas/CustomerOrderPlacedConsumed'
+      examples:
+      - name: customerOrderPlaced
+        summary: An order was placed.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a000d
+          source: /retailnetwork/customer-ordering
+          type: com.retailnetwork.commerce.customer-ordering.customerorder.CustomerOrderPlaced
+          subject: ord-55a901
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-ordering:events:CustomerOrderPlaced:v1
+          data:
+            orderId: ord-55a901
+            groups:
+            - groupNo: 1
+              promiseId: prm-7f3a21
+    CustomerOrderCancelled:
+      name: CustomerOrderCancelled
+      title: An order (or some of its groups) was cancelled
+      summary: An order (or some of its groups) was cancelled.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.customer-ordering.events`; `type` = `com.retailnetwork.commerce.customer-ordering.customerorder.CustomerOrderCancelled`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: CancelPromise for each named group (G21).'
+      tags:
+      - name: consumed-customer-ordering
+      payload:
+        $ref: '#/components/schemas/CustomerOrderCancelledConsumed'
+      examples:
+      - name: customerOrderCancelled
+        summary: An order (or some of its groups) was cancelled.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a000e
+          source: /retailnetwork/customer-ordering
+          type: com.retailnetwork.commerce.customer-ordering.customerorder.CustomerOrderCancelled
+          subject: ord-55a901
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:customer-ordering:events:CustomerOrderCancelled:v1
+          data:
+            orderId: ord-55a901
+            reason: CUSTOMER_REQUEST
+            groupNos:
+            - 1
+    FulfillmentLocked:
+      name: FulfillmentLocked
+      title: The vendor accepted; the path is locked
+      summary: The vendor accepted; the path is locked.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.order-sourcing.events`; `type` = `com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentLocked`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Records assignmentId -> (promiseId, orderId, groupNo) (E1). promiseId, orderId and groupNo
+        were added by contracts-delta E1.'
+      tags:
+      - name: consumed-order-sourcing
+      payload:
+        $ref: '#/components/schemas/FulfillmentLockedConsumed'
+      examples:
+      - name: fulfillmentLocked
+        summary: The vendor accepted; the path is locked.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a000f
+          source: /retailnetwork/order-sourcing
+          type: com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentLocked
+          subject: asg-31b7
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:order-sourcing:events:FulfillmentLocked:v1
+          data:
+            assignmentId: asg-31b7
+            orderId: ord-55a901
+            groupNo: 1
+            promiseId: prm-7f3a21
+            nodeId: N-VWS-AUS3
+    FulfillmentShipped:
+      name: FulfillmentShipped
+      title: The vendor shipped the group
+      summary: The vendor shipped the group.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.order-sourcing.events`; `type` = `com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentShipped`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Records the package set of the group; the group is judged when its last package is delivered
+        (E1).'
+      tags:
+      - name: consumed-order-sourcing
+      payload:
+        $ref: '#/components/schemas/FulfillmentShippedConsumed'
+      examples:
+      - name: fulfillmentShipped
+        summary: The vendor shipped the group.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0010
+          source: /retailnetwork/order-sourcing
+          type: com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentShipped
+          subject: asg-31b7
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:order-sourcing:events:FulfillmentShipped:v1
+          data:
+            assignmentId: asg-31b7
+            orderId: ord-55a901
+            groupNo: 1
+            trackingNumbers:
+            - TRK-1001
+    FulfillmentUnsourceable:
+      name: FulfillmentUnsourceable
+      title: No node can fulfil the group
+      summary: No node can fulfil the group.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.order-sourcing.events`; `type` = `com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentUnsourceable`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: FlagPromiseAtRisk then RevisePromise excluding excludedNodes; PromiseUnkeepable when nothing
+        is feasible (E9).'
+      tags:
+      - name: consumed-order-sourcing
+      payload:
+        $ref: '#/components/schemas/FulfillmentUnsourceableConsumed'
+      examples:
+      - name: fulfillmentUnsourceable
+        summary: No node can fulfil the group.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0011
+          source: /retailnetwork/order-sourcing
+          type: com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentUnsourceable
+          subject: asg-31b7
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:order-sourcing:events:FulfillmentUnsourceable:v1
+          data:
+            assignmentId: asg-31b7
+            orderId: ord-55a901
+            groupNo: 1
+            promiseId: prm-7f3a21
+            excludedNodes:
+            - N-VWS-AUS3
+            reason: ALL_NODES_REFUSED
+    PackageDelivered:
+      name: PackageDelivered
+      title: A package was delivered
+      summary: A package was delivered.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.shipping-and-tracking.events`; `type` = `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageDelivered`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Recorded as a package outcome; JudgePromise when the last package of the group is delivered.'
+      tags:
+      - name: consumed-shipping-and-tracking
+      payload:
+        $ref: '#/components/schemas/PackageDeliveredConsumed'
+      examples:
+      - name: packageDelivered
+        summary: A package was delivered.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0012
+          source: /retailnetwork/shipping-and-tracking
+          type: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageDelivered
+          subject: TRK-1001
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shipping-and-tracking:events:PackageDelivered:v1
+          data:
+            trackingNumber: TRK-1001
+            assignmentId: asg-31b7
+            orderId: ord-55a901
+            deliveredAt: '2026-10-23T18:30:00Z'
+    PackageExceptionRaised:
+      name: PackageExceptionRaised
+      title: A package raised a tracking exception
+      summary: A package raised a tracking exception.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.shipping-and-tracking.events`; `type` = `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageExceptionRaised`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: FlagPromiseAtRisk then RevisePromise (RepromiseOnRisk).'
+      tags:
+      - name: consumed-shipping-and-tracking
+      payload:
+        $ref: '#/components/schemas/PackageExceptionRaisedConsumed'
+      examples:
+      - name: packageExceptionRaised
+        summary: A package raised a tracking exception.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0013
+          source: /retailnetwork/shipping-and-tracking
+          type: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageExceptionRaised
+          subject: TRK-1001
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shipping-and-tracking:events:PackageExceptionRaised:v1
+          data:
+            trackingNumber: TRK-1001
+            assignmentId: asg-31b7
+            orderId: ord-55a901
+            reason: NO_SCAN
+            at: '2026-10-23T08:00:00Z'
+    PackageLost:
+      name: PackageLost
+      title: A package was declared lost (integration event, E6)
+      summary: A package was declared lost (integration event, E6).
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.shipping-and-tracking.events`; `type` = `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageLost`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: JudgePromise BROKEN, cause LOST, at the first lost package.'
+      tags:
+      - name: consumed-shipping-and-tracking
+      payload:
+        $ref: '#/components/schemas/PackageLostConsumed'
+      examples:
+      - name: packageLost
+        summary: A package was declared lost (integration event, E6).
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0014
+          source: /retailnetwork/shipping-and-tracking
+          type: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageLost
+          subject: TRK-1001
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shipping-and-tracking:events:PackageLost:v1
+          data:
+            trackingNumber: TRK-1001
+            orderId: ord-55a901
+            declaredAt: '2026-10-24T09:00:00Z'
+    PackageReturned:
+      name: PackageReturned
+      title: A package was returned to sender before delivery (integration event, E6)
+      summary: A package was returned to sender before delivery (integration event, E6).
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.shipping-and-tracking.events`; `type` = `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageReturned`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: JudgePromise BROKEN, cause RETURNED, at the first returned package.'
+      tags:
+      - name: consumed-shipping-and-tracking
+      payload:
+        $ref: '#/components/schemas/PackageReturnedConsumed'
+      examples:
+      - name: packageReturned
+        summary: A package was returned to sender before delivery (integration event, E6).
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0015
+          source: /retailnetwork/shipping-and-tracking
+          type: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageReturned
+          subject: TRK-1001
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shipping-and-tracking:events:PackageReturned:v1
+          data:
+            trackingNumber: TRK-1001
+            orderId: ord-55a901
+            returnedAt: '2026-10-24T09:00:00Z'
+    DepartureScheduled:
+      name: DepartureScheduled
+      title: A departure was scheduled
+      summary: A departure was scheduled.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.linehaul-transportation.events`; `type` = `com.retailnetwork.logistics.linehaul-transportation.departure.DepartureScheduled`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts DepartureView.'
+      tags:
+      - name: consumed-linehaul-transportation
+      payload:
+        $ref: '#/components/schemas/DepartureScheduledConsumed'
+      examples:
+      - name: departureScheduled
+        summary: A departure was scheduled.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0016
+          source: /retailnetwork/linehaul-transportation
+          type: com.retailnetwork.logistics.linehaul-transportation.departure.DepartureScheduled
+          subject: dep-AUS3-1800
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:linehaul-transportation:events:DepartureScheduled:v1
+          data:
+            departureId: dep-AUS3-1800
+            laneId: lane-aus3-sau1
+            kind: PICKUP
+            originNodeId: N-VWS-AUS3
+            destinationNodeId: N-SAU1
+            cutoffAt: '2026-10-22T23:00:00Z'
+            departsAt: '2026-10-22T23:15:00Z'
+            arrivesAt: '2026-10-23T00:15:00Z'
+            capacityPackages: 40
+    DepartureCapacityChanged:
+      name: DepartureCapacityChanged
+      title: A departure's booked capacity changed
+      summary: A departure's booked capacity changed.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.linehaul-transportation.events`; `type` = `com.retailnetwork.logistics.linehaul-transportation.departure.DepartureCapacityChanged`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Updates DepartureView remaining capacity.'
+      tags:
+      - name: consumed-linehaul-transportation
+      payload:
+        $ref: '#/components/schemas/DepartureCapacityChangedConsumed'
+      examples:
+      - name: departureCapacityChanged
+        summary: A departure's booked capacity changed.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0017
+          source: /retailnetwork/linehaul-transportation
+          type: com.retailnetwork.logistics.linehaul-transportation.departure.DepartureCapacityChanged
+          subject: dep-AUS3-1800
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:linehaul-transportation:events:DepartureCapacityChanged:v1
+          data:
+            departureId: dep-AUS3-1800
+            capacityPackages: 40
+            bookedPackages: 12
+            remainingPackages: 28
+    DepartureCancelled:
+      name: DepartureCancelled
+      title: A departure was cancelled
+      summary: A departure was cancelled.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.linehaul-transportation.events`; `type` = `com.retailnetwork.logistics.linehaul-transportation.departure.DepartureCancelled`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Marks the departure cancelled and flags every CONFIRMED promise whose witness path uses it
+        AT_RISK (RepromiseOnRisk).'
+      tags:
+      - name: consumed-linehaul-transportation
+      payload:
+        $ref: '#/components/schemas/DepartureCancelledConsumed'
+      examples:
+      - name: departureCancelled
+        summary: A departure was cancelled.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0018
+          source: /retailnetwork/linehaul-transportation
+          type: com.retailnetwork.logistics.linehaul-transportation.departure.DepartureCancelled
+          subject: dep-SAU1-DAU1-2200
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:linehaul-transportation:events:DepartureCancelled:v1
+          data:
+            departureId: dep-SAU1-DAU1-2200
+            reason: WEATHER
+            cancelledAt: '2026-10-22T21:40:00Z'
+    BookingMoved:
+      name: BookingMoved
+      title: A booking was rebooked onto the next departure (E13)
+      summary: A booking was rebooked onto the next departure (E13).
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.linehaul-transportation.events`; `type` = `com.retailnetwork.logistics.linehaul-transportation.departure.BookingMoved`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: RepromiseOnRisk: recompute from the new departure.'
+      tags:
+      - name: consumed-linehaul-transportation
+      payload:
+        $ref: '#/components/schemas/BookingMovedConsumed'
+      examples:
+      - name: bookingMoved
+        summary: A booking was rebooked onto the next departure (E13).
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0019
+          source: /retailnetwork/linehaul-transportation
+          type: com.retailnetwork.logistics.linehaul-transportation.departure.BookingMoved
+          subject: asg-31b7
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:linehaul-transportation:events:BookingMoved:v1
+          data:
+            assignmentId: asg-31b7
+            fromDepartureId: dep-AUS3-1800
+            toDepartureId: dep-AUS3-0600
+    BookingFailed:
+      name: BookingFailed
+      title: No departure fits the booking (E13)
+      summary: No departure fits the booking (E13).
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.linehaul-transportation.events`; `type` = `com.retailnetwork.logistics.linehaul-transportation.departure.BookingFailed`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: RepromiseOnRisk.'
+      tags:
+      - name: consumed-linehaul-transportation
+      payload:
+        $ref: '#/components/schemas/BookingFailedConsumed'
+      examples:
+      - name: bookingFailed
+        summary: No departure fits the booking (E13).
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a001a
+          source: /retailnetwork/linehaul-transportation
+          type: com.retailnetwork.logistics.linehaul-transportation.departure.BookingFailed
+          subject: asg-31b7
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:linehaul-transportation:events:BookingFailed:v1
+          data:
+            assignmentId: asg-31b7
+            departureId: dep-AUS3-1800
+            reason: DEPARTURE_FULL
+    DeliveryWaveScheduled:
+      name: DeliveryWaveScheduled
+      title: A delivery wave was scheduled
+      summary: A delivery wave was scheduled.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.last-mile-delivery.events`; `type` = `com.retailnetwork.logistics.last-mile-delivery.wave.DeliveryWaveScheduled`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts DeliveryWaveView.'
+      tags:
+      - name: consumed-last-mile-delivery
+      payload:
+        $ref: '#/components/schemas/DeliveryWaveScheduledConsumed'
+      examples:
+      - name: deliveryWaveScheduled
+        summary: A delivery wave was scheduled.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a001b
+          source: /retailnetwork/last-mile-delivery
+          type: com.retailnetwork.logistics.last-mile-delivery.wave.DeliveryWaveScheduled
+          subject: W-DAU1-1023-A
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:last-mile-delivery:events:DeliveryWaveScheduled:v1
+          data:
+            waveId: W-DAU1-1023-A
+            stationNodeId: N-DAU1
+            serviceDate: '2026-10-23'
+            inductCutoffAt: '2026-10-23T11:00:00Z'
+            windowStart: '2026-10-23T14:00:00Z'
+            windowEnd: '2026-10-24T02:00:00Z'
+            stopCapacity: 320
+    DeliveryWaveCapacityChanged:
+      name: DeliveryWaveCapacityChanged
+      title: A wave's assigned stops changed
+      summary: A wave's assigned stops changed.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.last-mile-delivery.events`; `type` = `com.retailnetwork.logistics.last-mile-delivery.wave.DeliveryWaveCapacityChanged`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Updates DeliveryWaveView remaining stops.'
+      tags:
+      - name: consumed-last-mile-delivery
+      payload:
+        $ref: '#/components/schemas/DeliveryWaveCapacityChangedConsumed'
+      examples:
+      - name: deliveryWaveCapacityChanged
+        summary: A wave's assigned stops changed.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a001c
+          source: /retailnetwork/last-mile-delivery
+          type: com.retailnetwork.logistics.last-mile-delivery.wave.DeliveryWaveCapacityChanged
+          subject: W-DAU1-1023-A
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:last-mile-delivery:events:DeliveryWaveCapacityChanged:v1
+          data:
+            waveId: W-DAU1-1023-A
+            stopCapacity: 320
+            assignedStops: 20
+            remainingStops: 300
+    DeliveryWaveCancelled:
+      name: DeliveryWaveCancelled
+      title: A wave was cancelled (integration event, E5)
+      summary: A wave was cancelled (integration event, E5).
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.last-mile-delivery.events`; `type` = `com.retailnetwork.logistics.last-mile-delivery.wave.DeliveryWaveCancelled`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Marks the wave cancelled and flags every CONFIRMED promise whose witness wave it is AT_RISK.'
+      tags:
+      - name: consumed-last-mile-delivery
+      payload:
+        $ref: '#/components/schemas/DeliveryWaveCancelledConsumed'
+      examples:
+      - name: deliveryWaveCancelled
+        summary: A wave was cancelled (integration event, E5).
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a001d
+          source: /retailnetwork/last-mile-delivery
+          type: com.retailnetwork.logistics.last-mile-delivery.wave.DeliveryWaveCancelled
+          subject: W-DAU1-1023-A
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:last-mile-delivery:events:DeliveryWaveCancelled:v1
+          data:
+            waveId: W-DAU1-1023-A
+            reason: WEATHER
+    PackageInductionDeferred:
+      name: PackageInductionDeferred
+      title: A package could not be inducted on a wave (E15)
+      summary: A package could not be inducted on a wave (E15).
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.last-mile-delivery.events`; `type` = `com.retailnetwork.logistics.last-mile-delivery.package.PackageInductionDeferred`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: RepromiseOnRisk: treated as a risk to the group''s promise.'
+      tags:
+      - name: consumed-last-mile-delivery
+      payload:
+        $ref: '#/components/schemas/PackageInductionDeferredConsumed'
+      examples:
+      - name: packageInductionDeferred
+        summary: A package could not be inducted on a wave (E15).
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a001e
+          source: /retailnetwork/last-mile-delivery
+          type: com.retailnetwork.logistics.last-mile-delivery.package.PackageInductionDeferred
+          subject: TRK-1001
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:last-mile-delivery:events:PackageInductionDeferred:v1
+          data:
+            trackingNumber: TRK-1001
+            assignmentId: asg-31b7
+    NodeScorecardUpdated:
+      name: NodeScorecardUpdated
+      title: A node scorecard was recomputed
+      summary: A node scorecard was recomputed.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-performance.events`; `type` = `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts ScorecardView (grade of the 30d window; PROVISIONAL adds no handicap).'
+      tags:
+      - name: consumed-node-performance
+      payload:
+        $ref: '#/components/schemas/NodeScorecardUpdatedConsumed'
+      examples:
+      - name: nodeScorecardUpdated
+        summary: A node scorecard was recomputed.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a001f
+          source: /retailnetwork/node-performance
+          type: com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated
+          subject: N-VWS-AUS3
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-performance:events:NodeScorecardUpdated:v1
+          data:
+            nodeId: N-VWS-AUS3
+            window: 30d
+            grade: B
+            observations: 120
+            computedAt: '2026-10-22T06:00:00Z'
+    NodeRegistered:
+      name: NodeRegistered
+      title: A node was registered
+      summary: A node was registered.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-topology.events`; `type` = `com.retailnetwork.logistics.node-topology.node.NodeRegistered`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts NodeProfileView.'
+      tags:
+      - name: consumed-node-topology
+      payload:
+        $ref: '#/components/schemas/NodeRegisteredConsumed'
+      examples:
+      - name: nodeRegistered
+        summary: A node was registered.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0020
+          source: /retailnetwork/node-topology
+          type: com.retailnetwork.logistics.node-topology.node.NodeRegistered
+          subject: N-VWS-AUS3
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-topology:events:NodeRegistered:v1
+          data:
+            nodeId: N-VWS-AUS3
+            nodeType: FULFILLMENT_CENTER
+            subtype: SUB_SAME_DAY
+            operator: VENDOR
+            regionId: R-SC
+            timezone: America/Chicago
+    NodeOperationalProfileDeclared:
+      name: NodeOperationalProfileDeclared
+      title: A node operational profile revision was declared
+      summary: A node operational profile revision was declared.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-topology.events`; `type` = `com.retailnetwork.logistics.node-topology.node.NodeOperationalProfileDeclared`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts NodeProfileView; a profileRevision not above the stored one is ignored.'
+      tags:
+      - name: consumed-node-topology
+      payload:
+        $ref: '#/components/schemas/NodeOperationalProfileDeclaredConsumed'
+      examples:
+      - name: nodeOperationalProfileDeclared
+        summary: A node operational profile revision was declared.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0021
+          source: /retailnetwork/node-topology
+          type: com.retailnetwork.logistics.node-topology.node.NodeOperationalProfileDeclared
+          subject: N-VWS-AUS3
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-topology:events:NodeOperationalProfileDeclared:v1
+          data:
+            nodeId: N-VWS-AUS3
+            profileRevision: 2
+            timezone: America/Chicago
+            operatingHoursByDay:
+              monday:
+                start: 06:00
+                end: '22:00'
+            holidays:
+            - '2026-12-25'
+            handlingTimeMinutes: 95
+            cutoffs:
+            - localTime: '18:00'
+              maxOrders: 2500
+            throughputCap:
+              value: 400
+              timeUnit: HOUR
+              unit: ORDER
+    NodeActivated:
+      name: NodeActivated
+      title: A node became ACTIVE
+      summary: A node became ACTIVE.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-topology.events`; `type` = `com.retailnetwork.logistics.node-topology.node.NodeActivated`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Updates the NodeProfileView state; only ACTIVE nodes are quoted.'
+      tags:
+      - name: consumed-node-topology
+      payload:
+        $ref: '#/components/schemas/NodeActivatedConsumed'
+      examples:
+      - name: nodeActivated
+        summary: A node became ACTIVE.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0022
+          source: /retailnetwork/node-topology
+          type: com.retailnetwork.logistics.node-topology.node.NodeActivated
+          subject: N-VWS-AUS3
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-topology:events:NodeActivated:v1
+          data:
+            nodeId: N-VWS-AUS3
+            activatedAt: '2026-10-01T00:00:00Z'
+    NodeSuspended:
+      name: NodeSuspended
+      title: A node was suspended
+      summary: A node was suspended.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-topology.events`; `type` = `com.retailnetwork.logistics.node-topology.node.NodeSuspended`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Updates the NodeProfileView state; only ACTIVE nodes are quoted.'
+      tags:
+      - name: consumed-node-topology
+      payload:
+        $ref: '#/components/schemas/NodeSuspendedConsumed'
+      examples:
+      - name: nodeSuspended
+        summary: A node was suspended.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0023
+          source: /retailnetwork/node-topology
+          type: com.retailnetwork.logistics.node-topology.node.NodeSuspended
+          subject: N-VWS-AUS3
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-topology:events:NodeSuspended:v1
+          data:
+            nodeId: N-VWS-AUS3
+            reason: PLANNED
+            suspendedAt: '2026-10-22T00:00:00Z'
+    NodeRetired:
+      name: NodeRetired
+      title: A node was retired
+      summary: A node was retired.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-topology.events`; `type` = `com.retailnetwork.logistics.node-topology.node.NodeRetired`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Updates the NodeProfileView state; only ACTIVE nodes are quoted.'
+      tags:
+      - name: consumed-node-topology
+      payload:
+        $ref: '#/components/schemas/NodeRetiredConsumed'
+      examples:
+      - name: nodeRetired
+        summary: A node was retired.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0024
+          source: /retailnetwork/node-topology
+          type: com.retailnetwork.logistics.node-topology.node.NodeRetired
+          subject: N-VWS-AUS3
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-topology:events:NodeRetired:v1
+          data:
+            nodeId: N-VWS-AUS3
+            retiredAt: '2026-10-22T00:00:00Z'
+    LaneOpened:
+      name: LaneOpened
+      title: A lane was opened
+      summary: A lane was opened.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-topology.events`; `type` = `com.retailnetwork.logistics.node-topology.lane.LaneOpened`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts LaneView (nominal STANDARD fallback).'
+      tags:
+      - name: consumed-node-topology
+      payload:
+        $ref: '#/components/schemas/LaneOpenedConsumed'
+      examples:
+      - name: laneOpened
+        summary: A lane was opened.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0025
+          source: /retailnetwork/node-topology
+          type: com.retailnetwork.logistics.node-topology.lane.LaneOpened
+          subject: lane-aus3-sau1
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-topology:events:LaneOpened:v1
+          data:
+            laneId: lane-aus3-sau1
+            originNodeId: N-VWS-AUS3
+            destinationNodeId: N-SAU1
+            mode: GROUND
+            nominalTransitMinutes: 75
+    LaneClosed:
+      name: LaneClosed
+      title: A lane was closed
+      summary: A lane was closed.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-topology.events`; `type` = `com.retailnetwork.logistics.node-topology.lane.LaneClosed`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Marks the LaneView row closed.'
+      tags:
+      - name: consumed-node-topology
+      payload:
+        $ref: '#/components/schemas/LaneClosedConsumed'
+      examples:
+      - name: laneClosed
+        summary: A lane was closed.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0026
+          source: /retailnetwork/node-topology
+          type: com.retailnetwork.logistics.node-topology.lane.LaneClosed
+          subject: lane-aus3-sau1
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-topology:events:LaneClosed:v1
+          data:
+            laneId: lane-aus3-sau1
+            closedAt: '2026-10-22T00:00:00Z'
+    ServiceAreaAssigned:
+      name: ServiceAreaAssigned
+      title: A postal prefix was assigned to a delivery station
+      summary: A postal prefix was assigned to a delivery station.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-topology.events`; `type` = `com.retailnetwork.logistics.node-topology.servicearea.ServiceAreaAssigned`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts RegionAndServiceAreaView; an assignmentVersion not above the stored one is ignored.'
+      tags:
+      - name: consumed-node-topology
+      payload:
+        $ref: '#/components/schemas/ServiceAreaAssignedConsumed'
+      examples:
+      - name: serviceAreaAssigned
+        summary: A postal prefix was assigned to a delivery station.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0027
+          source: /retailnetwork/node-topology
+          type: com.retailnetwork.logistics.node-topology.servicearea.ServiceAreaAssigned
+          subject: '787'
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-topology:events:ServiceAreaAssigned:v1
+          data:
+            postalPrefix: '787'
+            deliveryStationNodeId: N-DAU1
+            regionId: R-SC
+            assignmentVersion: 1
+    RegionDefined:
+      name: RegionDefined
+      title: A region was defined
+      summary: A region was defined.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-topology.events`; `type` = `com.retailnetwork.logistics.node-topology.region.RegionDefined`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts RegionAndServiceAreaView.'
+      tags:
+      - name: consumed-node-topology
+      payload:
+        $ref: '#/components/schemas/RegionDefinedConsumed'
+      examples:
+      - name: regionDefined
+        summary: A region was defined.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0028
+          source: /retailnetwork/node-topology
+          type: com.retailnetwork.logistics.node-topology.region.RegionDefined
+          subject: R-SC
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-topology:events:RegionDefined:v1
+          data:
+            regionId: R-SC
+            code: SC
+            name: South Central
+    CatalogItemCreated:
+      name: CatalogItemCreated
+      title: A catalogue item was created
+      summary: A catalogue item was created.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.offer-availability.events`; `type` = `com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts AvailabilityView (item known, not discontinued).'
+      tags:
+      - name: consumed-offer-availability
+      payload:
+        $ref: '#/components/schemas/CatalogItemCreatedConsumed'
+      examples:
+      - name: catalogItemCreated
+        summary: A catalogue item was created.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0029
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated
+          subject: ci-1001
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:CatalogItemCreated:v1
+          data:
+            catalogItemId: ci-1001
+    CatalogItemDiscontinued:
+      name: CatalogItemDiscontinued
+      title: A catalogue item was discontinued
+      summary: A catalogue item was discontinued.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.offer-availability.events`; `type` = `com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Marks the item discontinued: no offer is quoted for it.'
+      tags:
+      - name: consumed-offer-availability
+      payload:
+        $ref: '#/components/schemas/CatalogItemDiscontinuedConsumed'
+      examples:
+      - name: catalogItemDiscontinued
+        summary: A catalogue item was discontinued.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a002a
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued
+          subject: ci-1001
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:CatalogItemDiscontinued:v1
+          data:
+            catalogItemId: ci-1001
+    ListingCreated:
+      name: ListingCreated
+      title: A listing (item at node) was created
+      summary: A listing (item at node) was created.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.offer-availability.events`; `type` = `com.retailnetwork.commerce.offer-availability.listing.ListingCreated`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Upserts the listing row of AvailabilityView.'
+      tags:
+      - name: consumed-offer-availability
+      payload:
+        $ref: '#/components/schemas/ListingCreatedConsumed'
+      examples:
+      - name: listingCreated
+        summary: A listing (item at node) was created.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a002b
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.listing.ListingCreated
+          subject: lst-1
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:ListingCreated:v1
+          data:
+            listingId: lst-1
+            catalogItemId: ci-1001
+            nodeId: N-VWS-AUS3
+    ListingAvailabilityChanged:
+      name: ListingAvailabilityChanged
+      title: A listing's claimed quantity changed
+      summary: A listing's claimed quantity changed.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.offer-availability.events`; `type` = `com.retailnetwork.commerce.offer-availability.listing.ListingAvailabilityChanged`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Sets availableQty; an asOf older than the stored one is ignored.'
+      tags:
+      - name: consumed-offer-availability
+      payload:
+        $ref: '#/components/schemas/ListingAvailabilityChangedConsumed'
+      examples:
+      - name: listingAvailabilityChanged
+        summary: A listing's claimed quantity changed.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a002c
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.listing.ListingAvailabilityChanged
+          subject: lst-1
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:ListingAvailabilityChanged:v1
+          data:
+            listingId: lst-1
+            catalogItemId: ci-1001
+            nodeId: N-VWS-AUS3
+            availableQty: 37
+            basis: THROUGHPUT_CONSTRAINED
+            asOf: '2026-10-22T19:00:00Z'
+            feedId: feed-9
+    ListingSuppressed:
+      name: ListingSuppressed
+      title: A listing was suppressed
+      summary: A listing was suppressed.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.offer-availability.events`; `type` = `com.retailnetwork.commerce.offer-availability.listing.ListingSuppressed`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Suppressed listings are not quoted.'
+      tags:
+      - name: consumed-offer-availability
+      payload:
+        $ref: '#/components/schemas/ListingSuppressedConsumed'
+      examples:
+      - name: listingSuppressed
+        summary: A listing was suppressed.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a002d
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.listing.ListingSuppressed
+          subject: lst-1
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:ListingSuppressed:v1
+          data:
+            listingId: lst-1
+            nodeId: N-VWS-AUS3
+            reason: STALE_FEED
+    ListingRestored:
+      name: ListingRestored
+      title: A listing was restored
+      summary: A listing was restored.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.offer-availability.events`; `type` = `com.retailnetwork.commerce.offer-availability.listing.ListingRestored`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: Clears the suppression.'
+      tags:
+      - name: consumed-offer-availability
+      payload:
+        $ref: '#/components/schemas/ListingRestoredConsumed'
+      examples:
+      - name: listingRestored
+        summary: A listing was restored.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a002e
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.listing.ListingRestored
+          subject: lst-1
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:ListingRestored:v1
+          data:
+            listingId: lst-1
+            nodeId: N-VWS-AUS3
+  schemas:
+    CloudEventEnvelope:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          format: uuid
+        source:
+          type: string
+          const: /retailnetwork/delivery-promise
+        type: &id001
+          type: string
+        subject:
+          type: string
+          description: The aggregate root id (promiseId, bookId, offerId or policyVersion).
+        time: &id002
+          type: string
+          format: date-time
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema: *id001
+    ConsumedEnvelope:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - time
+      - data
+      description: 'Tolerant envelope of a consumed event: only the attributes the consumer relies on.'
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          format: uuid
+        source: *id001
+        type: *id001
+        subject: *id001
+        time: *id002
+        datacontenttype: *id001
+        dataschema: *id001
+    Tier:
+      type: string
+      enum:
+      - SAME_DAY
+      - NEXT_DAY
+      - TWO_DAY
+      - STANDARD
+    Basis:
+      type: string
+      enum:
+      - SCHEDULED
+      - NOMINAL
+    GroupLine:
+      type: object
+      required:
+      - catalogItemId
+      - quantity
+      properties:
+        catalogItemId: *id001
+        quantity:
+          type: integer
+          minimum: 1
+    OrderDeadline:
+      type: object
+      required:
+      - tier
+      - localTime
+      properties:
+        tier:
+          $ref: '#/components/schemas/Tier'
+        regionId:
+          type: string
+          description: Absent means every region.
+        localTime:
+          type: string
+          pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+    PromiseMadeEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - promiseId
+            - offerId
+            - tier
+            - nodeId
+            - shipBy
+            - deliverByEarliest
+            - deliverByLatest
+            - basis
+            - policyVersion
+            - holdExpiresAt
+            - lines
+            properties:
+              promiseId: *id001
+              offerId: *id001
+              tier:
+                $ref: '#/components/schemas/Tier'
+              nodeId: *id001
+              pickupDepartureId:
+                type: string
+                description: The witness pickup departure; with nodeId it names the PromiseBook (nodeId:pickupDepartureId).
+                  Omitted for a NOMINAL promise, whose witness path carries no departure id (E8).
+              shipBy:
+                type: string
+                format: date-time
+                description: The pickup cutoff at the witness node.
+              deliverByEarliest: *id002
+              deliverByLatest: *id002
+              basis:
+                $ref: '#/components/schemas/Basis'
+              policyVersion: *id001
+              holdExpiresAt: *id002
+              lines:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupLine'
+                description: The shipment group's lines; always present.
+    PromiseConfirmedEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - promiseId
+            - orderId
+            - groupNo
+            properties:
+              promiseId: *id001
+              orderId: *id001
+              groupNo:
+                type: integer
+                description: Shipment group number within the order, from 1.
+    PromiseAtRiskEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - promiseId
+            - orderId
+            - reason
+            - detectedAt
+            properties:
+              promiseId: *id001
+              orderId: *id001
+              reason: *id001
+              detectedAt: *id002
+    PromiseRevisedEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - promiseId
+            - orderId
+            - revisionNo
+            - previousDeliverByLatest
+            - deliverByEarliest
+            - deliverByLatest
+            - shipBy
+            - nodeId
+            - reason
+            properties:
+              promiseId: *id001
+              orderId: *id001
+              revisionNo:
+                type: integer
+                minimum: 1
+                description: Strictly increasing per promise.
+              previousDeliverByLatest: *id002
+              deliverByEarliest: *id002
+              deliverByLatest: *id002
+              shipBy: *id002
+              nodeId: *id001
+              reason: *id001
+    PromiseKeptEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - promiseId
+            - orderId
+            - nodeId
+            - deliveredAt
+            - deliverByLatest
+            properties:
+              promiseId: *id001
+              orderId: *id001
+              nodeId: *id001
+              deliveredAt: *id002
+              deliverByLatest: *id002
+    PromiseBrokenEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - promiseId
+            - orderId
+            - nodeId
+            - deliverByLatest
+            - lateByMinutes
+            - cause
+            properties:
+              promiseId: *id001
+              orderId: *id001
+              nodeId: *id001
+              deliveredAt:
+                type: string
+                format: date-time
+                description: Omitted for cause LOST and RETURNED.
+              deliverByLatest: *id002
+              lateByMinutes:
+                type: integer
+                minimum: 0
+              cause:
+                type: string
+                enum:
+                - LATE
+                - LOST
+                - RETURNED
+    PromiseReleasedEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - promiseId
+            - reason
+            properties:
+              promiseId: *id001
+              reason: *id001
+    PromiseCancelledEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - promiseId
+            - orderId
+            - reason
+            properties:
+              promiseId: *id001
+              orderId: *id001
+              reason: *id001
+    PromiseUnkeepableEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - promiseId
+            - orderId
+            - groupNo
+            - reason
+            properties:
+              promiseId: *id001
+              orderId: *id001
+              groupNo:
+                type: integer
+                description: Shipment group number within the order, from 1.
+              reason: *id001
+    PromiseBookExhaustedEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - bookId
+            - nodeId
+            - pickupDepartureId
+            - share
+            properties:
+              bookId:
+                type: string
+                description: nodeId + ':' + pickupDepartureId
+              nodeId: *id001
+              pickupDepartureId: *id001
+              share:
+                type: integer
+                minimum: 0
+    DeliveryOfferQuotedEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - offerId
+            - tier
+            - destinationPostalPrefix
+            - nodeId
+            - deliverByEarliest
+            - deliverByLatest
+            - basis
+            - policyVersion
+            - expiresAt
+            properties:
+              offerId: *id001
+              tier:
+                $ref: '#/components/schemas/Tier'
+              destinationPostalPrefix: *id001
+              nodeId: *id001
+              deliverByEarliest: *id002
+              deliverByLatest: *id002
+              basis:
+                $ref: '#/components/schemas/Basis'
+              policyVersion: *id001
+              expiresAt: *id002
+    PromisePolicyPublishedEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - policyVersion
+            - version
+            - offerTtlMinutes
+            - holdTtlMinutes
+            - packagesPerOrder
+            - capacitySharePercent
+            - orderDeadlines
+            - publishedAt
+            properties:
+              policyVersion: *id001
+              version:
+                type: integer
+                minimum: 1
+              offerTtlMinutes: &id003
+                type: integer
+              holdTtlMinutes: *id003
+              packagesPerOrder: *id003
+              capacitySharePercent: *id003
+              orderDeadlines:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderDeadline'
+              publishedAt: *id002
+    CustomerOrderPlacedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - orderId
+            - groups
+            properties:
+              orderId: *id001
+              groups:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - groupNo
+                  - promiseId
+                  properties:
+                    groupNo: *id003
+                    promiseId: *id001
+    CustomerOrderCancelledConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - orderId
+            properties:
+              orderId: *id001
+              reason: *id001
+              groupNos:
+                type: array
+                items: *id003
+                description: Empty or absent means every group of the order.
+    FulfillmentLockedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - assignmentId
+            - orderId
+            - groupNo
+            - promiseId
+            properties:
+              assignmentId: *id001
+              orderId: *id001
+              groupNo: *id003
+              promiseId: *id001
+              nodeId: *id001
+    FulfillmentShippedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - assignmentId
+            - trackingNumbers
+            properties:
+              assignmentId: *id001
+              orderId: *id001
+              groupNo: *id003
+              trackingNumbers: &id004
+                type: array
+                items: *id001
+    FulfillmentUnsourceableConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - assignmentId
+            - orderId
+            - groupNo
+            - promiseId
+            properties:
+              assignmentId: *id001
+              orderId: *id001
+              groupNo: *id003
+              promiseId: *id001
+              excludedNodes: *id004
+              reason: *id001
+    PackageDeliveredConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - trackingNumber
+            - deliveredAt
+            properties:
+              trackingNumber: *id001
+              assignmentId: *id001
+              orderId: *id001
+              deliveredAt: *id002
+    PackageExceptionRaisedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - trackingNumber
+            - assignmentId
+            properties:
+              trackingNumber: *id001
+              assignmentId: *id001
+              orderId: *id001
+              reason: *id001
+              at: *id002
+    PackageLostConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - trackingNumber
+            - declaredAt
+            properties:
+              trackingNumber: *id001
+              orderId: *id001
+              declaredAt: *id002
+    PackageReturnedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - trackingNumber
+            - returnedAt
+            properties:
+              trackingNumber: *id001
+              orderId: *id001
+              returnedAt: *id002
+    DepartureScheduledConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - departureId
+            - kind
+            - originNodeId
+            - destinationNodeId
+            - cutoffAt
+            - arrivesAt
+            - capacityPackages
+            properties:
+              departureId: *id001
+              laneId: *id001
+              kind:
+                type: string
+                enum:
+                - PICKUP
+                - LINEHAUL
+                - AIR
+              originNodeId: *id001
+              destinationNodeId: *id001
+              cutoffAt: *id002
+              departsAt: *id002
+              arrivesAt: *id002
+              capacityPackages: *id003
+    DepartureCapacityChangedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - departureId
+            - remainingPackages
+            properties:
+              departureId: *id001
+              capacityPackages: *id003
+              bookedPackages: *id003
+              remainingPackages: *id003
+    DepartureCancelledConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - departureId
+            properties:
+              departureId: *id001
+              reason: *id001
+              cancelledAt: *id002
+    BookingMovedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - assignmentId
+            - fromDepartureId
+            - toDepartureId
+            properties:
+              assignmentId: *id001
+              fromDepartureId: *id001
+              toDepartureId: *id001
+    BookingFailedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - assignmentId
+            - departureId
+            properties:
+              assignmentId: *id001
+              departureId: *id001
+              reason: *id001
+    DeliveryWaveScheduledConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - waveId
+            - stationNodeId
+            - inductCutoffAt
+            - windowStart
+            - windowEnd
+            - stopCapacity
+            properties:
+              waveId: *id001
+              stationNodeId: *id001
+              serviceDate:
+                type: string
+                format: date
+              inductCutoffAt: *id002
+              windowStart: *id002
+              windowEnd: *id002
+              stopCapacity: *id003
+    DeliveryWaveCapacityChangedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - waveId
+            - remainingStops
+            properties:
+              waveId: *id001
+              stopCapacity: *id003
+              assignedStops: *id003
+              remainingStops: *id003
+    DeliveryWaveCancelledConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - waveId
+            properties:
+              waveId: *id001
+              reason: *id001
+    PackageInductionDeferredConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - trackingNumber
+            - assignmentId
+            properties:
+              trackingNumber: *id001
+              assignmentId: *id001
+    NodeScorecardUpdatedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - nodeId
+            - window
+            - grade
+            properties:
+              nodeId: *id001
+              window:
+                type: string
+                enum:
+                - 7d
+                - 30d
+                description: Only the 30d window feeds ScorecardView (E18).
+              grade:
+                type: string
+                enum:
+                - A
+                - B
+                - C
+                - D
+                - PROVISIONAL
+              observations: *id003
+              computedAt: *id002
+    NodeRegisteredConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - nodeId
+            - nodeType
+            - regionId
+            - timezone
+            properties:
+              nodeId: *id001
+              nodeType: *id001
+              subtype:
+                type:
+                - string
+                - 'null'
+              operator: *id001
+              regionId: *id001
+              timezone: *id001
+    NodeOperationalProfileDeclaredConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - nodeId
+            - profileRevision
+            - timezone
+            - operatingHoursByDay
+            - holidays
+            - handlingTimeMinutes
+            - cutoffs
+            - throughputCap
+            properties:
+              nodeId: *id001
+              profileRevision: *id003
+              timezone: *id001
+              operatingHoursByDay:
+                type: object
+                additionalProperties:
+                  type: object
+                  required:
+                  - start
+                  - end
+                  properties:
+                    start: *id001
+                    end: *id001
+              holidays:
+                type: array
+                items:
+                  type: string
+                  format: date
+              handlingTimeMinutes: *id003
+              cutoffs:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - localTime
+                  properties:
+                    localTime: *id001
+                    days:
+                      type: array
+                      items: *id001
+                    maxOrders: *id003
+              throughputCap:
+                type: object
+                required:
+                - value
+                - timeUnit
+                properties:
+                  value: *id003
+                  timeUnit:
+                    type: string
+                    enum:
+                    - HOUR
+                    - DAY
+                  unit: *id001
+              sortDwellMinutes: *id003
+    NodeActivatedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - nodeId
+            properties:
+              nodeId: *id001
+              activatedAt: *id002
+    NodeSuspendedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - nodeId
+            properties:
+              nodeId: *id001
+              reason: *id001
+              suspendedAt: *id002
+    NodeRetiredConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - nodeId
+            properties:
+              nodeId: *id001
+              retiredAt: *id002
+    LaneOpenedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - laneId
+            - originNodeId
+            - destinationNodeId
+            - mode
+            - nominalTransitMinutes
+            properties:
+              laneId: *id001
+              originNodeId: *id001
+              destinationNodeId: *id001
+              mode:
+                type: string
+                enum:
+                - GROUND
+                - AIR
+              nominalTransitMinutes: *id003
+    LaneClosedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - laneId
+            properties:
+              laneId: *id001
+              closedAt: *id002
+    ServiceAreaAssignedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - postalPrefix
+            - deliveryStationNodeId
+            - regionId
+            - assignmentVersion
+            properties:
+              postalPrefix: *id001
+              deliveryStationNodeId: *id001
+              regionId: *id001
+              assignmentVersion: *id003
+    RegionDefinedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - regionId
+            - code
+            properties:
+              regionId: *id001
+              code: *id001
+              name: *id001
+    CatalogItemCreatedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - catalogItemId
+            properties:
+              catalogItemId: *id001
+    CatalogItemDiscontinuedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - catalogItemId
+            properties:
+              catalogItemId: *id001
+    ListingCreatedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - listingId
+            - catalogItemId
+            - nodeId
+            properties:
+              listingId: *id001
+              catalogItemId: *id001
+              nodeId: *id001
+    ListingAvailabilityChangedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - listingId
+            - catalogItemId
+            - nodeId
+            - availableQty
+            properties:
+              listingId: *id001
+              catalogItemId: *id001
+              nodeId: *id001
+              availableQty: *id003
+              basis: *id001
+              asOf: *id002
+              feedId: *id001
+    ListingSuppressedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - listingId
+            - nodeId
+            properties:
+              listingId: *id001
+              nodeId: *id001
+              reason: *id001
+    ListingRestoredConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - listingId
+            - nodeId
+            properties:
+              listingId: *id001
+              nodeId: *id001
