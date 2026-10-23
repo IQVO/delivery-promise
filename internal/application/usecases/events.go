@@ -1,6 +1,9 @@
 package usecases
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // Meta is what a consumer knows about the CloudEvents envelope of a message.
 type Meta struct {
@@ -176,7 +179,7 @@ type WaveCancelled struct {
 // InductionDeferred is last-mile-delivery PackageInductionDeferred.
 type InductionDeferred struct {
 	TrackingNumber string `json:"trackingNumber"`
-	AssignmentID   string `json:"assignmentId"`
+	AssignmentID   string `json:"assignmentId,omitempty"` // optional on the wire: omitted when no label data arrived
 }
 
 // ScorecardUpdated is node-performance NodeScorecardUpdated.
@@ -209,7 +212,7 @@ type FulfillmentUnsourceable struct {
 	OrderID       string   `json:"orderId"`
 	GroupNo       int      `json:"groupNo"`
 	PromiseID     string   `json:"promiseId"`
-	ExcludedNodes []string `json:"excludedNodes"`
+	ExcludedNodes NodeRefs `json:"excludedNodes"`
 }
 
 // PackageDelivered is shipping-and-tracking PackageDelivered.
@@ -254,4 +257,34 @@ type CustomerOrderCancelled struct {
 	OrderID  string `json:"orderId"`
 	Reason   string `json:"reason"`
 	GroupNos []int  `json:"groupNos"`
+}
+
+// NodeRefs is the excludedNodes list of FulfillmentUnsourceable: order-sourcing
+// publishes objects ({nodeId, reason}); a bare node id string is tolerated too.
+type NodeRefs []string
+
+// UnmarshalJSON accepts an array of objects with a nodeId, or of strings.
+func (n *NodeRefs) UnmarshalJSON(b []byte) error {
+	var raw []json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	out := make(NodeRefs, 0, len(raw))
+	for _, r := range raw {
+		var id string
+		if err := json.Unmarshal(r, &id); err != nil {
+			var o struct {
+				NodeID string `json:"nodeId"`
+			}
+			if err := json.Unmarshal(r, &o); err != nil {
+				return err
+			}
+			id = o.NodeID
+		}
+		if id != "" {
+			out = append(out, id)
+		}
+	}
+	*n = out
+	return nil
 }

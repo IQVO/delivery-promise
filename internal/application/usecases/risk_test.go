@@ -1,6 +1,7 @@
 package usecases_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -265,4 +266,33 @@ func TestAnOrderCancelledBeforeAnythingWasConfirmedIsANoOp(t *testing.T) {
 	must(t, e.svc.OnCustomerOrderCancelled(ctx, e.meta("CustomerOrderCancelled"), usecases.CustomerOrderCancelled{OrderID: "ord-none"}))
 	eq(t, "nothing happened", len(e.eventNames()), 0)
 	e.clock.Advance(time.Second)
+}
+
+func TestAnInductionDeferredWithoutAnAssignmentIdIsFoundThroughItsTrackingNumber(t *testing.T) {
+	e := newEnv(t)
+	id := e.confirmedNextDay("ord-1", 1)
+	must(t, e.svc.OnFulfillmentLocked(ctx, e.meta("FulfillmentLocked"), usecases.FulfillmentLocked{AssignmentID: "asg-1", OrderID: "ord-1", GroupNo: 1, PromiseID: id, NodeID: "N-AUS3"}))
+	must(t, e.svc.OnFulfillmentShipped(ctx, e.meta("FulfillmentShipped"), usecases.FulfillmentShipped{AssignmentID: "asg-1", TrackingNumbers: []string{"TRK-1"}}))
+	must(t, e.svc.OnInductionDeferred(ctx, e.meta("PackageInductionDeferred"), usecases.InductionDeferred{TrackingNumber: "TRK-1"}))
+	eq(t, "the promise was flagged", count(e.eventNames(), "PromiseAtRisk"), 1)
+	// an unknown tracking number is ignored
+	must(t, e.svc.OnInductionDeferred(ctx, e.meta("PackageInductionDeferred"), usecases.InductionDeferred{TrackingNumber: "TRK-unknown"}))
+	eq(t, "still one flag", count(e.eventNames(), "PromiseAtRisk"), 1)
+}
+
+func TestExcludedNodesDecodeFromObjectsAndFromBareIds(t *testing.T) {
+	var got usecases.FulfillmentUnsourceable
+	raw := `{"assignmentId":"a","excludedNodes":[{"nodeId":"N-1","reason":"REJECTED:OUT_OF_STOCK"},"N-2",{"nodeId":""}]}`
+	if err := json.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.ExcludedNodes) != 2 || got.ExcludedNodes[0] != "N-1" || got.ExcludedNodes[1] != "N-2" {
+		t.Fatalf("excluded = %v", got.ExcludedNodes)
+	}
+	if err := json.Unmarshal([]byte(`{"excludedNodes":[7]}`), &got); err == nil {
+		t.Fatal("a number is not a node reference")
+	}
+	if err := json.Unmarshal([]byte(`{"excludedNodes":"N-1"}`), &got); err == nil {
+		t.Fatal("a string is not a list")
+	}
 }

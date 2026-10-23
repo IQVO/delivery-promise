@@ -342,13 +342,27 @@ func (s *Service) OnWaveCancelled(ctx context.Context, m Meta, e WaveCancelled) 
 
 // OnInductionDeferred treats a deferred induction as a risk (E15).
 func (s *Service) OnInductionDeferred(ctx context.Context, m Meta, e InductionDeferred) error {
-	return s.assignmentRisk(ctx, m, e.AssignmentID, ReasonInductionDeferred, nil, nil)
+	return s.assignmentRiskVia(ctx, m, e.AssignmentID, e.TrackingNumber, ReasonInductionDeferred, nil, nil)
 }
 
 // assignmentRisk flags the promise of an assignment AT_RISK, remembering the
 // nodes and departures re-promising must skip.
 func (s *Service) assignmentRisk(ctx context.Context, m Meta, assignmentID, reason string, nodes, departures []string) error {
+	return s.assignmentRiskVia(ctx, m, assignmentID, "", reason, nodes, departures)
+}
+
+// assignmentRiskVia is assignmentRisk for an event that may carry only a
+// tracking number (PackageInductionDeferred omits assignmentId when no label
+// data arrived): the assignment is then found through FulfillmentShipped.
+func (s *Service) assignmentRiskVia(ctx context.Context, m Meta, assignmentID, trackingNumber, reason string, nodes, departures []string) error {
 	return s.consume(ctx, m, func(ctx context.Context) ([]promise.ID, error) {
+		if assignmentID == "" && trackingNumber != "" {
+			id, err := s.Shipments.AssignmentOf(ctx, trackingNumber)
+			if err != nil && !notFound(err) {
+				return nil, err
+			}
+			assignmentID = id
+		}
 		a, err := s.Shipments.GetAssignment(ctx, assignmentID)
 		if notFound(err) {
 			s.Logger.WarnContext(ctx, "risk for an assignment whose lock was not seen", "assignmentId", assignmentID, "reason", reason)

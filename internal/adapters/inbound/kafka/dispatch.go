@@ -101,7 +101,7 @@ func Handlers(s *usecases.Service) map[string]HandlerFunc {
 	h[typ("logistics", "last-mile-delivery", "wave", "DeliveryWaveScheduled")] = handle(func(v usecases.WaveScheduled) []string { return ids(v.WaveID, v.StationNodeID) }, s.OnWaveScheduled)
 	h[typ("logistics", "last-mile-delivery", "wave", "DeliveryWaveCapacityChanged")] = handle(func(v usecases.WaveCapacityChanged) []string { return ids(v.WaveID) }, s.OnWaveCapacityChanged)
 	h[typ("logistics", "last-mile-delivery", "wave", "DeliveryWaveCancelled")] = handle(func(v usecases.WaveCancelled) []string { return ids(v.WaveID) }, s.OnWaveCancelled)
-	h[typ("logistics", "last-mile-delivery", "packageattempthistory", "PackageInductionDeferred")] = handle(func(v usecases.InductionDeferred) []string { return ids(v.AssignmentID) }, s.OnInductionDeferred)
+	h[typ("logistics", "last-mile-delivery", "packageattempthistory", "PackageInductionDeferred")] = handle(func(v usecases.InductionDeferred) []string { return ids(v.TrackingNumber) }, s.OnInductionDeferred)
 
 	h[typ("commerce", "order-sourcing", "assignment", "FulfillmentLocked")] = handle(func(v usecases.FulfillmentLocked) []string { return ids(v.AssignmentID, v.PromiseID) }, s.OnFulfillmentLocked)
 	h[typ("commerce", "order-sourcing", "assignment", "FulfillmentShipped")] = handle(func(v usecases.FulfillmentShipped) []string { return ids(v.AssignmentID) }, s.OnFulfillmentShipped)

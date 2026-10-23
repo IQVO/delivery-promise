@@ -945,8 +945,9 @@ components:
             groupNo: 1
             promiseId: prm-7f3a21
             excludedNodes:
-            - N-VWS-AUS3
-            reason: ALL_NODES_REFUSED
+            - nodeId: N-VWS-AUS3
+              reason: 'REJECTED:OUT_OF_STOCK'
+            reason: NODE_REFUSED
     PackageDelivered:
       name: PackageDelivered
       title: A package was delivered
@@ -2262,8 +2263,21 @@ components:
               orderId: *id001
               groupNo: *id003
               promiseId: *id001
-              excludedNodes: *id004
-              reason: *id001
+              excludedNodes:
+                type: array
+                description: The nodes that refused (order-sourcing's {nodeId, reason} objects); a bare node id string is tolerated.
+                items:
+                  type: object
+                  required:
+                  - nodeId
+                  properties:
+                    nodeId: *id001
+                    reason: *id001
+              reason:
+                type: string
+                enum:
+                - NO_CANDIDATE
+                - NODE_REFUSED
     PackageDeliveredConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2470,10 +2484,11 @@ components:
             type: object
             required:
             - trackingNumber
-            - assignmentId
             properties:
               trackingNumber: *id001
-              assignmentId: *id001
+              assignmentId:
+                type: string
+                description: From the package's LabelIssued; omitted when no label data was received, then the assignment is found through the trackingNumber (FulfillmentShipped).
     NodeScorecardUpdatedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'

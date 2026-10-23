@@ -224,6 +224,10 @@ func TestEveryProjectionHandlerAcceptsAMinimalPayload(t *testing.T) {
 		"logistics.shipping-and-tracking.journey.PackageDelivered":        {"trackingNumber": "T-1", "deliveredAt": "2026-10-23T12:00:00Z"},
 		"commerce.customer-ordering.customerorder.CustomerOrderCancelled": {"orderId": "ord-1", "groupNos": []int{}},
 		"commerce.customer-ordering.customerorder.CustomerOrderPlaced":    {"orderId": "ord-1", "groups": []any{}},
+		// the producers' own shapes: objects in excludedNodes, no assignmentId when no label data arrived
+		"commerce.order-sourcing.assignment.FulfillmentUnsourceable": {"assignmentId": "asg-1", "orderId": "ord-1", "groupNo": 1, "promiseId": "p-1", "reason": "NODE_REFUSED",
+			"excludedNodes": []any{map[string]any{"nodeId": "N-1", "reason": "REJECTED:OUT_OF_STOCK"}}},
+		"logistics.last-mile-delivery.packageattempthistory.PackageInductionDeferred": {"trackingNumber": "T-1"},
 	}
 	i := 0
 	for suffix, data := range payloads {
