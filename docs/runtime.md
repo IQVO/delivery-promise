@@ -84,6 +84,17 @@ others; the sweeper is the only place the clock drives the domain.
   topic, type and key) and stays in the table with `attempts` and `last_error`. Fix the
   cause, then re-arm it: `UPDATE outbox_events SET attempts = 0 WHERE id = <id>;`.
 
+## Cancelling a promise on request
+
+`POST /promises/{promiseId}:cancel` (no body, `Idempotency-Key` required) is the compensation
+route of customer-ordering's checkout: when a later group fails to confirm, the promises already
+CONFIRMED are cancelled. It reuses the CancelPromise rule that `CustomerOrderCancelled` drives:
+a CONFIRMED or AT_RISK promise becomes CANCELLED with `cancelReason` `CANCELLED_ON_REQUEST`, its
+confirmed hold goes back to the PromiseBook and `PromiseCancelled` is appended to the outbox, in
+one transaction. Answers: `200` with the promise view (also for a repeat on an already CANCELLED
+promise, which changes and publishes nothing), `404 not-found`, `409 illegal-transition` for a
+PROVISIONAL, KEPT, BROKEN or RELEASED promise (ADR 0002 A30).
+
 ## Idempotency of writes
 
 `Idempotency-Key` is required on every state-changing POST except the quote, where it is

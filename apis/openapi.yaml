@@ -6,7 +6,8 @@ info:
     derived from retail-network-docs model/model.yaml (contexts[delivery-promise].rest) and the FINAL cross-context
     decisions (contracts-delta E7, E8, E9; gap register G8, G9, G19, G21, G22). The quote route is an Open Host
     Service for the storefront and an in-organization Customer/Supplier contract for customer-ordering; POST /promises
-    and POST /promises/{promiseId}:confirm are called only by customer-ordering inside checkout. The promise hot
+    POST /promises/{promiseId}:confirm and POST /promises/{promiseId}:cancel (checkout compensation) are called only
+    by customer-ordering inside checkout. The promise hot
     path makes no synchronous call to any other context: every input is an event-fed local read model. No authentication,
     consistent with the fleet. No personal data appears in any schema: the destination is a postal prefix, never
     an address. Errors are RFC 9457 application/problem+json whose `type` is https://retailnetwork.example/problems/<slug>.
@@ -228,6 +229,33 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/Unprocessable'
+  /promises/{promiseId}:cancel:
+    post:
+      tags:
+      - Promises
+      operationId: cancelPromise
+      summary: Cancel a confirmed promise on request (CancelPromise)
+      description: 'Called by customer-ordering to compensate a checkout whose later group failed to confirm: the
+        promises already CONFIRMED are cancelled so their capacity is given back. No request body. A CONFIRMED or
+        AT_RISK promise becomes CANCELLED (cancelReason CANCELLED_ON_REQUEST), the confirmed hold goes back to its
+        PromiseBook and PromiseCancelled goes to the analytics topic, in one transaction. Idempotent: cancelling an
+        already CANCELLED promise is a no-op returning 200 with the same view. A PROVISIONAL, KEPT, BROKEN or RELEASED
+        promise is refused with illegal-transition (409); a provisional hold is never cancelled, it lapses by itself
+        (ReleaseExpiredHolds).'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      - $ref: '#/components/parameters/PromiseId'
+      responses:
+        '200':
+          description: The CANCELLED promise (also the replay and the repeat on an already cancelled promise).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promise'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /promise-policies:
     post:
       tags:

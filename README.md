@@ -31,6 +31,7 @@ Consumed (34 types from eight contexts, ADR 0003): customer-ordering, order-sour
 | `GET /delivery-offers/{offerId}` | read an offer |
 | `POST /promises` | make a PROVISIONAL promise from an offer, holding capacity |
 | `POST /promises/{promiseId}:confirm` | confirm it for an order group (called inside checkout) |
+| `POST /promises/{promiseId}:cancel` | cancel a confirmed promise and release its capacity (checkout compensation; no body, `Idempotency-Key` required) |
 | `GET /promises/{promiseId}`, `GET /promises?orderId=` | read promises |
 | `GET /promise-books?nodeId=&date=` | capacity books of a node and day |
 | `POST /promise-policies`, `GET /promise-policies/current` | publish and read the policy |

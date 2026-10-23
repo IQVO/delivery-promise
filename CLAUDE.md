@@ -22,7 +22,7 @@ Workers: one consumer, the sweeper (`SWEEP_INTERVAL` 15s: ExpireOffers, ReleaseE
 `/healthz` = liveness; `/readyz` = drain gate + Postgres ping + Kafka metadata request naming no topic. Shutdown: /readyz 503, `SHUTDOWN_DRAIN_DELAY` (5s), drain HTTP, stop consumer and sweeper, stop relay LAST, close pool. cmd/** never imports outbound/memory or repocontract. No authentication on REST. See docs/runtime.md.
 
 ## REST
-chi router for apis/openapi.yaml: POST /delivery-offers:quote, GET /delivery-offers/{offerId}, POST /promises, POST /promises/{promiseId}:confirm, GET /promises/{promiseId}, GET /promises?orderId=, GET /promise-books?nodeId=&date=, POST/GET /promise-policies. `Idempotency-Key` required on every state-changing POST except the quote (optional); (route, key) scope, savepoint (ADR 0006).
+chi router for apis/openapi.yaml: POST /delivery-offers:quote, GET /delivery-offers/{offerId}, POST /promises, POST /promises/{promiseId}:confirm, POST /promises/{promiseId}:cancel, GET /promises/{promiseId}, GET /promises?orderId=, GET /promise-books?nodeId=&date=, POST/GET /promise-policies. `Idempotency-Key` required on every state-changing POST except the quote (optional); (route, key) scope, savepoint (ADR 0006).
 Errors are RFC 9457 problem+json, `type` = slug (ADR 0002 A22): not-found, illegal-transition, concurrent-update, validation-failed, plus the model slugs and idempotency-key-reused, dependency-unavailable.
 
 ## Events: CloudEvents 1.0 is MANDATORY

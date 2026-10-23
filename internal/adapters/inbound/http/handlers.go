@@ -59,6 +59,12 @@ func (s *Server) handleConfirm(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, http.StatusOK, res, err)
 }
 
+// handleCancel serves POST /promises/{promiseId}:cancel. The route has no body.
+func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
+	res, err := s.API.CancelPromise(r.Context(), chi.URLParam(r, "promiseId"))
+	respond(w, r, http.StatusOK, res, err)
+}
+
 func (s *Server) handleListBooks(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	res, err := s.API.ListPromiseBooks(r.Context(), q.Get("nodeId"), q.Get("date"))

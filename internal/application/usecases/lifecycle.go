@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/claudioed/delivery-promise/internal/application/ports"
@@ -96,10 +97,18 @@ func (s *Service) cancelOne(ctx context.Context, id promise.ID, reason string) e
 	if err != nil {
 		return err
 	}
-	events, err := p.Cancel(reason, s.Clock.Now())
+	err = s.cancel(ctx, p, reason)
 	if errors.Is(err, promise.ErrPromiseClosed) || errors.Is(err, shared.ErrIllegalTransition) {
 		return nil
 	}
+	return err
+}
+
+// cancel moves p to CANCELLED, gives its confirmed hold back to the book and
+// appends PromiseCancelled. It returns the domain error when p cannot be
+// cancelled; the caller runs inside a transaction.
+func (s *Service) cancel(ctx context.Context, p *promise.Promise, reason string) error {
+	events, err := p.Cancel(reason, s.Clock.Now())
 	if err != nil {
 		return err
 	}
@@ -111,6 +120,43 @@ func (s *Service) cancelOne(ctx context.Context, id promise.ID, reason string) e
 		return err
 	}
 	return s.saveAll(ctx, p, b, events)
+}
+
+// CancelReasonRequested is the cancel reason recorded when a promise is
+// cancelled through POST /promises/{promiseId}:cancel, which carries no body
+// (ADR 0002, A30).
+const CancelReasonRequested = "CANCELLED_ON_REQUEST"
+
+// CancelPromise cancels one promise on request (POST /promises/{promiseId}:cancel,
+// reusing the CancelPromise rule that CustomerOrderCancelled drives): a
+// CONFIRMED or AT_RISK promise becomes CANCELLED, its confirmed hold goes back
+// to the book and PromiseCancelled is raised, in one transaction. A promise
+// already CANCELLED is returned unchanged (idempotent, no event). A promise in
+// any other state (PROVISIONAL, KEPT, BROKEN, RELEASED) is an illegal
+// transition (409); the "closed" sentinel is deliberately not propagated so the
+// problem slug stays illegal-transition.
+func (s *Service) CancelPromise(ctx context.Context, id string) (views.Promise, error) {
+	var out views.Promise
+	err := s.tx(ctx, func(ctx context.Context) error {
+		p, err := s.Promises.Get(ctx, promise.ID(id))
+		if err != nil {
+			return err
+		}
+		if p.State() == promise.StateCancelled {
+			out = views.FromPromise(p)
+			return nil
+		}
+		err = s.cancel(ctx, p, CancelReasonRequested)
+		if errors.Is(err, promise.ErrPromiseClosed) {
+			return fmt.Errorf("%w: promise %s is %s and cannot be cancelled", shared.ErrIllegalTransition, p.ID(), p.State())
+		}
+		if err != nil {
+			return err
+		}
+		out = views.FromPromise(p)
+		return nil
+	})
+	return out, err
 }
 
 // ReleaseExpiredHolds releases the PROVISIONAL promises whose hold lapsed and

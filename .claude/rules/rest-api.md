@@ -17,6 +17,7 @@ the wiring is `cmd/api/main.go` `run`:
 - `GET /promises/{promiseId}` -> `GetPromise`
 - `GET /promises?orderId=` -> `ListPromisesByOrder` (`{"items":[...]}`)
 - `POST /promises/{promiseId}:confirm` -> `ConfirmPromise` (body `{orderId, groupNo}`; repeating it is a no-op)
+- `POST /promises/{promiseId}:cancel` -> `CancelPromise` (no body; CONFIRMED/AT_RISK -> CANCELLED and the confirmed hold is released; an already CANCELLED promise is a 200 no-op; PROVISIONAL, KEPT, BROKEN or RELEASED is 409 `illegal-transition`; ADR 0002 A30)
 - `GET /promise-books?nodeId=&date=` -> `ListPromiseBooks`
 - `POST /promise-policies` -> `PublishPromisePolicy` (201)
 - `GET /promise-policies/current` -> `CurrentPolicy`
@@ -34,8 +35,8 @@ the wiring is `cmd/api/main.go` `run`:
   `nominal-basis-not-allowed-for-tier`); an unmapped error is an opaque 500
   `internal-error`. A new `Err` needs a catalogue row and a row in
   `handlers_test.go` `TestEveryDomainErrorIsItsDocumentedProblem`.
-- **Idempotency-Key** is required on `POST /promises`, `POST /promises/{id}:confirm`
-  and `POST /promise-policies` (`idempotency.go`), optional on the quote. The key is
+- **Idempotency-Key** is required on `POST /promises`, `POST /promises/{id}:confirm`,
+  `POST /promises/{id}:cancel` and `POST /promise-policies` (`idempotency.go`), optional on the quote. The key is
   stored per (route, key); same key + same body replays the first response with
   `Idempotency-Replayed: true`, same key + other body is 422
   `idempotency-key-reused`, a missing key 400 `idempotency-key-required`; keys live
