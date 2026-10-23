@@ -1303,7 +1303,7 @@ components:
       title: A package could not be inducted on a wave (E15)
       summary: A package could not be inducted on a wave (E15).
       contentType: application/cloudevents+json
-      description: 'Consumed from `retailnetwork.last-mile-delivery.events`; `type` = `com.retailnetwork.logistics.last-mile-delivery.package.PackageInductionDeferred`
+      description: 'Consumed from `retailnetwork.last-mile-delivery.events`; `type` = `com.retailnetwork.logistics.last-mile-delivery.packageattempthistory.PackageInductionDeferred`
         (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
         fields are ignored. Use: RepromiseOnRisk: treated as a risk to the group''s promise.'
       tags:
@@ -1317,7 +1317,7 @@ components:
           specversion: '1.0'
           id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a001e
           source: /retailnetwork/last-mile-delivery
-          type: com.retailnetwork.logistics.last-mile-delivery.package.PackageInductionDeferred
+          type: com.retailnetwork.logistics.last-mile-delivery.packageattempthistory.PackageInductionDeferred
           subject: TRK-1001
           time: '2026-10-22T19:00:00Z'
           datacontenttype: application/json

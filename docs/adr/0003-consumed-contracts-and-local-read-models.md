@@ -10,20 +10,20 @@ The promise sits on the shopper's critical path and makes NO synchronous call (m
 
 ## Decision
 
-### Consumed events (dispatch on the FULL type; consumer groups mandatory)
+### Consumed events (dispatch on the FULL type; consumer group mandatory)
 
-| Producer topic | Consumer group variable | Types (`com.retailnetwork.<tier>.<producer>.<entity>.<Event>`) | Effect |
-|---|---|---|---|
-| `retailnetwork.node-topology.events` | `DELIVERY_PROMISE_TOPOLOGY_CONSUMER_GROUP` | `node.NodeRegistered`, `node.NodeOperationalProfileDeclared`, `node.NodeActivated`, `node.NodeSuspended`, `node.NodeRetired`, `lane.LaneOpened`, `lane.LaneClosed`, `servicearea.ServiceAreaAssigned`, `region.RegionDefined` | NodeProfileView, LaneView, RegionAndServiceAreaView |
-| `retailnetwork.offer-availability.events` | `DELIVERY_PROMISE_AVAILABILITY_CONSUMER_GROUP` | `catalogitem.CatalogItemCreated`, `catalogitem.CatalogItemDiscontinued`, `listing.ListingCreated`, `listing.ListingAvailabilityChanged`, `listing.ListingSuppressed`, `listing.ListingRestored` | AvailabilityView |
-| `retailnetwork.linehaul-transportation.events` | `DELIVERY_PROMISE_LINEHAUL_CONSUMER_GROUP` | `departure.DepartureScheduled`, `departure.DepartureCapacityChanged`, `departure.DepartureCancelled`, `departure.BookingMoved`, `departure.BookingFailed` | DepartureView; RepromiseOnRisk (E13) |
-| `retailnetwork.last-mile-delivery.events` | `DELIVERY_PROMISE_LASTMILE_CONSUMER_GROUP` | `wave.DeliveryWaveScheduled`, `wave.DeliveryWaveCapacityChanged`, `wave.DeliveryWaveCancelled`, `package.PackageInductionDeferred` | DeliveryWaveView; RepromiseOnRisk (E5, E15) |
-| `retailnetwork.node-performance.events` | `DELIVERY_PROMISE_SCORECARD_CONSUMER_GROUP` | `scorecard.NodeScorecardUpdated` | ScorecardView (30d window only, E18) |
-| `retailnetwork.order-sourcing.events` | `DELIVERY_PROMISE_SOURCING_CONSUMER_GROUP` | `assignment.FulfillmentLocked`, `assignment.FulfillmentShipped`, `assignment.FulfillmentUnsourceable` | assignment map and package set (E1); RepromiseOnRisk |
-| `retailnetwork.shipping-and-tracking.events` | `DELIVERY_PROMISE_TRACKING_CONSUMER_GROUP` | `journey.PackageDelivered`, `journey.PackageExceptionRaised`, `journey.PackageLost`, `journey.PackageReturned` | JudgeOnDelivery, RepromiseOnRisk (E6) |
-| `retailnetwork.customer-ordering.events` | `DELIVERY_PROMISE_ORDERING_CONSUMER_GROUP` | `customerorder.CustomerOrderPlaced`, `customerorder.CustomerOrderCancelled` | reconciling ConfirmPromise (E7); CancelPromise (G21) |
+| Producer topic | Types (`com.retailnetwork.<tier>.<producer>.<entity>.<Event>`) | Effect |
+|---|---|---|
+| `retailnetwork.node-topology.events` | `node.NodeRegistered`, `node.NodeOperationalProfileDeclared`, `node.NodeActivated`, `node.NodeSuspended`, `node.NodeRetired`, `lane.LaneOpened`, `lane.LaneClosed`, `servicearea.ServiceAreaAssigned`, `region.RegionDefined` | NodeProfileView, LaneView, RegionAndServiceAreaView |
+| `retailnetwork.offer-availability.events` | `catalogitem.CatalogItemCreated`, `catalogitem.CatalogItemDiscontinued`, `listing.ListingCreated`, `listing.ListingAvailabilityChanged`, `listing.ListingSuppressed`, `listing.ListingRestored` | AvailabilityView |
+| `retailnetwork.linehaul-transportation.events` | `departure.DepartureScheduled`, `departure.DepartureCapacityChanged`, `departure.DepartureCancelled`, `departure.BookingMoved`, `departure.BookingFailed` | DepartureView; RepromiseOnRisk (E13) |
+| `retailnetwork.last-mile-delivery.events` | `wave.DeliveryWaveScheduled`, `wave.DeliveryWaveCapacityChanged`, `wave.DeliveryWaveCancelled`, `packageattempthistory.PackageInductionDeferred` | DeliveryWaveView; RepromiseOnRisk (E5, E15) |
+| `retailnetwork.node-performance.events` | `scorecard.NodeScorecardUpdated` | ScorecardView (30d window only, E18) |
+| `retailnetwork.order-sourcing.events` | `assignment.FulfillmentLocked`, `assignment.FulfillmentShipped`, `assignment.FulfillmentUnsourceable` | assignment map and package set (E1); RepromiseOnRisk |
+| `retailnetwork.shipping-and-tracking.events` | `journey.PackageDelivered`, `journey.PackageExceptionRaised`, `journey.PackageLost`, `journey.PackageReturned` | JudgeOnDelivery, RepromiseOnRisk (E6) |
+| `retailnetwork.customer-ordering.events` | `customerorder.CustomerOrderPlaced`, `customerorder.CustomerOrderCancelled` | reconciling ConfirmPromise (E7); CancelPromise (G21) |
 
-A missing consumer group variable is a boot error naming it, raised before the listener binds. A transient failure is retried with capped backoff, then the message goes to `<topic>.dlq`; a deterministic problem (not a CloudEvent, unknown type, malformed payload) is logged and skipped. Every handler runs in a unit of work that also inserts the CloudEvents `id` into `processed_events` (inbox), so a redelivery commits nothing.
+One consumer reads the eight topics under ONE stable group, `DELIVERY_PROMISE_CONSUMER_GROUP` (a chart value, never derived from the pod name). A missing group is a boot error naming the variable, raised before the listener binds. A transient failure is retried with capped backoff, then the message goes to `<topic>.dlq`; a deterministic problem (not a CloudEvent, unknown type, malformed payload) is logged and skipped. Every handler runs in a unit of work that also inserts the CloudEvents `id` into `processed_events` (inbox), so a redelivery commits nothing.
 
 ### Local read models (Postgres tables, rebuilt from events)
 
