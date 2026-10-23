@@ -1,0 +1,43 @@
+# ADR 0003: consumed contracts, local read models and relationships
+
+## Status
+
+Accepted (2026-10-23).
+
+## Context
+
+The promise sits on the shopper's critical path and makes NO synchronous call (model `sync_calls: []`). Every input is a local read model kept from events. The consumed contracts are the producers' CloudEvents; `apis/asyncapi.yaml` restates, as `receive` operations, only the fields this service relies on (tolerant decoding: unknown fields and unknown types are ignored).
+
+## Decision
+
+### Consumed events (dispatch on the FULL type; consumer groups mandatory)
+
+| Producer topic | Consumer group variable | Types (`com.retailnetwork.<tier>.<producer>.<entity>.<Event>`) | Effect |
+|---|---|---|---|
+| `retailnetwork.node-topology.events` | `DELIVERY_PROMISE_TOPOLOGY_CONSUMER_GROUP` | `node.NodeRegistered`, `node.NodeOperationalProfileDeclared`, `node.NodeActivated`, `node.NodeSuspended`, `node.NodeRetired`, `lane.LaneOpened`, `lane.LaneClosed`, `servicearea.ServiceAreaAssigned`, `region.RegionDefined` | NodeProfileView, LaneView, RegionAndServiceAreaView |
+| `retailnetwork.offer-availability.events` | `DELIVERY_PROMISE_AVAILABILITY_CONSUMER_GROUP` | `catalogitem.CatalogItemCreated`, `catalogitem.CatalogItemDiscontinued`, `listing.ListingCreated`, `listing.ListingAvailabilityChanged`, `listing.ListingSuppressed`, `listing.ListingRestored` | AvailabilityView |
+| `retailnetwork.linehaul-transportation.events` | `DELIVERY_PROMISE_LINEHAUL_CONSUMER_GROUP` | `departure.DepartureScheduled`, `departure.DepartureCapacityChanged`, `departure.DepartureCancelled`, `departure.BookingMoved`, `departure.BookingFailed` | DepartureView; RepromiseOnRisk (E13) |
+| `retailnetwork.last-mile-delivery.events` | `DELIVERY_PROMISE_LASTMILE_CONSUMER_GROUP` | `wave.DeliveryWaveScheduled`, `wave.DeliveryWaveCapacityChanged`, `wave.DeliveryWaveCancelled`, `package.PackageInductionDeferred` | DeliveryWaveView; RepromiseOnRisk (E5, E15) |
+| `retailnetwork.node-performance.events` | `DELIVERY_PROMISE_SCORECARD_CONSUMER_GROUP` | `scorecard.NodeScorecardUpdated` | ScorecardView (30d window only, E18) |
+| `retailnetwork.order-sourcing.events` | `DELIVERY_PROMISE_SOURCING_CONSUMER_GROUP` | `assignment.FulfillmentLocked`, `assignment.FulfillmentShipped`, `assignment.FulfillmentUnsourceable` | assignment map and package set (E1); RepromiseOnRisk |
+| `retailnetwork.shipping-and-tracking.events` | `DELIVERY_PROMISE_TRACKING_CONSUMER_GROUP` | `journey.PackageDelivered`, `journey.PackageExceptionRaised`, `journey.PackageLost`, `journey.PackageReturned` | JudgeOnDelivery, RepromiseOnRisk (E6) |
+| `retailnetwork.customer-ordering.events` | `DELIVERY_PROMISE_ORDERING_CONSUMER_GROUP` | `customerorder.CustomerOrderPlaced`, `customerorder.CustomerOrderCancelled` | reconciling ConfirmPromise (E7); CancelPromise (G21) |
+
+A missing consumer group variable is a boot error naming it, raised before the listener binds. A transient failure is retried with capped backoff, then the message goes to `<topic>.dlq`; a deterministic problem (not a CloudEvent, unknown type, malformed payload) is logged and skipped. Every handler runs in a unit of work that also inserts the CloudEvents `id` into `processed_events` (inbox), so a redelivery commits nothing.
+
+### Local read models (Postgres tables, rebuilt from events)
+
+`rm_nodes` (type, subtype, operator, region, time zone, state, profile revision and profile), `rm_lanes`, `rm_regions`, `rm_service_areas`, `rm_catalog_items`, `rm_listings`, `rm_departures`, `rm_waves`, `rm_scorecards`, `rm_assignments` (assignmentId to promiseId, orderId, groupNo, locked node), `rm_shipments` (trackingNumber to assignmentId) and `rm_package_outcomes`. Version guards make every projection idempotent and order-tolerant: a `profileRevision`, `assignmentVersion` or `asOf` not above the stored value is ignored (A25).
+
+### Relationships
+
+Customer/Supplier with customer-ordering (it calls `POST /delivery-offers:quote`, `POST /promises` and `POST /promises/{promiseId}:confirm`; it consumes `PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseUnkeepable`) and with order-sourcing (consumes `PromiseRevised`, `PromiseBookExhausted`); node-performance consumes `PromiseKept` and `PromiseBroken`. Open Host Service for the storefront (quote). Conformist to node-topology, offer-availability, linehaul-transportation, last-mile-delivery, node-performance and shipping-and-tracking.
+
+### Sync calls
+
+None. No client of a sibling service exists in this repository.
+
+## Consequences
+
+- A cold or stale read model yields fewer offers, never a false one: fast tiers need every input, only STANDARD falls back to nominal (A1).
+- Producer contracts still to be re-checked when they push: the entities of A26, the `window` literal of the scorecard (`30d`), and the `FulfillmentLocked` additions of E1.
