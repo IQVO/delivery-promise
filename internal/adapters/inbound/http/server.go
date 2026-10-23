@@ -41,6 +41,20 @@ type Server struct {
 	Idempotency func(http.Handler) http.Handler
 }
 
+// optionalKey wraps h in the idempotency middleware only when the caller sent an
+// Idempotency-Key: the quote works without one, and with one a repeat inside the
+// offers' TTL replays the first answer (openapi: POST /delivery-offers:quote).
+func (s *Server) optionalKey(h http.HandlerFunc) http.Handler {
+	keyed := s.idempotent(h)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(IdempotencyKeyHeader) == "" {
+			h(w, r)
+			return
+		}
+		keyed.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) idempotent(h http.HandlerFunc) http.Handler {
 	if s.Idempotency == nil {
 		return h
@@ -56,7 +70,7 @@ func NewRouter(s *Server) http.Handler {
 	r.Get("/healthz", s.handleHealthz)
 	r.Get("/readyz", s.handleReadyz)
 
-	r.Post("/delivery-offers:quote", s.handleQuote)
+	r.Method(http.MethodPost, "/delivery-offers:quote", s.optionalKey(s.handleQuote))
 	r.Get("/delivery-offers/{offerId}", s.handleGetOffer)
 	r.Method(http.MethodPost, "/promises", s.idempotent(s.handleMakePromise))
 	r.Get("/promises", s.handleListPromises)

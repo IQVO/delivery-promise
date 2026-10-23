@@ -283,3 +283,22 @@ func TestUnknownRoutesAndMethodsAreNotFoundOrNotAllowed(t *testing.T) {
 		t.Errorf("wrong method: %d", rec.Code)
 	}
 }
+
+func TestTheQuoteIsKeyedOnlyWhenTheCallerSendsAKey(t *testing.T) {
+	var keyed int
+	mw := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { keyed++; next.ServeHTTP(w, r) })
+	}
+	h := NewRouter(&Server{API: &fakeAPI{}, Idempotency: mw})
+	body := `{"destinationPostalPrefix":"787","lines":[{"catalogItemId":"ci-1","quantity":1}]}`
+	if rec := do(h, "POST", "/delivery-offers:quote", body); rec.Code != 200 || keyed != 0 {
+		t.Fatalf("no key: %d, middleware ran %d times", rec.Code, keyed)
+	}
+	req := httptest.NewRequest("POST", "/delivery-offers:quote", strings.NewReader(body))
+	req.Header.Set(IdempotencyKeyHeader, "k1")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 200 || keyed != 1 {
+		t.Fatalf("with a key: %d, middleware ran %d times", rec.Code, keyed)
+	}
+}

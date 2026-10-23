@@ -53,10 +53,10 @@ linter already catches.
    fleet-wide revert) — a reintroduced auth check is very likely
    accidental (an agent "helpfully" adding back something that looks
    missing) and should be flagged even if the code itself looks correct.
-8. **Anything that would surprise the sibling-context boundary.** If this
-   repo's `AGENTS.md`/`CLAUDE.md` documents a stricter rule (e.g. "no
-   outbound calls to sibling contexts"), check the diff doesn't
-   reintroduce exactly that.
+8. **Anything that would surprise the sibling-context boundary.** This
+   service makes NO call to a sibling context (ADR 0003): sibling data is an
+   event-fed local read model. Check the diff adds no HTTP client, no `sync_calls`
+   entry and no import of a sibling repository.
 
 ## Output format
 
