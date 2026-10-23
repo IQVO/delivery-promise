@@ -1,0 +1,30 @@
+{
+  "specversion": "1.0",
+  "id": "7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0001",
+  "source": "/retailnetwork/delivery-promise",
+  "type": "com.retailnetwork.commerce.delivery-promise.promisepolicy.PromisePolicyPublished",
+  "subject": "v2",
+  "datacontenttype": "application/json",
+  "dataschema": "urn:retailnetwork:delivery-promise:analytics:PromisePolicyPublished:v1",
+  "time": "2026-10-22T19:05:00Z",
+  "data": {
+    "capacitySharePercent": 80,
+    "holdTtlMinutes": 15,
+    "offerTtlMinutes": 10,
+    "orderDeadlines": [
+      {
+        "tier": "NEXT_DAY",
+        "regionId": "R-SC",
+        "localTime": "23:59"
+      },
+      {
+        "tier": "SAME_DAY",
+        "localTime": "09:05"
+      }
+    ],
+    "packagesPerOrder": 2,
+    "policyVersion": "v2",
+    "publishedAt": "2026-10-22T19:05:00Z",
+    "version": 2
+  }
+}

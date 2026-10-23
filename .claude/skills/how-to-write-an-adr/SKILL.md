@@ -1,110 +1,62 @@
 ---
 name: how-to-write-an-adr
-description: Write an Architecture Decision Record in this repo's numbering and format, including companion ADRs for cross-repo changes. Use when a design decision should be recorded or a change contradicts an existing ADR.
+description: Write an architecture decision record for this service: numbering, sections, the immutable-body rule, the index and the assumptions list. Use when a change takes a decision that is not obvious from the code (a new dependency, a contract choice, a model gap).
 ---
-
-<!-- TEMPLATE NOTE (warehouse-harness-template v2): adapt every repo-specific example in this file (file paths, type names, field names) to THIS repo real code. Do not copy-paste verbatim. -->
 
 # How to write an ADR
 
-Use when a change is architecturally significant — a new bounded-context
-integration, a reversal of a prior decision, a cross-repo contract change,
-or anything a future reader would otherwise have to reverse-engineer from
-the diff. Not every change needs one: a bug fix or a routine feature
-addition inside an already-decided architecture doesn't.
+Use an ADR for a decision someone will later ask "why?" about: a contract choice, a
+reading of a model gap, a new dependency, a runtime behaviour. Do not write one for a
+change the code and its tests already explain.
 
 ## Numbering and location
 
-`docs/docs/adr/NNNN-kebab-case-title.md`, four-digit zero-padded,
-sequential — check the highest existing number
-(`git ls-tree --name-only origin/develop -- docs/docs/adr/` and pick the
-next integer, never reuse or guess). `docs/docs/adr/about.md` explains the
-format to readers; you don't need to touch it when adding a new ADR.
+`docs/adr/NNNN-kebab-case-title.md`, four-digit zero-padded and sequential: list
+`docs/adr/` and take the next integer, never reuse or guess. Add a row to
+`docs/adr/index.md` in the same commit. The ADR bodies are immutable; a changed
+decision gets a NEW ADR that says which one it supersedes (and the old ADR's
+`## Status` line is the only thing edited).
 
-## Frontmatter (Docusaurus needs all five fields)
-
-```yaml
----
-id: NNNN-kebab-case-title
-slug: /adr/NNNN-kebab-case-title
-title: "NN. Title (a short noun phrase, matching the heading)"
-sidebar_label: "NN. Short label for the nav sidebar"
-sidebar_position: NN
-description: "One or two sentences — this shows up in search and link
-  previews, so make it stand alone without the rest of the doc."
----
-```
-
-`id`/`slug` are the full kebab-case filename (minus `.md`); `title`/
-`sidebar_label` repeat the number as plain text (`"13. ..."`, not `#13`);
-`sidebar_position` is the bare integer. Getting these inconsistent is the
-most common cause of a broken sidebar entry or 404 after merge — verify
-by running the docs build (see below) before opening the PR.
-
-## Format: Michael Nygard's template
+## Sections
 
 ```markdown
-# NNNN. Title (a short noun phrase)
+# ADR NNNN: <the decision, as a statement>
 
 ## Status
-Accepted | Proposed | Deprecated | Superseded by ADR-XXXX
+
+Accepted (YYYY-MM-DD).   <!-- or: Superseded by ADR MMMM -->
 
 ## Context
-The forces at play — technical, business, constraints — that make this
-decision necessary. Write in the past tense, as if explaining to someone
-who wasn't there. State the alternatives seriously considered, not just
-the one chosen; a reader six months from now needs to know a simpler
-option was weighed and rejected, not assume nobody thought of it.
+
+The forces: what the model or the contracts say, what they leave open, what
+constraint applies.
 
 ## Decision
-What was actually decided, stated as an active, present-tense
-declaration ("we will...", not "we might..."). Be specific about the
-mechanism, not just the intent — this section should let a reader
-implement the same decision from scratch without asking follow-up
-questions.
+
+What we do, specific enough that a reader can check the code against it.
 
 ## Consequences
-What becomes easier, what becomes harder, and what future work this
-creates or forecloses. Be honest about the downsides — an ADR that only
-lists benefits reads as marketing, not a decision record.
+
+What this makes easy, what it costs, what it forecloses. Be honest about the
+downsides: an ADR that only lists benefits reads as marketing.
 ```
 
-The `## Decision` section is the part worth the most editing effort: see
-ADR-0013 (`docs/docs/adr/0013-location-classification-via-facility-events.md`)
-for a model example — it states the exact mechanism (event-fed local
-cache replacing a synchronous HTTP read), names the readiness-gate design,
-and is specific enough that Task "how-to-add-an-integration-event"'s
-consumer-group guidance can point straight at it.
+## Assumptions where the model is silent
 
-## Superseding an earlier ADR
+Every reading of a gap in `model/model.yaml`, the Gap Register or contracts-delta is
+a numbered assumption (`A1`, `A2`, ...) in `docs/adr/0002-aggregates-and-invariants.md`
+and is repeated in the final report as `model_gaps`. Continue the numbering; do not
+renumber. Each assumption has a table-driven test in the package that enforces it.
 
-Don't edit the old ADR's Decision section. Add a `## Status` line noting
-`Superseded by ADR-XXXX` on the OLD one (a one-line patch), and open the
-new ADR referencing it: `**Accepted.** <date>. Supersedes [NN. Old title](./NNNN-old-slug.md).`
-— see ADR-0015 (`0015-remove-rest-identity-layer.md`) for the exact
-wording pattern superseding ADR-0014.
+## The CloudEvents catalogue ADR
 
-## Cross-repo decisions: use a companion ADR, not one repo's private opinion
+`docs/adr/0004-cloudevents-envelope-and-type-catalogue.md` holds one `type:` line per
+published type; `TestEventCatalogueMatchesContract` compares it with
+`apis/asyncapi.yaml`. Change both in the same commit.
 
-When a decision genuinely spans two bounded-context repos (e.g.
-facility-layout's functional-location roles enabling wes-work-planning's
-travel-graph feature), write ONE ADR per repo, each referencing the other
-explicitly as "the companion ADR" with a one-line description of the
-split of responsibility — see facility-layout's ADR-0016/0017 pair. Don't
-write the decision once in one repo and expect the other repo's readers
-to find it; each bounded context's docs site is read independently.
+## Worked examples in this repo
 
-## After writing: regenerate and verify the docs build
-
-```bash
-cd docs
-npm ci
-npm run build   # onBrokenLinks / onBrokenAnchors are both 'throw' — this
-                 # WILL fail if the frontmatter/slug is wrong or a
-                 # cross-reference link is broken
-```
-
-A broken ADR link or malformed frontmatter fails the build with a clear
-Docusaurus error, not a silent 404 — always run this locally before
-opening the PR; several repos in this fleet gate this in CI
-(`docs-api-drift`/dedicated docs build job) but not all yet.
+ADR 0002 (aggregates, invariants and assumptions), ADR 0003 (consumed contracts and
+local read models: states the mechanism and the relationship) and ADR 0005 (the outbox
+relay and its attempt cap: states the trade-off). Write the Decision section like those:
+the exact mechanism, not the intention.

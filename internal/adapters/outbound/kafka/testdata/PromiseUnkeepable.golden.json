@@ -1,0 +1,16 @@
+{
+  "specversion": "1.0",
+  "id": "7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0001",
+  "source": "/retailnetwork/delivery-promise",
+  "type": "com.retailnetwork.commerce.delivery-promise.promise.PromiseUnkeepable",
+  "subject": "prm-1",
+  "datacontenttype": "application/json",
+  "dataschema": "urn:retailnetwork:delivery-promise:events:PromiseUnkeepable:v1",
+  "time": "2026-10-22T19:05:00Z",
+  "data": {
+    "groupNo": 1,
+    "orderId": "ord-1",
+    "promiseId": "prm-1",
+    "reason": "NO_FEASIBLE_PATH"
+  }
+}
