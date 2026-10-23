@@ -1,0 +1,73 @@
+// Package http is the inbound REST adapter (chi): it decodes requests, calls
+// one use case per operation of apis/openapi.yaml and writes the answer or the
+// RFC 9457 problem of the error. It holds no business rule.
+package http
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/claudioed/delivery-promise/internal/application/usecases"
+	"github.com/claudioed/delivery-promise/internal/application/views"
+	"github.com/claudioed/delivery-promise/internal/domain/policy"
+)
+
+// DefaultServiceName names the service in logs.
+const DefaultServiceName = "delivery-promise"
+
+// API is the set of use cases the REST adapter drives; *usecases.Service is the
+// production implementation.
+type API interface {
+	QuoteDeliveryOffers(ctx context.Context, cmd usecases.QuoteCommand) (views.QuoteResult, error)
+	GetOffer(ctx context.Context, id string) (views.Offer, error)
+	MakePromise(ctx context.Context, cmd usecases.MakePromiseCommand) (usecases.MakePromiseResult, error)
+	ListPromisesByOrder(ctx context.Context, orderID string) (views.PromiseList, error)
+	GetPromise(ctx context.Context, id string) (views.Promise, error)
+	ListPromiseBooks(ctx context.Context, nodeID, date string) (views.BookList, error)
+	ConfirmPromise(ctx context.Context, id, orderID string, groupNo int) (views.Promise, error)
+	PublishPromisePolicy(ctx context.Context, in policy.Input) (views.Policy, error)
+	CurrentPolicy(ctx context.Context) (views.Policy, error)
+}
+
+// Server holds the collaborators of the handlers.
+type Server struct {
+	API API
+	// Readiness gates /readyz (nil = always ready, a unit-test fixture).
+	Readiness *Readiness
+	// Idempotency wraps the mutating routes that require an Idempotency-Key
+	// (nil = no middleware, a unit-test fixture; cmd/api always sets it).
+	Idempotency func(http.Handler) http.Handler
+}
+
+func (s *Server) idempotent(h http.HandlerFunc) http.Handler {
+	if s.Idempotency == nil {
+		return h
+	}
+	return s.Idempotency(h)
+}
+
+// NewRouter builds the chi router: /healthz and /readyz, then the operations of
+// apis/openapi.yaml behind the NUL-rejecting middleware.
+func NewRouter(s *Server) http.Handler {
+	r := chi.NewRouter()
+	r.Use(rejectNUL)
+	r.Get("/healthz", s.handleHealthz)
+	r.Get("/readyz", s.handleReadyz)
+
+	r.Post("/delivery-offers:quote", s.handleQuote)
+	r.Get("/delivery-offers/{offerId}", s.handleGetOffer)
+	r.Method(http.MethodPost, "/promises", s.idempotent(s.handleMakePromise))
+	r.Get("/promises", s.handleListPromises)
+	r.Get("/promises/{promiseId}", s.handleGetPromise)
+	r.Method(http.MethodPost, "/promises/{promiseId}:confirm", s.idempotent(s.handleConfirm))
+	r.Get("/promise-books", s.handleListBooks)
+	r.Method(http.MethodPost, "/promise-policies", s.idempotent(s.handlePublishPolicy))
+	r.Get("/promise-policies/current", s.handleCurrentPolicy)
+	return r
+}
+
+func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, statusBody{Status: "ok"})
+}
