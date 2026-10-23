@@ -99,3 +99,24 @@ Feature: Making and confirming promises
     And the last command published the event "PromiseCancelled" 1 time
     When the order "ord-1" is cancelled
     Then the last command published no events
+
+  Scenario: Cancelling a promise on request releases the confirmed capacity and is idempotent
+    Given I quote 2 of "ci-1001" for postal prefix "787"
+    And a promise exists from the NEXT_DAY offer
+    And I confirm the promise for the order "ord-1" group 1
+    When I cancel the promise on request
+    Then the command succeeds
+    And the promise is CANCELLED
+    And the book "N-AUS3:dep-AUS3-1800" holds 0 provisional and 0 confirmed
+    And the last command published the event "PromiseCancelled" 1 time
+    When I cancel the promise on request
+    Then the command succeeds
+    And the last command published no events
+
+  Scenario: A provisional promise cannot be cancelled on request
+    Given I quote 2 of "ci-1001" for postal prefix "787"
+    And a promise exists from the NEXT_DAY offer
+    When I cancel the promise on request
+    Then the command is refused with "ErrIllegalTransition"
+    And the promise is PROVISIONAL
+    And the book "N-AUS3:dep-AUS3-1800" holds 1 provisional and 0 confirmed

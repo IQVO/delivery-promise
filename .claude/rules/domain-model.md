@@ -3,7 +3,7 @@
 Source of truth: retail-network-docs `model/model.yaml` (context `delivery-promise`),
 amended by the Model Gap Register and contracts-delta. Invariants, transitions and
 every assumption the model left open are in `docs/adr/0002-aggregates-and-invariants.md`
-(assumptions A1-A33).
+(assumptions A1-A30; A1, A2, A12, A17, A19, A20, A21 are settled).
 
 ## Ubiquitous Language (use these exact names)
 

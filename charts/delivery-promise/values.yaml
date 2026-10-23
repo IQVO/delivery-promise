@@ -1,0 +1,191 @@
+# Default values for delivery-promise.
+
+replicaCount: 1
+
+# The tag defaults to the chart's appVersion (the release job packages the chart
+# with --app-version = the image tag it just published). Override repository and
+# tag for a locally built image.
+image:
+  repository: ghcr.io/iqvo/delivery-promise
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# The image runs as uid 1000 (USER 1000) and writes nothing to disk, so the root
+# filesystem is read-only and no volume is mounted.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Optional exposure of the REST API, both OFF by default. They route to this
+# chart's only Service (the api).
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: delivery-promise.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+gatewayApi:
+  enabled: false
+  parentRefs:
+    - name: ""
+      namespace: ""
+      sectionName: "http"
+  hosts:
+    - path: /
+      pathType: PathPrefix
+  stripPath: true
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# HorizontalPodAutoscaler (autoscaling/v2) for the api Deployment, OFF by
+# default. When enabled the Deployment omits replicas so the HPA owns them.
+# N>1 is safe for the outbox relay (FOR UPDATE SKIP LOCKED), the version-guarded
+# aggregate writes and the consumer (stable group, inbox dedupe on the CloudEvents
+# id in the same transaction); it has not been load-tested.
+autoscaling:
+  api:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+
+# Environment read by cmd/api (config.go, main.go, workers.go). Every key maps
+# 1:1 to one env var; the chart renders exactly the variables the binary reads.
+config:
+  httpAddr: ":8080"                  # HTTP_ADDR (keep service.targetPort in step)
+  logLevel: "info"                   # LOG_LEVEL: debug | info | warn (or warning) | error
+  # EVENT_PUBLISHER: "kafka" is the only publisher; the log sink does not
+  # exist. Any other value is refused at render and by the binary at boot.
+  eventPublisher: "kafka"
+  # DELIVERY_PROMISE_CONSUMER_GROUP: the STABLE group id of the one consumer
+  # over the eight producing contexts, so a rescheduled pod resumes from its
+  # committed offsets. REQUIRED (empty = the chart refuses to render, the binary
+  # refuses to boot). Service-prefixed, for example "delivery-promise-consumer";
+  # never the pod name.
+  consumerGroup: ""
+  # OUTBOX_MAX_ATTEMPTS: how many times one outbox row may fail before the relay
+  # excludes it from claims, so a poison row cannot block the relay forever.
+  # 0 = unlimited.
+  outboxMaxAttempts: 20
+  # OUTBOX_RELAY_INTERVAL: Go duration ("500ms", "2s") or plain seconds. Empty =
+  # not rendered; the binary defaults to 1s.
+  outboxRelayInterval: ""
+  # SWEEP_INTERVAL: how often the sweeper runs ExpireOffers, ReleaseExpiredHolds,
+  # CloseBooks and RepriceAtRisk. Empty = not rendered; the binary defaults to 15s.
+  sweepInterval: ""
+  # SHUTDOWN_DRAIN_DELAY: wait after /readyz flips before closing the listener
+  # (Go duration, "0" disables). Empty = not rendered; the binary defaults to 5s.
+  # The grace period below must exceed it plus 40s.
+  shutdownDrainDelay: ""
+
+# The chart refuses to render unless database.url or database.existingSecret is
+# set. Postgres is the only runtime: cmd/api has no in-memory mode and exits at
+# boot without DATABASE_URL. DATABASE_URL always comes from a Secret
+# (secretKeyRef), never from the ConfigMap.
+database:
+  # A DSN the chart stores in its own Secret. Prefer existingSecret in a real
+  # cluster so the DSN never passes through values.
+  url: ""
+  existingSecret: ""
+  existingSecretKey: "DATABASE_URL"
+  # Key, in the same secret, of a DIRECT (non-pooled, session-mode) connection
+  # string used ONLY for the golang-migrate startup step, never for the runtime
+  # pool. golang-migrate takes a session-scoped advisory lock that a transaction
+  # pooler cannot honour. Rendered with `optional: true`: a secret without the
+  # key still starts the pod and the binary falls back to DATABASE_URL.
+  migrationsExistingSecretKey: "MIGRATIONS_DATABASE_URL"
+  # With database.url (chart-owned Secret) only: the direct DSN stored under
+  # migrationsExistingSecretKey. Empty = the key is not created.
+  migrationsUrl: ""
+
+# Kafka is the only runtime: KAFKA_BROKERS is MANDATORY (comma-separated) and
+# always rendered (outbox relay, consumer, /readyz broker check). Produced
+# topics: retailnetwork.delivery-promise.events and .analytics. Consumed: the
+# integration topics of customer-ordering, order-sourcing, shipping-and-tracking,
+# linehaul-transportation, last-mile-delivery, node-performance, node-topology
+# and offer-availability, all through one consumer group (config.consumerGroup).
+kafka:
+  brokers: ""
+
+# Extra env vars appended to the api container as a raw list. The chart refuses
+# any *_MODE variable, EVENT_PUBLISHER other than "kafka", and any variable that
+# has a dedicated value above.
+extraEnv: []
+
+# The Postgres dial (migrations + ping) at boot is wrapped in a bounded retry
+# (internal/bootretry), so startupProbe gives the pod about a minute before the
+# kubelet gives up. Once it succeeds, liveness takes over; readiness uses
+# /readyz (drain gate + Postgres ping + Kafka metadata), which flips to
+# not-ready as the FIRST step of the graceful shutdown.
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  periodSeconds: 2
+  failureThreshold: 30
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 5
+
+# Room for the binary's sequential graceful shutdown: SHUTDOWN_DRAIN_DELAY
+# (default 5s) + HTTP drain (10s) + consumer drain (10s) + sweeper drain (10s) +
+# outbox relay drain (10s, stopped LAST) = 45s worst case. The chart refuses a
+# value that does not EXCEED drain delay + 40: a shorter grace period SIGKILLs
+# the consumer or the relay mid-drain.
+terminationGracePeriodSeconds: 60
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

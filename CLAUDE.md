@@ -22,7 +22,7 @@ Workers: one consumer, the sweeper (`SWEEP_INTERVAL` 15s: ExpireOffers, ReleaseE
 `/healthz` = liveness; `/readyz` = drain gate + Postgres ping + Kafka metadata request naming no topic. Shutdown: /readyz 503, `SHUTDOWN_DRAIN_DELAY` (5s), drain HTTP, stop consumer and sweeper, stop relay LAST, close pool. cmd/** never imports outbound/memory or repocontract. No authentication on REST. See docs/runtime.md.
 
 ## REST
-chi router for apis/openapi.yaml: POST /delivery-offers:quote, GET /delivery-offers/{offerId}, POST /promises, POST /promises/{promiseId}:confirm, GET /promises/{promiseId}, GET /promises?orderId=, GET /promise-books?nodeId=&date=, POST/GET /promise-policies. `Idempotency-Key` required on every state-changing POST except the quote (optional); (route, key) scope, savepoint (ADR 0006).
+chi router for apis/openapi.yaml: POST /delivery-offers:quote, GET /delivery-offers/{offerId}, POST /promises, POST /promises/{promiseId}:confirm, POST /promises/{promiseId}:cancel, GET /promises/{promiseId}, GET /promises?orderId=, GET /promise-books?nodeId=&date=, POST/GET /promise-policies. `Idempotency-Key` required on every state-changing POST except the quote (optional); (route, key) scope, savepoint (ADR 0006).
 Errors are RFC 9457 problem+json, `type` = slug (ADR 0002 A22): not-found, illegal-transition, concurrent-update, validation-failed, plus the model slugs and idempotency-key-reused, dependency-unavailable.
 
 ## Events: CloudEvents 1.0 is MANDATORY
@@ -33,8 +33,8 @@ Consumed: dispatch on the FULL type (`Handlers` in inbound/kafka/dispatch.go), t
 A new event: domain struct + apis/asyncapi.yaml + ADR 0004 `type:` line in the SAME commit + encoder payload + golden test (.claude/skills/how-to-add-an-integration-event).
 
 ## Domain
-Aggregates, invariants and assumptions A1-A29 in docs/adr/0002; consumed contracts and local read models in 0003; outbox/relay/cap in 0005; HTTP, consumer, sweeper, readiness in 0006. A group is judged on its LAST delivered package or the first LOST/RETURNED one (A18). The node never changes after lock (A17).
+Aggregates, invariants and assumptions A1-A30 in docs/adr/0002; consumed contracts and local read models in 0003; outbox/relay/cap in 0005; HTTP, consumer, sweeper, readiness in 0006. A group is judged on its LAST delivered package or the first LOST/RETURNED one (A18). The node never changes after lock (A17).
 
 ## Workflow
 GitFlow: feature/* -> PR into develop, CI green before merge, never push develop or main. lefthook: pre-commit fmt/vet/lint, pre-push `make check`. Commit and push after each step.
-Open follow-up: the Helm chart (docs/before-first-release.md).
+Deployment: `charts/delivery-promise` (api only; Helm chart tests `bash charts/delivery-promise/tests/render_test.sh` and `python3 charts/delivery-promise/tests/test_service_selectors.py`; CI `helm-lint` + `chart-tests`). The chart refuses to render without `database.*`, `kafka.brokers`, `config.consumerGroup`, with a `*_MODE` in extraEnv or with `terminationGracePeriodSeconds` <= drain delay + 40s. Open: registry secrets (docs/before-first-release.md row 11).

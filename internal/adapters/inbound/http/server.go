@@ -27,6 +27,7 @@ type API interface {
 	GetPromise(ctx context.Context, id string) (views.Promise, error)
 	ListPromiseBooks(ctx context.Context, nodeID, date string) (views.BookList, error)
 	ConfirmPromise(ctx context.Context, id, orderID string, groupNo int) (views.Promise, error)
+	CancelPromise(ctx context.Context, id string) (views.Promise, error)
 	PublishPromisePolicy(ctx context.Context, in policy.Input) (views.Policy, error)
 	CurrentPolicy(ctx context.Context) (views.Policy, error)
 }
@@ -76,6 +77,7 @@ func NewRouter(s *Server) http.Handler {
 	r.Get("/promises", s.handleListPromises)
 	r.Get("/promises/{promiseId}", s.handleGetPromise)
 	r.Method(http.MethodPost, "/promises/{promiseId}:confirm", s.idempotent(s.handleConfirm))
+	r.Method(http.MethodPost, "/promises/{promiseId}:cancel", s.idempotent(s.handleCancel))
 	r.Get("/promise-books", s.handleListBooks)
 	r.Method(http.MethodPost, "/promise-policies", s.idempotent(s.handlePublishPolicy))
 	r.Get("/promise-policies/current", s.handleCurrentPolicy)

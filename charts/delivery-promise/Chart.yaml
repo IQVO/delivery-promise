@@ -1,0 +1,12 @@
+apiVersion: v2
+name: delivery-promise
+description: Delivery Promise - quotes delivery offers from a feasible witness path, holds capacity in a PromiseBook and judges every promise kept or broken; publishes on retailnetwork.delivery-promise.events and .analytics (a domain-driven design study)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/IQVO/delivery-promise
+keywords:
+  - ddd
+  - hexagonal-architecture
+  - retail-network
+  - golang

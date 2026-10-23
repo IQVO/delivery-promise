@@ -22,6 +22,7 @@ func registerPromiseSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^the second promise is the first promise$`, w.samePromise)
 	sc.Step(`^the sweeper releases the expired holds$`, w.releaseHolds)
 	sc.Step(`^the order "([^"]*)" is cancelled$`, w.cancelOrder)
+	sc.Step(`^I cancel the promise on request$`, w.cancelPromise)
 }
 
 func (w *world) makeFrom(tier string) error {
@@ -132,6 +133,17 @@ func (w *world) samePromise() error {
 func (w *world) releaseHolds() error {
 	w.run(func() error {
 		_, err := w.svc.ReleaseExpiredHolds(w.ctx(), 10)
+		return err
+	})
+	return nil
+}
+
+func (w *world) cancelPromise() error {
+	if w.promiseID == "" {
+		return errNoPromise
+	}
+	w.run(func() error {
+		_, err := w.svc.CancelPromise(w.ctx(), w.promiseID)
 		return err
 	})
 	return nil

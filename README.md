@@ -31,6 +31,7 @@ Consumed (34 types from eight contexts, ADR 0003): customer-ordering, order-sour
 | `GET /delivery-offers/{offerId}` | read an offer |
 | `POST /promises` | make a PROVISIONAL promise from an offer, holding capacity |
 | `POST /promises/{promiseId}:confirm` | confirm it for an order group (called inside checkout) |
+| `POST /promises/{promiseId}:cancel` | cancel a confirmed promise and release its capacity (checkout compensation; no body, `Idempotency-Key` required) |
 | `GET /promises/{promiseId}`, `GET /promises?orderId=` | read promises |
 | `GET /promise-books?nodeId=&date=` | capacity books of a node and day |
 | `POST /promise-policies`, `GET /promise-policies/current` | publish and read the policy |
@@ -46,6 +47,19 @@ Decisions are in [`docs/adr/`](docs/adr/index.md): the bounded context (0001), t
 ## Runtime
 
 Go, hexagonal (`internal/domain`, `internal/application`, `internal/adapters`, `cmd/api`), real PostgreSQL and Kafka only (`DATABASE_URL`, `KAFKA_BROKERS` and `DELIVERY_PROMISE_CONSUMER_GROUP` are mandatory), CloudEvents 1.0 on every message, transactional outbox with an attempt cap, chi REST adapter with problem+json, dependency-aware `/readyz`.
+
+## Deployment
+
+The Helm chart is [`charts/delivery-promise`](charts/delivery-promise) (the `api` component only: Deployment, Service, ConfigMap, Secret or `database.existingSecret`, ServiceAccount, and an optional HPA, Ingress and Gateway API HTTPRoute, all off by default). It renders exactly the variables `cmd/api` reads and refuses to render without `database.url` or `database.existingSecret`, `kafka.brokers` and `config.consumerGroup`, with a `*_MODE` or a non-`kafka` `EVENT_PUBLISHER` in `extraEnv`, or with a `terminationGracePeriodSeconds` that does not exceed the shutdown bounds. See [`docs/runtime.md`](docs/runtime.md#deployment-helm-chart).
+
+```
+helm template delivery-promise charts/delivery-promise \
+  --set database.existingSecret=delivery-promise-db \
+  --set kafka.brokers=kafka:9092 \
+  --set config.consumerGroup=delivery-promise-consumer
+bash charts/delivery-promise/tests/render_test.sh
+python3 charts/delivery-promise/tests/test_service_selectors.py
+```
 
 ## Develop
 

@@ -306,7 +306,55 @@ func TestRealWiring(t *testing.T) {
 	t.Run("idempotent replay", func(t *testing.T) { assertReplay(t, s, promiseID) })
 	t.Run("redelivered events change nothing", func(t *testing.T) { assertInbox(t, s) })
 	t.Run("exact CloudEvents on the topics", func(t *testing.T) { assertTopics(t, s) })
+	t.Run("cancel route", func(t *testing.T) { assertCancelRoute(t, s, promiseID) })
 	t.Run("Kafka down", func(t *testing.T) { assertKafkaDown(t, s) })
+}
+
+// assertCancelRoute drives POST /promises/{id}:cancel over REST: a KEPT promise
+// is refused (409 illegal-transition), an unknown id is 404, the key is
+// required, and a freshly confirmed promise is cancelled (200 CANCELLED, the
+// confirmed hold given back, one PromiseCancelled row) and a repeat is a 200
+// no-op that appends nothing.
+func assertCancelRoute(t *testing.T, s *service, keptID string) {
+	t.Helper()
+	if r := s.call(http.MethodPost, "/promises/"+keptID+":cancel", "", "cancel-kept"); r.status != http.StatusConflict || !strings.Contains(string(r.body), "illegal-transition") {
+		t.Fatalf("cancel of a KEPT promise = %d %s, want 409 illegal-transition", r.status, r.body)
+	}
+	if r := s.call(http.MethodPost, "/promises/prm-nope:cancel", "", "cancel-missing"); r.status != http.StatusNotFound || !strings.Contains(string(r.body), "not-found") {
+		t.Fatalf("cancel of an unknown promise = %d %s, want 404 not-found", r.status, r.body)
+	}
+	if r := s.call(http.MethodPost, "/promises/"+keptID+":cancel", "", ""); r.status != http.StatusBadRequest {
+		t.Fatalf("cancel without Idempotency-Key = %d, want 400", r.status)
+	}
+
+	offer := quoteWhenProjected(s)
+	made := s.write("/promises", `{"offerId":"`+str(offer, "offerId")+`","lines":[{"catalogItemId":"ci-1001","quantity":2}]}`, http.StatusCreated)
+	id := str(made, "promiseId")
+	s.write("/promises/"+id+":confirm", `{"orderId":"ord-cancel","groupNo":1}`, http.StatusOK)
+	confirmed := s.count(`SELECT COALESCE(sum((snapshot->>'Confirmed')::int), 0) FROM promise_books`)
+
+	cancelled := decode(t, s.call(http.MethodPost, "/promises/"+id+":cancel", "", "cancel-1").body)
+	if str(cancelled, "state") != "CANCELLED" || str(cancelled, "promiseId") != id || str(cancelled, "cancelReason") != usecases.CancelReasonRequested {
+		t.Fatalf("cancelled = %v", cancelled)
+	}
+	if got := s.count(`SELECT COALESCE(sum((snapshot->>'Confirmed')::int), 0) FROM promise_books`); got != confirmed-1 {
+		t.Fatalf("confirmed holds %d -> %d, want one given back", confirmed, got)
+	}
+	rows := s.count(`SELECT count(*) FROM outbox_events WHERE event_type LIKE '%.PromiseCancelled'`)
+	if rows != 1 {
+		t.Fatalf("PromiseCancelled outbox rows = %d, want 1", rows)
+	}
+	again := s.call(http.MethodPost, "/promises/"+id+":cancel", "", "cancel-2")
+	if again.status != http.StatusOK || str(decode(t, again.body), "state") != "CANCELLED" {
+		t.Fatalf("repeat cancel = %d %s, want 200 CANCELLED", again.status, again.body)
+	}
+	replay := s.call(http.MethodPost, "/promises/"+id+":cancel", "", "cancel-1")
+	if replay.status != http.StatusOK || replay.header.Get("Idempotency-Replayed") != "true" {
+		t.Fatalf("replay of the first key = %d replayed=%q", replay.status, replay.header.Get("Idempotency-Replayed"))
+	}
+	if got := s.count(`SELECT count(*) FROM outbox_events WHERE event_type LIKE '%.PromiseCancelled'`); got != rows {
+		t.Fatalf("a repeat appended PromiseCancelled rows: %d -> %d", rows, got)
+	}
 }
 
 func restFlow(t *testing.T, s *service, nw network) string {

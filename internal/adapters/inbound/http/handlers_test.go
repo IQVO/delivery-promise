@@ -28,6 +28,7 @@ type fakeAPI struct {
 	make      usecases.MakePromiseCommand
 	policy    policy.Input
 	confirm   [3]any
+	cancel    string
 	books     [2]string
 	orderID   string
 	offerID   string
@@ -69,6 +70,11 @@ func (f *fakeAPI) ConfirmPromise(_ context.Context, id, order string, group int)
 	return views.Promise{PromiseID: id, State: "CONFIRMED"}, f.err
 }
 
+func (f *fakeAPI) CancelPromise(_ context.Context, id string) (views.Promise, error) {
+	f.cancel = id
+	return views.Promise{PromiseID: id, State: "CANCELLED"}, f.err
+}
+
 func (f *fakeAPI) PublishPromisePolicy(_ context.Context, in policy.Input) (views.Policy, error) {
 	f.policy = in
 	return views.Policy{PolicyVersion: "v1"}, f.err
@@ -100,6 +106,7 @@ func TestEveryOperationCallsItsUseCaseAndAnswers(t *testing.T) {
 		{"list by order", "GET", "/promises?orderId=ord-1", ``, 200, `"items":[]`},
 		{"get promise", "GET", "/promises/prm-7", ``, 200, `"promiseId":"prm-7"`},
 		{"confirm", "POST", "/promises/prm-7:confirm", `{"orderId":"ord-1","groupNo":2}`, 200, `"state":"CONFIRMED"`},
+		{"cancel", "POST", "/promises/prm-8:cancel", ``, 200, `"state":"CANCELLED"`},
 		{"list books", "GET", "/promise-books?nodeId=N-AUS3&date=2026-10-22", ``, 200, `"items":[]`},
 		{"publish policy", "POST", "/promise-policies", `{"offerTtlMinutes":5,"holdTtlMinutes":20,"packagesPerOrder":2,"capacitySharePercent":50,"orderDeadlines":[{"tier":"NEXT_DAY","regionId":"R-SC","localTime":"23:59"}]}`, 201, `"policyVersion":"v1"`},
 		{"current policy", "GET", "/promise-policies/current", ``, 200, `"policyVersion":"v0"`},
@@ -127,6 +134,9 @@ func assertRecordedCalls(t *testing.T, api *fakeAPI) {
 	}
 	if api.make.OfferID != "off-1" || api.make.Lines[0].CatalogItemID != "ci-1" || api.offerID != "off-9" || api.orderID != "ord-1" || api.promiseID != "prm-7" {
 		t.Errorf("recorded = %+v", api)
+	}
+	if api.cancel != "prm-8" {
+		t.Errorf("cancel recorded %q", api.cancel)
 	}
 	if api.confirm != [3]any{"prm-7", "ord-1", 2} || api.books != [2]string{"N-AUS3", "2026-10-22"} {
 		t.Errorf("confirm %v books %v", api.confirm, api.books)
@@ -249,9 +259,10 @@ func TestOnlyTheMutatingRoutesAreWrappedByTheIdempotencyMiddleware(t *testing.T)
 	do(h, "POST", "/delivery-offers:quote", `{"destinationPostalPrefix":"787","lines":[]}`)
 	do(h, "POST", "/promises", `{"offerId":"o","lines":[]}`)
 	do(h, "POST", "/promises/prm-1:confirm", `{"orderId":"o","groupNo":1}`)
+	do(h, "POST", "/promises/prm-1:cancel", ``)
 	do(h, "POST", "/promise-policies", `{}`)
 	do(h, "GET", "/promises/prm-1", ``)
-	want := "POST /promises,POST /promises/prm-1:confirm,POST /promise-policies"
+	want := "POST /promises,POST /promises/prm-1:confirm,POST /promises/prm-1:cancel,POST /promise-policies"
 	if got := strings.Join(wrapped, ","); got != want {
 		t.Fatalf("wrapped = %s, want %s", got, want)
 	}
