@@ -2,6 +2,10 @@
 
 Retail network, bounded context **Delivery Promise** (Core, commerce tier).
 
+## Disclaimer
+
+This project is a domain-driven design study. It is not associated with, endorsed by or affiliated with any company, and it uses no company's code, data, logos or trademarks. All names, figures and examples are illustrative or synthetic.
+
 Tells a shopper, before and at purchase, the date a package will arrive, and makes that date true by construction: a delivery offer is quoted only from a feasible witness path (node cutoff, scheduled departures, delivery wave) that has remaining capacity, and a promise holds that capacity until the order is placed or the hold expires. Judges every promise kept or broken.
 
 Status: under construction. The design is proposed in
