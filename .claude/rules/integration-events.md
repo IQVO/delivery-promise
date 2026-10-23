@@ -1,101 +1,146 @@
 ---
 paths:
   - "internal/adapters/**/kafka/**"
-  - "internal/adapters/outbound/events/**"
+  - "internal/adapters/outbound/outbox/**"
   - "apis/asyncapi*"
 ---
 
-<!-- TEMPLATE (warehouse-harness-template v2): fill in every "FILL IN" for
-     THIS repo, or delete this file if the repo publishes/consumes no Kafka
-     events. The "CloudEvents 1.0 is MANDATORY" section is NOT a
-     placeholder: keep it verbatim, only substitute the per-repo values. -->
 # Cross-service integration events (Kafka)
 
-FILL IN: state whether this service PUBLISHES, CONSUMES, or both, and
-to/from which topic(s). Fleet naming: `warehouse.<context>.events`
-(integration) and `warehouse.<context>.analytics` (consumed only by this
-service's own analytics projector).
+delivery-promise PUBLISHES twelve events (six integration events to
+`retailnetwork.delivery-promise.events`, six analytics-only events to
+`retailnetwork.delivery-promise.analytics`) and CONSUMES 34 integration events from
+the eight producing contexts (ADR 0003, ADR 0004). Never produce or consume a
+`warehouse.*` topic.
 
 ## Events: CloudEvents 1.0 is MANDATORY
 
-Every Kafka message this service produces or consumes (integration
-`warehouse.<ctx>.events` AND analytics `warehouse.<ctx>.analytics`) is a
-CloudEvents 1.0 event in structured content mode. This is a hard fleet rule,
-not a preference — there is nothing to "choose" here:
+Every Kafka message this service produces or consumes is a CloudEvents 1.0 event in
+structured content mode. This is a hard rule, not a preference:
 
-- No flat envelope (`event_id`/`event_type`/`occurred_at`), no dual-write,
-  no dual-read, no envelope toggle env var (`EVENT_ENVELOPE_MODE` is gone
-  fleet-wide). `internal/architecture/fitness_test.go`'s
+- No flat envelope (`event_id`/`event_type`/`occurred_at`), no dual-write, no
+  envelope toggle env var. `internal/architecture/fitness_test.go`'s
   `TestNoEventEnvelopeToggleOrFlatEnvelope` fails CI on any of them.
-- Build/validate/(un)marshal with `github.com/cloudevents/sdk-go/v2/event`
-  (latest v2) via ONE helper package,
-  `internal/adapters/kafka/cloudevents/` — copy it from this template's
-  `templates/cloudevents/cloudevents.go.tmpl` (+ its test) and change only
-  the per-repo constants. Transport stays `segmentio/kafka-go` (no sdk-go
-  protocol/client packages, no hand-rolled CloudEvent structs).
+- Build and validate the envelope with `github.com/cloudevents/sdk-go/v2/event`
+  through ONE helper package, `internal/adapters/kafka/cloudevents` (`New`,
+  `Decode`, `ContentTypeHeader`). Transport stays `segmentio/kafka-go`; no
+  hand-rolled CloudEvent structs. The only producer-side caller is the encoder
+  `internal/adapters/outbound/kafka/encoder.go`.
 - Every produced message carries the Kafka header
-  `content-type: application/cloudevents+json; charset=UTF-8`
-  (`cloudevents.ContentTypeHeader()`), next to the W3C trace headers
-  (`traceparent`/`tracestate` stay in headers, never duplicated into
-  extension attributes). Message key = aggregate id, `kafkago.Hash{}`
-  balancer.
-- Required attributes: `specversion=1.0`; `id` (UUID v4 minted ONCE per
-  domain event and persisted with the outbox row, so redelivery carries
-  the same id); `source=/warehouse/<repo>`; `type`; `subject` (aggregate
-  instance id, never empty); `time` (domain occurred-at, UTC);
-  `datacontenttype=application/json`;
-  `dataschema=urn:warehouse:<repo>:<events|analytics>:<EventName>:v<N>`.
+  `content-type: application/cloudevents+json; charset=UTF-8`. Message key =
+  aggregate id, `kafkago.Hash{}` balancer (`internal/adapters/outbound/kafka/writer.go`).
+- Attributes: `specversion=1.0`; `id` (UUID v4 minted ONCE per event at outbox
+  append and stored in `outbox_events.event_id`, so a redelivery carries the same
+  id); `source=/retailnetwork/delivery-promise`; `type`; `subject` (the aggregate
+  id: promiseId, offerId, bookId or policyVersion; never empty); `time` (the domain
+  occurred-at, UTC); `datacontenttype=application/json`;
+  `dataschema=urn:retailnetwork:delivery-promise:<events|analytics>:<EventName>:v1`.
   No custom extension attributes without an ADR.
-- `type` = `com.warehouse.<subdomain>.<bounded-context>.<entity>.<EventName>`
-  (subdomain `wms` or `wes`; FILL IN this repo's exact prefix, e.g.
-  `com.warehouse.wes.order-management`). The SAME `type` names the
-  occurrence on both the integration and the analytics topic; `dataschema`
-  names the payload shape. Breaking payload change => new `.v2` type + new
-  dataschema version, never mutate an existing one.
-- Consumers decode with `cloudevents.Decode` (validates), dispatch on the
-  FULL `type` string (never a short name or suffix match), ignore unknown
-  types, read `time`/`subject` from attributes and the payload via
-  `DataAs`, dedupe on `id`, and DLQ/skip — WARN log + commit past, never
-  crash, never block the partition, never fall back to parsing a legacy
-  shape — anything that fails CloudEvents validation.
-- Tests: a golden exact-JSON test per published `type` (all attributes +
-  the `content-type` header); a legacy-flat-message-rejected test per
-  consumer; Kafka integration tests via testcontainers only.
-
-Full standard, subdomain table and the fleet's cross-service type
-catalogue: warehouse-docs `docs/strategic-design/event-standard-cloudevents.md`.
-Record it in this repo as its own ADR "CloudEvents 1.0 as the mandatory
-event envelope" under `docs/docs/adr/`.
+- `type` = `com.retailnetwork.commerce.delivery-promise.<entity>.<EventName>` with
+  entity `promise`, `promisebook`, `deliveryoffer` or `promisepolicy` (lowercase,
+  no separators). A breaking payload change is a new `.v2` dataschema, never a
+  mutation of v1; evolution is additive only.
+- Payloads follow the wire conventions of contracts-delta: ids are strings,
+  instants RFC 3339 UTC, durations integers ending in `Minutes`, enums UPPER_SNAKE,
+  optional fields omitted, arrays always present.
+- Tests: a golden exact-JSON test per published type
+  (`internal/adapters/outbound/kafka/encoder_test.go`, files in `testdata/`), the
+  catalogue-vs-contract sensor (`TestEventCatalogueMatchesContract`), the handler
+  table vs the contract (`internal/adapters/inbound/kafka/dispatch_test.go`
+  `TestHandlersAreExactlyTheConsumedMessagesOfTheContract`) and the real-broker
+  proof (`cmd/api/e2e_integration_test.go`), all via testcontainers.
 
 ### Published types
 
-FILL IN: one row per published event, exact strings.
+`subject` and the Kafka key are the aggregate id; `dataschema` is
+`urn:retailnetwork:delivery-promise:<stream>:<Event>:v1`.
 
-| `type` | topic(s) | `subject` | `dataschema` |
-| --- | --- | --- | --- |
-| `com.warehouse.<sub>.<ctx>.<entity>.<EventName>` | `warehouse.<ctx>.events` | aggregate id | `urn:warehouse:<repo>:events:<EventName>:v1` |
+| `type` | topic | `subject` |
+| --- | --- | --- |
+| `com.retailnetwork.commerce.delivery-promise.promise.PromiseAtRisk` | `retailnetwork.delivery-promise.events` | promiseId |
+| `com.retailnetwork.commerce.delivery-promise.promise.PromiseRevised` | `retailnetwork.delivery-promise.events` | promiseId |
+| `com.retailnetwork.commerce.delivery-promise.promise.PromiseKept` | `retailnetwork.delivery-promise.events` | promiseId |
+| `com.retailnetwork.commerce.delivery-promise.promise.PromiseBroken` | `retailnetwork.delivery-promise.events` | promiseId |
+| `com.retailnetwork.commerce.delivery-promise.promise.PromiseUnkeepable` | `retailnetwork.delivery-promise.events` | promiseId |
+| `com.retailnetwork.commerce.delivery-promise.promisebook.PromiseBookExhausted` | `retailnetwork.delivery-promise.events` | bookId |
+| `com.retailnetwork.commerce.delivery-promise.promise.PromiseMade` | `retailnetwork.delivery-promise.analytics` | promiseId |
+| `com.retailnetwork.commerce.delivery-promise.promise.PromiseConfirmed` | `retailnetwork.delivery-promise.analytics` | promiseId |
+| `com.retailnetwork.commerce.delivery-promise.promise.PromiseReleased` | `retailnetwork.delivery-promise.analytics` | promiseId |
+| `com.retailnetwork.commerce.delivery-promise.promise.PromiseCancelled` | `retailnetwork.delivery-promise.analytics` | promiseId |
+| `com.retailnetwork.commerce.delivery-promise.deliveryoffer.DeliveryOfferQuoted` | `retailnetwork.delivery-promise.analytics` | offerId |
+| `com.retailnetwork.commerce.delivery-promise.promisepolicy.PromisePolicyPublished` | `retailnetwork.delivery-promise.analytics` | policyVersion |
 
 ### Consumed types
 
-FILL IN: one row per consumed event — the EXACT `type` string from the
-producer's catalogue (byte-identical; see the cross-service catalogue on the
-Event Standard page).
+The EXACT `type` strings of the producers' AsyncAPI (re-checked against
+`origin/feature/service` of each producer); the dispatch table is
+`internal/adapters/inbound/kafka/dispatch.go` `Handlers`.
 
 | `type` | topic | producer |
 | --- | --- | --- |
+| `com.retailnetwork.logistics.node-topology.node.NodeRegistered` | `retailnetwork.node-topology.events` | node-topology |
+| `com.retailnetwork.logistics.node-topology.node.NodeOperationalProfileDeclared` | `retailnetwork.node-topology.events` | node-topology |
+| `com.retailnetwork.logistics.node-topology.node.NodeActivated` | `retailnetwork.node-topology.events` | node-topology |
+| `com.retailnetwork.logistics.node-topology.node.NodeSuspended` | `retailnetwork.node-topology.events` | node-topology |
+| `com.retailnetwork.logistics.node-topology.node.NodeRetired` | `retailnetwork.node-topology.events` | node-topology |
+| `com.retailnetwork.logistics.node-topology.lane.LaneOpened` | `retailnetwork.node-topology.events` | node-topology |
+| `com.retailnetwork.logistics.node-topology.lane.LaneClosed` | `retailnetwork.node-topology.events` | node-topology |
+| `com.retailnetwork.logistics.node-topology.servicearea.ServiceAreaAssigned` | `retailnetwork.node-topology.events` | node-topology |
+| `com.retailnetwork.logistics.node-topology.region.RegionDefined` | `retailnetwork.node-topology.events` | node-topology |
+| `com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated` | `retailnetwork.offer-availability.events` | offer-availability |
+| `com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued` | `retailnetwork.offer-availability.events` | offer-availability |
+| `com.retailnetwork.commerce.offer-availability.listing.ListingCreated` | `retailnetwork.offer-availability.events` | offer-availability |
+| `com.retailnetwork.commerce.offer-availability.listing.ListingAvailabilityChanged` | `retailnetwork.offer-availability.events` | offer-availability |
+| `com.retailnetwork.commerce.offer-availability.listing.ListingSuppressed` | `retailnetwork.offer-availability.events` | offer-availability |
+| `com.retailnetwork.commerce.offer-availability.listing.ListingRestored` | `retailnetwork.offer-availability.events` | offer-availability |
+| `com.retailnetwork.partner.node-performance.scorecard.NodeScorecardUpdated` | `retailnetwork.node-performance.events` | node-performance |
+| `com.retailnetwork.logistics.linehaul-transportation.departure.DepartureScheduled` | `retailnetwork.linehaul-transportation.events` | linehaul-transportation |
+| `com.retailnetwork.logistics.linehaul-transportation.departure.DepartureCapacityChanged` | `retailnetwork.linehaul-transportation.events` | linehaul-transportation |
+| `com.retailnetwork.logistics.linehaul-transportation.departure.DepartureCancelled` | `retailnetwork.linehaul-transportation.events` | linehaul-transportation |
+| `com.retailnetwork.logistics.linehaul-transportation.departure.BookingMoved` | `retailnetwork.linehaul-transportation.events` | linehaul-transportation |
+| `com.retailnetwork.logistics.linehaul-transportation.departure.BookingFailed` | `retailnetwork.linehaul-transportation.events` | linehaul-transportation |
+| `com.retailnetwork.logistics.last-mile-delivery.wave.DeliveryWaveScheduled` | `retailnetwork.last-mile-delivery.events` | last-mile-delivery |
+| `com.retailnetwork.logistics.last-mile-delivery.wave.DeliveryWaveCapacityChanged` | `retailnetwork.last-mile-delivery.events` | last-mile-delivery |
+| `com.retailnetwork.logistics.last-mile-delivery.wave.DeliveryWaveCancelled` | `retailnetwork.last-mile-delivery.events` | last-mile-delivery |
+| `com.retailnetwork.logistics.last-mile-delivery.packageattempthistory.PackageInductionDeferred` | `retailnetwork.last-mile-delivery.events` | last-mile-delivery |
+| `com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentLocked` | `retailnetwork.order-sourcing.events` | order-sourcing |
+| `com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentShipped` | `retailnetwork.order-sourcing.events` | order-sourcing |
+| `com.retailnetwork.commerce.order-sourcing.assignment.FulfillmentUnsourceable` | `retailnetwork.order-sourcing.events` | order-sourcing |
+| `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageDelivered` | `retailnetwork.shipping-and-tracking.events` | shipping-and-tracking |
+| `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageExceptionRaised` | `retailnetwork.shipping-and-tracking.events` | shipping-and-tracking |
+| `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageLost` | `retailnetwork.shipping-and-tracking.events` | shipping-and-tracking |
+| `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageReturned` | `retailnetwork.shipping-and-tracking.events` | shipping-and-tracking |
+| `com.retailnetwork.commerce.customer-ordering.customerorder.CustomerOrderPlaced` | `retailnetwork.customer-ordering.events` | customer-ordering |
+| `com.retailnetwork.commerce.customer-ordering.customerorder.CustomerOrderCancelled` | `retailnetwork.customer-ordering.events` | customer-ordering |
+
+## Consuming
+
+`internal/adapters/inbound/kafka` runs ONE consumer over the eight topics: it
+decodes with `cloudevents.Decode`, dispatches on the FULL `type`, ignores unknown
+types and skips (WARN) anything that is not a valid CloudEvent. Each handler is a
+`usecases.Service.On...` method that claims the CloudEvents `id` in
+`processed_events` (the inbox) and writes the read model or changes the aggregate in
+ONE unit of work, so a redelivery commits nothing. A transient failure is retried
+with capped backoff (5 attempts), then the message goes to `<topic>.dlq`; a payload
+that can never be applied (`errBadPayload`) goes there at once. Offsets are committed
+only after handling.
+
+## Transactional outbox
+
+A use case saves the aggregates and appends the encoded events in ONE Postgres
+transaction (`ports.EventOutbox`, `internal/adapters/outbound/postgres/outbox.go`).
+The relay (`internal/adapters/outbound/outbox/relay.go`, always on, started by
+`cmd/api/workers.go`) drains `outbox_events` in id order, at-least-once. The cap
+`OUTBOX_MAX_ATTEMPTS` (default 20, 0 = unlimited) excludes a poison row; re-arm it
+with `UPDATE outbox_events SET attempts = 0 WHERE id = ...` (ADR 0005). The first
+write to a topic that does not exist yet can fail once with an unknown-topic
+error: the relay retries it with the same id. The caller of `NewOutboxRelay` must
+pass `WithMaxAttempts(...)` inline (`TestOutboxRelaysPassAttemptCap`).
 
 ## Consumer group id
 
-If this service consumes Kafka: state where the consumer group id comes
-from. It MUST be env-configurable, never a hardcoded string literal --
-`internal/architecture/fitness_test.go`'s
-TestKafkaConsumerGroupNeverHardcodedInline enforces this (a real incident:
-wes-work-planning's hardcoded group id let a locally-run e2e-tests process
-silently collide with the live in-cluster Deployment's consumer group on
-the shared fleet Kafka broker).
-
-If this consumer replays from FirstOffset on every start to build an
-in-memory read model (rather than resuming from a committed offset), the
-group id must additionally be UNIQUE PER PROCESS INSTANCE (hostname+PID+
-timestamp), not just configurable -- see HARNESS.md's Kafka section for
-why a shared group breaks that pattern specifically.
+`DELIVERY_PROMISE_CONSUMER_GROUP` is mandatory (a boot error naming it, raised
+before the listener binds), one stable group for the eight topics, a chart value and
+never a string literal (`TestKafkaConsumerGroupNeverHardcodedInline`). The consumer
+resumes from its committed offsets; the read models live in Postgres, so the group
+is NOT per process instance.

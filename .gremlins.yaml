@@ -1,10 +1,12 @@
-# .gremlins.yaml — mutation-testing configuration template (warehouse-harness-template v2).
+# .gremlins.yaml — mutation-testing configuration for delivery-promise.
 #
 # gremlins (github.com/go-gremlins/gremlins, pinned to v0.6.0 in CI) reads
 # this file automatically from the Go module root, so the `mutation-fast`
 # CI job, the scheduled exhaustive `mutation` CI job, the `drift` job's
 # coverage-quality check, and the local `make mutation` / `make
-# mutation-full` targets all run with identical settings.
+# mutation-full` targets all run with identical settings. Every package
+# under internal/domain/ is run on its own (the loop in the Makefile and in
+# ci.yml), each against the thresholds below.
 #
 # Mutation testing is the sensor that tells us whether the tests actually
 # ASSERT rather than merely execute. The thresholds below turn it into a
@@ -21,11 +23,20 @@ unleash:
   threshold:
     # gremlins fails when the measured value is <= the threshold
     # (internal/report/report.go in gremlins itself), so a threshold must
-    # sit strictly BELOW the number this repo can meet today. Measure
-    # first (`make mutation-full`), THEN set these -- don't guess/copy a
-    # sibling repo's numbers, every domain layer's mutant survivability
-    # differs. See HARNESS.md's mutation-testing section for the
-    # tagless-switch-under-reports pitfall before assuming a low number
-    # means missing tests.
-    efficacy: "0"
-    mutant-coverage: "0"
+    # sit strictly BELOW what the repo meets today. One file serves every
+    # package, so each value is below the WEAKEST package. Measured on
+    # 2026-10-23 (one run per internal/domain package, 496 mutants):
+    #
+    #   package   killed  lived  not-covered  efficacy  mutator-coverage
+    #   shared       55      1       0         98.21%      100.00%
+    #   calendar     62     14       0         81.58%      100.00%
+    #   policy       50      3       0         94.34%      100.00%
+    #   offer        26      2       0         92.86%      100.00%
+    #   book         69      7       0         90.79%      100.00%
+    #   promise      94      9       0         91.26%      100.00%
+    #   search       77     22       5         77.78%       95.19%
+    #
+    # Weakest: search (efficacy 77.78%, mutator coverage 95.19%). Raise the
+    # numbers when tests kill more mutants; never lower them.
+    efficacy: "75"
+    mutant-coverage: "90"

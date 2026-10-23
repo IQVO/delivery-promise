@@ -1,0 +1,867 @@
+openapi: 3.0.3
+info:
+  title: Delivery Promise API
+  version: 0.1.0
+  description: 'REST contract of the delivery-promise bounded context (Core, commerce tier) of the retail network,
+    derived from retail-network-docs model/model.yaml (contexts[delivery-promise].rest) and the FINAL cross-context
+    decisions (contracts-delta E7, E8, E9; gap register G8, G9, G19, G21, G22). The quote route is an Open Host
+    Service for the storefront and an in-organization Customer/Supplier contract for customer-ordering; POST /promises
+    POST /promises/{promiseId}:confirm and POST /promises/{promiseId}:cancel (checkout compensation) are called only
+    by customer-ordering inside checkout. The promise hot
+    path makes no synchronous call to any other context: every input is an event-fed local read model. No authentication,
+    consistent with the fleet. No personal data appears in any schema: the destination is a postal prefix, never
+    an address. Errors are RFC 9457 application/problem+json whose `type` is https://retailnetwork.example/problems/<slug>.
+    Shared slugs: not-found (404), illegal-transition (409), concurrent-update (409), validation-failed (422). Model
+    slugs (kebab-case of the Err name): offer-not-quotable, promise-capacity-exhausted, book-closed, promise-hold-expired,
+    promise-closed, revision-moves-earlier (409); group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier
+    (422). Infrastructure slug: idempotency-key-reused (422). Every state-changing POST takes Idempotency-Key; a
+    repeat with the same key and body replays the first response for 24 hours.'
+  contact:
+    name: delivery-promise maintainers
+    url: https://github.com/IQVO/delivery-promise
+servers:
+- url: http://localhost:8080
+tags:
+- name: DeliveryOffers
+  description: Short-lived quotes backed by a feasible witness path (aggregate DeliveryOffer).
+- name: Promises
+  description: Commitments per shipment group (aggregate Promise).
+- name: PromiseBooks
+  description: Capacity ledgers per node pickup cutoff (aggregate PromiseBook).
+- name: PromisePolicy
+  description: 'Versioned promise policy: offer TTL, hold TTL, packages per order, capacity share and per-tier order
+    deadlines (aggregate PromisePolicy, G19).'
+paths:
+  /delivery-offers:quote:
+    post:
+      tags:
+      - DeliveryOffers
+      operationId: quoteDeliveryOffers
+      summary: Quote delivery offers per tier for a destination and a set of lines
+      description: 'Runs the PromisePolicy search over local read models. The cart is first split into shipment
+        groups (ShipmentGrouping: one node for the whole cart when one can cover every line, otherwise the fewest
+        groups). Returns one QUOTED offer per (group, requested tier) that has a feasible witness path, and an OfferConstraint
+        for every (group, tier) that has none. "No offer" is a normal 200 answer. A tier whose order deadline in
+        the destination region has passed is reported PAST_ORDER_DEADLINE. Each offer is persisted with a TTL so
+        checkout can honour it. With an Idempotency-Key, a repeat inside the offers'' TTL returns the same offers.
+        Makes no synchronous call.'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuoteRequest'
+      responses:
+        '200':
+          description: Offers for the feasible tiers and constraints for the others.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteResponse'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /delivery-offers/{offerId}:
+    get:
+      tags:
+      - DeliveryOffers
+      operationId: getDeliveryOffer
+      summary: Get one delivery offer
+      parameters:
+      - $ref: '#/components/parameters/OfferId'
+      responses:
+        '200':
+          description: The offer, in any state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryOffer'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: Returns the offer in any state (QUOTED, EXPIRED or CONSUMED) with its witness path, basis and
+        policy version. Offers are kept for a retention period after they expire.
+  /promises:
+    post:
+      tags:
+      - Promises
+      operationId: makePromise
+      summary: Make a provisional promise for one shipment group from a quoted offer
+      description: 'MakePromise. Consumes the offer (CONSUMED), creates the promise in PROVISIONAL with holdExpiresAt,
+        and holds capacity on the witness PromiseBook (nodeId:pickupDepartureId), opening the book lazily on the
+        first hold, in ONE transaction (documented exception to one aggregate per transaction, G22). A retry with
+        the same Idempotency-Key and body replays the first response (200). Errors: not-found (404); offer-not-quotable,
+        promise-capacity-exhausted, book-closed, concurrent-update (409); group-spans-nodes, invalid-promise-terms,
+        nominal-basis-not-allowed-for-tier, idempotency-key-reused, validation-failed (422).'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MakePromiseRequest'
+      responses:
+        '201':
+          description: Promise made (PROVISIONAL) and capacity held.
+          headers:
+            Location:
+              description: URL of the new promise.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promise'
+        '200':
+          description: Idempotent replay; the promise made by the first request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promise'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    get:
+      tags:
+      - Promises
+      operationId: listPromisesByOrder
+      summary: List the promises of one customer order
+      description: Returns every promise confirmed for the order, one per shipment group.
+      parameters:
+      - name: orderId
+        in: query
+        required: true
+        description: The customer order id (from CustomerOrderPlaced).
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The order's promises, ordered by groupNo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromiseList'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /promises/{promiseId}:
+    get:
+      tags:
+      - Promises
+      operationId: getPromise
+      summary: Get one promise with its terms, witness path, revisions and judgement
+      parameters:
+      - $ref: '#/components/parameters/PromiseId'
+      responses:
+        '200':
+          description: The promise.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promise'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      description: Returns the promise with its terms, witness path, revisions and judgement. A promise is never
+        deleted; terminal states stay readable.
+  /promise-books:
+    get:
+      tags:
+      - PromiseBooks
+      operationId: listPromiseBooks
+      summary: List the promise books of one node for one date
+      description: One book per pickup cutoff of the node whose cutoff falls on the date (node local time).
+      parameters:
+      - name: nodeId
+        in: query
+        required: true
+        description: The fulfillment node id.
+        schema:
+          type: string
+      - name: date
+        in: query
+        required: true
+        description: The cutoff date, YYYY-MM-DD, in the node's time zone.
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: The node's books for that date, ordered by cutoffAt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromiseBookList'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /promises/{promiseId}:confirm:
+    post:
+      tags:
+      - Promises
+      operationId: confirmPromise
+      summary: Confirm a provisional promise for a placed order (ConfirmPromise)
+      description: 'Called by customer-ordering inside checkout, before the order is placed (E7). PROVISIONAL becomes
+        CONFIRMED and the book hold moves from provisional to confirmed, in one transaction; PromiseConfirmed goes
+        to the analytics topic. Idempotent: confirming an already CONFIRMED promise with the same orderId and groupNo
+        is a no-op returning 200. A hold past holdExpiresAt is refused with promise-hold-expired (409), and a RELEASED
+        or otherwise closed promise with promise-closed (409): checkout then re-quotes and no order is placed.'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      - $ref: '#/components/parameters/PromiseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPromiseRequest'
+      responses:
+        '200':
+          description: The CONFIRMED promise (also the replay).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promise'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /promises/{promiseId}:cancel:
+    post:
+      tags:
+      - Promises
+      operationId: cancelPromise
+      summary: Cancel a confirmed promise on request (CancelPromise)
+      description: 'Called by customer-ordering to compensate a checkout whose later group failed to confirm: the
+        promises already CONFIRMED are cancelled so their capacity is given back. No request body. A CONFIRMED or
+        AT_RISK promise becomes CANCELLED (cancelReason CANCELLED_ON_REQUEST), the confirmed hold goes back to its
+        PromiseBook and PromiseCancelled goes to the analytics topic, in one transaction. Idempotent: cancelling an
+        already CANCELLED promise is a no-op returning 200 with the same view. A PROVISIONAL, KEPT, BROKEN or RELEASED
+        promise is refused with illegal-transition (409); a provisional hold is never cancelled, it lapses by itself
+        (ReleaseExpiredHolds).'
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      - $ref: '#/components/parameters/PromiseId'
+      responses:
+        '200':
+          description: The CANCELLED promise (also the replay and the repeat on an already cancelled promise).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Promise'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /promise-policies:
+    post:
+      tags:
+      - PromisePolicy
+      operationId: publishPromisePolicy
+      summary: Publish a new promise policy version (PublishPromisePolicy)
+      description: Stores the next policy version (strictly increasing) and publishes PromisePolicyPublished on
+        the analytics topic. Offers and promises made afterwards record the new policyVersion.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublishPolicyRequest'
+      responses:
+        '201':
+          description: Policy published.
+          headers:
+            Location:
+              description: URL of the current policy.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromisePolicy'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /promise-policies/current:
+    get:
+      tags:
+      - PromisePolicy
+      operationId: getCurrentPromisePolicy
+      summary: Get the current promise policy
+      description: Returns the highest published version, or the built-in default (policyVersion v0) when none has
+        been published.
+      responses:
+        '200':
+          description: The current policy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromisePolicy'
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Client-chosen key; a repeat with the same key returns the first result.
+      schema:
+        type: string
+        maxLength: 128
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Client-chosen key; a repeat with the same key and body returns the first result.
+      schema:
+        type: string
+        maxLength: 128
+    OfferId:
+      name: offerId
+      in: path
+      required: true
+      description: The DeliveryOffer id.
+      schema:
+        type: string
+    PromiseId:
+      name: promiseId
+      in: path
+      required: true
+      description: The Promise id.
+      schema:
+        type: string
+  responses:
+    NotFound:
+      description: 'Not found (not-found): the offer, promise or policy does not exist.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: State, capacity, closed or concurrency conflict (illegal-transition, concurrent-update, offer-not-quotable,
+        promise-capacity-exhausted, book-closed, promise-hold-expired, promise-closed, revision-moves-earlier).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unprocessable:
+      description: Validation failure (validation-failed, group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier,
+        idempotency-key-reused).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required:
+      - type
+      - title
+      - status
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Problem type, https://retailnetwork.example/problems/<slug>.
+          example: https://retailnetwork.example/problems/promise-capacity-exhausted
+        title:
+          type: string
+          example: Promise capacity exhausted
+        status:
+          type: integer
+          example: 409
+        detail:
+          type: string
+          example: Book AUS3:dep-pickup-0418 has no room left (share 2500).
+        instance:
+          type: string
+    Tier:
+      type: string
+      description: Service tier (promise.Tier).
+      enum:
+      - SAME_DAY
+      - NEXT_DAY
+      - TWO_DAY
+      - STANDARD
+    Basis:
+      type: string
+      description: Promise basis; NOMINAL only for STANDARD.
+      enum:
+      - SCHEDULED
+      - NOMINAL
+    OfferConstraint:
+      type: string
+      description: 'Why a tier has no offer. PAST_ORDER_DEADLINE: the tier''s order deadline in the destination
+        region has passed (G19).'
+      enum:
+      - DESTINATION_NOT_SERVED
+      - ITEM_QUANTITY_NOT_AVAILABLE
+      - DELIVERY_SLA_UNAVAILABLE
+      - NODE_CAPACITY_EXHAUSTED
+      - PAST_ORDER_DEADLINE
+    GroupLine:
+      type: object
+      required:
+      - catalogItemId
+      - quantity
+      properties:
+        catalogItemId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+    DeliveryWindow:
+      type: object
+      required:
+      - earliest
+      - latest
+      properties:
+        earliest:
+          type: string
+          format: date-time
+        latest:
+          type: string
+          format: date-time
+    WitnessPath:
+      type: object
+      description: 'The node, pickup departure, departure legs and delivery wave that prove feasibility. A NOMINAL
+        path (STANDARD only) carries no departure or wave ids: pickupDepartureId and deliveryWaveId are omitted
+        and legs is empty (E8).'
+      required:
+      - nodeId
+      - legs
+      properties:
+        nodeId:
+          type: string
+        pickupDepartureId:
+          type: string
+        legs:
+          type: array
+          items:
+            type: string
+            description: departureId
+        deliveryWaveId:
+          type: string
+    QuoteRequest:
+      type: object
+      required:
+      - destinationPostalPrefix
+      - lines
+      properties:
+        destinationPostalPrefix:
+          type: string
+          description: Destination postal prefix (never a full address).
+          example: '787'
+        lines:
+          type: array
+          minItems: 1
+          description: One line on a product page, the cart's lines at checkout.
+          items:
+            $ref: '#/components/schemas/GroupLine'
+        tiers:
+          type: array
+          description: Tiers to quote; all four when omitted.
+          items:
+            $ref: '#/components/schemas/Tier'
+    TierUnavailable:
+      type: object
+      required:
+      - tier
+      - constraint
+      properties:
+        tier:
+          $ref: '#/components/schemas/Tier'
+        constraint:
+          $ref: '#/components/schemas/OfferConstraint'
+        groupNo:
+          type: integer
+          minimum: 1
+          description: The quote-relative shipment group the constraint applies to; omitted when it applies to the
+            whole quote (DESTINATION_NOT_SERVED, ITEM_QUANTITY_NOT_AVAILABLE).
+    QuoteResponse:
+      type: object
+      required:
+      - offers
+      - unavailable
+      properties:
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliveryOffer'
+          description: One offer per (group, tier) with a feasible path, ordered by groupNo then tier.
+        unavailable:
+          type: array
+          items:
+            $ref: '#/components/schemas/TierUnavailable'
+    DeliveryOffer:
+      type: object
+      required:
+      - offerId
+      - state
+      - groupNo
+      - destinationPostalPrefix
+      - tier
+      - lines
+      - window
+      - witnessPath
+      - basis
+      - policyVersion
+      - quotedAt
+      - expiresAt
+      properties:
+        offerId:
+          type: string
+        state:
+          type: string
+          enum:
+          - QUOTED
+          - EXPIRED
+          - CONSUMED
+        destinationPostalPrefix:
+          type: string
+        tier:
+          $ref: '#/components/schemas/Tier'
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupLine'
+        window:
+          $ref: '#/components/schemas/DeliveryWindow'
+        witnessPath:
+          $ref: '#/components/schemas/WitnessPath'
+        quotedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: min(quotedAt + offerTtl, the latest instant the witness pickup cutoff can still be met).
+        groupNo:
+          type: integer
+          minimum: 1
+          description: Quote-relative shipment group number (1 for a single-node cart).
+        basis:
+          $ref: '#/components/schemas/Basis'
+        policyVersion:
+          type: string
+          description: The promise policy version the quote used (G8).
+    MakePromiseRequest:
+      type: object
+      required:
+      - offerId
+      - lines
+      properties:
+        offerId:
+          type: string
+          description: The offer the shopper saw.
+        lines:
+          type: array
+          minItems: 1
+          description: The shipment group's lines; all shippable from the offer's witness node. They must equal
+            the offer's lines.
+          items:
+            $ref: '#/components/schemas/GroupLine'
+    PromiseTerms:
+      type: object
+      required:
+      - tier
+      - shipBy
+      - deliverByEarliest
+      - deliverByLatest
+      - basis
+      - policyVersion
+      properties:
+        tier:
+          $ref: '#/components/schemas/Tier'
+        shipBy:
+          type: string
+          format: date-time
+          description: Pickup cutoff at the witness node.
+        deliverByEarliest:
+          type: string
+          format: date-time
+        deliverByLatest:
+          type: string
+          format: date-time
+        basis:
+          $ref: '#/components/schemas/Basis'
+        policyVersion:
+          type: string
+    Revision:
+      type: object
+      required:
+      - revisionNo
+      - previousTerms
+      - reason
+      - revisedAt
+      properties:
+        revisionNo:
+          type: integer
+          minimum: 1
+        previousTerms:
+          $ref: '#/components/schemas/PromiseTerms'
+        reason:
+          type: string
+        revisedAt:
+          type: string
+          format: date-time
+    Judgement:
+      type: object
+      required:
+      - outcome
+      properties:
+        outcome:
+          type: string
+          enum:
+          - KEPT
+          - BROKEN
+        deliveredAt:
+          type: string
+          format: date-time
+          description: Present when the package was delivered; omitted for cause LOST or RETURNED.
+        lateByMinutes:
+          type: integer
+          description: Present when BROKEN.
+        cause:
+          type: string
+          enum:
+          - LATE
+          - LOST
+          - RETURNED
+          description: Present when BROKEN.
+    Promise:
+      type: object
+      required:
+      - promiseId
+      - offerId
+      - state
+      - destinationPostalPrefix
+      - lines
+      - terms
+      - witnessPath
+      - holdExpiresAt
+      - revisions
+      - version
+      properties:
+        promiseId:
+          type: string
+        offerId:
+          type: string
+        orderId:
+          type: string
+          description: Set when the order is placed (CONFIRMED).
+        groupNo:
+          type: integer
+          minimum: 1
+          description: Set when the order is placed (CONFIRMED).
+        state:
+          type: string
+          enum:
+          - PROVISIONAL
+          - CONFIRMED
+          - AT_RISK
+          - KEPT
+          - BROKEN
+          - RELEASED
+          - CANCELLED
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupLine'
+        terms:
+          $ref: '#/components/schemas/PromiseTerms'
+        witnessPath:
+          $ref: '#/components/schemas/WitnessPath'
+        holdExpiresAt:
+          type: string
+          format: date-time
+        revisions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Revision'
+        judgement:
+          $ref: '#/components/schemas/Judgement'
+        destinationPostalPrefix:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+          description: Optimistic-concurrency version of the aggregate.
+        cancelReason:
+          type: string
+          description: Present when CANCELLED.
+        releaseReason:
+          type: string
+          description: Present when RELEASED.
+        atRiskReason:
+          type: string
+          description: Present while AT_RISK.
+    PromiseList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Promise'
+    Capacity:
+      type: object
+      required:
+      - share
+      - provisional
+      - confirmed
+      properties:
+        share:
+          type: integer
+          minimum: 0
+          description: Orders the promise side may hold on this cutoff (G9).
+        provisional:
+          type: integer
+          minimum: 0
+        confirmed:
+          type: integer
+          minimum: 0
+    PromiseBook:
+      type: object
+      required:
+      - bookId
+      - nodeId
+      - pickupDepartureId
+      - cutoffAt
+      - state
+      - capacity
+      - version
+      properties:
+        bookId:
+          type: string
+          description: nodeId + ':' + pickupDepartureId
+        nodeId:
+          type: string
+        pickupDepartureId:
+          type: string
+        cutoffAt:
+          type: string
+          format: date-time
+          description: The pickup departure's cutoff (from DepartureView).
+        state:
+          type: string
+          enum:
+          - OPEN
+          - CLOSED
+        capacity:
+          $ref: '#/components/schemas/Capacity'
+        version:
+          type: integer
+          minimum: 1
+    PromiseBookList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromiseBook'
+    ConfirmPromiseRequest:
+      type: object
+      required:
+      - orderId
+      - groupNo
+      properties:
+        orderId:
+          type: string
+          description: The customer order id.
+        groupNo:
+          type: integer
+          minimum: 1
+          description: The shipment group number within the order.
+    PublishPolicyRequest:
+      type: object
+      required:
+      - offerTtlMinutes
+      - holdTtlMinutes
+      - packagesPerOrder
+      - capacitySharePercent
+      - orderDeadlines
+      properties:
+        offerTtlMinutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+          description: How long a quote stays QUOTED (also capped by the pickup cutoff).
+        holdTtlMinutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+          description: How long a PROVISIONAL promise holds capacity before ReleaseExpiredHolds.
+        packagesPerOrder:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Declared packages per order; converts orders to departure packages (G9). Default 1.
+        capacitySharePercent:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Proportional share of the node cutoff capacity the promise side may use (G9 "D4"). Default
+            100.
+        orderDeadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderDeadline'
+    OrderDeadline:
+      type: object
+      required:
+      - tier
+      - localTime
+      properties:
+        tier:
+          $ref: '#/components/schemas/Tier'
+        regionId:
+          type: string
+          description: The destination region; absent means every region.
+        localTime:
+          type: string
+          pattern: ^([01][0-9]|2[0-3]):[0-5][0-9]$
+          description: Order deadline HH:mm in the destination delivery station's time zone.
+    PromisePolicy:
+      type: object
+      required:
+      - policyVersion
+      - version
+      - offerTtlMinutes
+      - holdTtlMinutes
+      - packagesPerOrder
+      - capacitySharePercent
+      - orderDeadlines
+      - publishedAt
+      properties:
+        policyVersion:
+          type: string
+          description: '''v'' + version.'
+          example: v3
+        version:
+          type: integer
+          minimum: 0
+        offerTtlMinutes:
+          type: integer
+        holdTtlMinutes:
+          type: integer
+        packagesPerOrder:
+          type: integer
+        capacitySharePercent:
+          type: integer
+        orderDeadlines:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderDeadline'
+        publishedAt:
+          type: string
+          format: date-time

@@ -5,8 +5,6 @@ disable-model-invocation: true
 argument-hint: "[git range]"
 ---
 
-<!-- TEMPLATE NOTE (warehouse-harness-template v2): adapt every repo-specific example in this file (file paths, type names, field names) to THIS repo real code. Do not copy-paste verbatim. -->
-
 Perform a pre-commit semantic code review of the current uncommitted
 changes (or, if `$ARGUMENTS` names a branch/commit range, review that
 diff instead — e.g. `/code-review origin/develop..HEAD`).
@@ -53,10 +51,10 @@ linter already catches.
    fleet-wide revert) — a reintroduced auth check is very likely
    accidental (an agent "helpfully" adding back something that looks
    missing) and should be flagged even if the code itself looks correct.
-8. **Anything that would surprise the sibling-context boundary.** If this
-   repo's `AGENTS.md`/`CLAUDE.md` documents a stricter rule (e.g. "no
-   outbound calls to sibling contexts"), check the diff doesn't
-   reintroduce exactly that.
+8. **Anything that would surprise the sibling-context boundary.** This
+   service makes NO call to a sibling context (ADR 0003): sibling data is an
+   event-fed local read model. Check the diff adds no HTTP client, no `sync_calls`
+   entry and no import of a sibling repository.
 
 ## Output format
 
