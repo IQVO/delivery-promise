@@ -34,8 +34,10 @@ On SIGINT/SIGTERM: `/readyz` flips to 503 `not_ready`, wait `SHUTDOWN_DRAIN_DELA
 HTTP (10 s), stop and await the consumer and the sweeper (10 s), stop and await the
 relay LAST (10 s) so nothing they committed is stranded, close the pool. If any worker
 returns on its own the process exits non-zero so the orchestrator restarts it. The sum
-of the bounds is 5 + 10 + 10 + 10 = 35 s: the chart's `terminationGracePeriodSeconds`
-must exceed it.
+of the bounds, taking each await one after the other, is the drain delay + 10 + 10 + 10 + 10
+= 45 s with the default 5 s drain (HTTP, consumer, sweeper, relay): the chart's
+`terminationGracePeriodSeconds` (default 60) must exceed drain delay + 40 and the chart
+refuses to render otherwise.
 
 ## Probes
 
@@ -83,6 +85,31 @@ others; the sweeper is the only place the clock drives the domain.
 - A row that failed `OUTBOX_MAX_ATTEMPTS` times is skipped (logged once at ERROR with id,
   topic, type and key) and stays in the table with `attempts` and `last_error`. Fix the
   cause, then re-arm it: `UPDATE outbox_events SET attempts = 0 WHERE id = <id>;`.
+
+## Deployment (Helm chart)
+
+`charts/delivery-promise` deploys the `api` component only (no MCP, frontend, projector or
+reports). Values map 1:1 to the variables above:
+
+| Value | Variable | Rule |
+|---|---|---|
+| `database.existingSecret` / `database.url` (+ `existingSecretKey`) | `DATABASE_URL` | required; always a `secretKeyRef`, never the ConfigMap |
+| `database.migrationsExistingSecretKey` | `MIGRATIONS_DATABASE_URL` | optional `secretKeyRef` (`optional: true`); the binary falls back to `DATABASE_URL` |
+| `kafka.brokers` | `KAFKA_BROKERS` | required |
+| `config.consumerGroup` | `DELIVERY_PROMISE_CONSUMER_GROUP` | required, stable and service-prefixed (one consumer group for the eight topics), never the pod name |
+| `config.eventPublisher` | `EVENT_PUBLISHER` | only `kafka` |
+| `config.httpAddr`, `config.logLevel` | `HTTP_ADDR`, `LOG_LEVEL` | |
+| `config.outboxMaxAttempts`, `config.outboxRelayInterval` | `OUTBOX_MAX_ATTEMPTS`, `OUTBOX_RELAY_INTERVAL` | interval empty = binary default |
+| `config.sweepInterval`, `config.shutdownDrainDelay` | `SWEEP_INTERVAL`, `SHUTDOWN_DRAIN_DELAY` | empty = binary default; malformed = refused |
+
+`extraEnv` may not carry a `*_MODE`, a non-`kafka` `EVENT_PUBLISHER` or a variable that has a
+dedicated value. The pod runs as uid 1000, non-root, with a read-only root filesystem,
+`allowPrivilegeEscalation: false`, all capabilities dropped and the `RuntimeDefault` seccomp
+profile; probes are `/healthz` (liveness, startup) and `/readyz` (readiness). Tests:
+`charts/delivery-promise/tests/render_test.sh` (also reads the shutdown bounds from
+`cmd/api/config.go`) and `test_service_selectors.py`, run by the `chart-tests` CI job on every
+push and PR; `helm-lint` (`ct lint` over `ci/*-values.yaml`) runs on pull requests; the `release`
+job packages `delivery-promise-<version>.tgz`.
 
 ## Cancelling a promise on request
 
