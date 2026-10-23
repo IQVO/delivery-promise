@@ -29,14 +29,12 @@ func ThroughputOrders(c Throughput, windowMinutes, dayMinutes int) int {
 // most MaxShare. maxOrders 0 means the slot sets none; throughput 0 means the
 // cap gives no bound.
 func Share(maxOrders, throughput, percent int) int {
-	base := 0
-	switch {
-	case maxOrders > 0 && throughput > 0:
-		base = min(maxOrders, throughput)
-	case maxOrders > 0:
+	base := throughput
+	if maxOrders > 0 {
 		base = maxOrders
-	default:
-		base = throughput
+		if throughput > 0 {
+			base = min(maxOrders, throughput)
+		}
 	}
 	if base < 1 {
 		return 1

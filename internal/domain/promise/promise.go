@@ -212,14 +212,16 @@ func normTerms(t Terms) Terms {
 
 // Make creates a PROVISIONAL promise at version 1 and raises PromiseMade.
 func Make(in Making, now time.Time) (*Promise, []shared.Event, error) {
-	switch {
-	case !shared.ValidID(string(in.ID)) || !shared.ValidID(in.OfferID):
+	if !shared.ValidID(string(in.ID)) || !shared.ValidID(in.OfferID) {
 		return nil, nil, shared.Invalid("promiseId and offerId must be valid ids")
-	case !shared.ValidPostalPrefix(in.DestinationPrefix):
+	}
+	if !shared.ValidPostalPrefix(in.DestinationPrefix) {
 		return nil, nil, shared.Invalid("destinationPostalPrefix %q is not valid", in.DestinationPrefix)
-	case in.BookID == "" || len(in.BookID) > 2*shared.MaxID+1:
+	}
+	if in.BookID == "" || len(in.BookID) > 2*shared.MaxID+1 {
 		return nil, nil, shared.Invalid("bookId is required")
-	case in.HoldTTL <= 0:
+	}
+	if in.HoldTTL <= 0 {
 		return nil, nil, shared.Invalid("the hold TTL must be positive")
 	}
 	if err := shared.ValidateLines(in.Lines); err != nil {
@@ -277,14 +279,16 @@ func cloneRevisions(in []Revision) []Revision {
 }
 
 func checkSnapshot(s Snapshot) error {
-	switch {
-	case !shared.ValidID(string(s.ID)) || !shared.ValidID(s.OfferID):
+	if !shared.ValidID(string(s.ID)) || !shared.ValidID(s.OfferID) {
 		return errors.New("promiseId and offerId must be valid ids")
-	case s.Version < 1 || s.MadeAt.IsZero() || s.HoldExpiresAt.IsZero() || s.BookID == "":
+	}
+	if s.Version < 1 || s.MadeAt.IsZero() || s.HoldExpiresAt.IsZero() || s.BookID == "" {
 		return errors.New("version, madeAt, holdExpiresAt and bookId are required")
-	case !s.State.Valid():
+	}
+	if !s.State.Valid() {
 		return fmt.Errorf("state %q is not a promise state", s.State)
-	case !shared.ValidPostalPrefix(s.DestinationPrefix):
+	}
+	if !shared.ValidPostalPrefix(s.DestinationPrefix) {
 		return errors.New("destination postal prefix is not valid")
 	}
 	if err := checkValueObjects(s); err != nil {

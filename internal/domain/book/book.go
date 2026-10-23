@@ -101,14 +101,16 @@ func Open(in Opening) (*Book, error) {
 }
 
 func checkOpening(in Opening) error {
-	switch {
-	case !shared.ValidID(in.NodeID) || !shared.ValidID(in.PickupDepartureID):
+	if !shared.ValidID(in.NodeID) || !shared.ValidID(in.PickupDepartureID) {
 		return shared.Invalid("nodeId and pickupDepartureId must be valid ids")
-	case len(in.NodeID)+1+len(in.PickupDepartureID) > 2*shared.MaxID+1:
+	}
+	if len(in.NodeID)+1+len(in.PickupDepartureID) > 2*shared.MaxID+1 {
 		return shared.Invalid("bookId is too long")
-	case in.CutoffAt.IsZero() || in.HoldDeadlineAt.IsZero() || in.HoldDeadlineAt.After(in.CutoffAt):
+	}
+	if in.CutoffAt.IsZero() || in.HoldDeadlineAt.IsZero() || in.HoldDeadlineAt.After(in.CutoffAt) {
 		return shared.Invalid("holdDeadlineAt must not be after cutoffAt")
-	case in.Share < 1 || in.Share > MaxShare:
+	}
+	if in.Share < 1 || in.Share > MaxShare {
 		return shared.Invalid("share must be between 1 and %d", MaxShare)
 	}
 	return nil
@@ -130,20 +132,25 @@ func checkSnapshot(s Snapshot) error {
 	if err := checkOpening(Opening{NodeID: s.NodeID, PickupDepartureID: s.PickupDepartureID, CutoffAt: s.CutoffAt, HoldDeadlineAt: s.HoldDeadlineAt, Share: s.Share}); err != nil {
 		return err
 	}
-	switch {
-	case s.ID != MakeID(s.NodeID, s.PickupDepartureID):
+	if s.ID != MakeID(s.NodeID, s.PickupDepartureID) {
 		return errors.New("bookId is not nodeId:pickupDepartureId")
-	case s.Version < 1:
+	}
+	if s.Version < 1 {
 		return errors.New("a version of at least 1 is required")
-	case s.Provisional < 0 || s.Confirmed < 0:
+	}
+	if s.Provisional < 0 || s.Confirmed < 0 {
 		return ErrCapacityUnderflow
-	case s.Provisional+s.Confirmed > s.Share:
+	}
+	if s.Provisional+s.Confirmed > s.Share {
 		return ErrPromiseCapacityExhausted
-	case s.State != StateOpen && s.State != StateClosed:
+	}
+	if s.State != StateOpen && s.State != StateClosed {
 		return fmt.Errorf("state %q is not OPEN or CLOSED", s.State)
-	case s.State == StateOpen && !s.ClosedAt.IsZero():
+	}
+	if s.State == StateOpen && !s.ClosedAt.IsZero() {
 		return errors.New("an OPEN book has no closedAt")
-	case s.State == StateClosed && s.ClosedAt.IsZero():
+	}
+	if s.State == StateClosed && s.ClosedAt.IsZero() {
 		return errors.New("a CLOSED book needs closedAt")
 	}
 	return nil

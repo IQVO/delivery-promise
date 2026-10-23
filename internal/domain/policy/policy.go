@@ -79,14 +79,16 @@ func Default() *Policy {
 }
 
 func validate(in Input) error {
-	switch {
-	case in.OfferTTLMinutes < 1 || in.OfferTTLMinutes > MaxTTLMinutes:
+	if in.OfferTTLMinutes < 1 || in.OfferTTLMinutes > MaxTTLMinutes {
 		return shared.Invalid("offerTtlMinutes must be between 1 and %d", MaxTTLMinutes)
-	case in.HoldTTLMinutes < 1 || in.HoldTTLMinutes > MaxTTLMinutes:
+	}
+	if in.HoldTTLMinutes < 1 || in.HoldTTLMinutes > MaxTTLMinutes {
 		return shared.Invalid("holdTtlMinutes must be between 1 and %d", MaxTTLMinutes)
-	case in.PackagesPerOrder < 1 || in.PackagesPerOrder > MaxPackagesPerOrder:
+	}
+	if in.PackagesPerOrder < 1 || in.PackagesPerOrder > MaxPackagesPerOrder {
 		return shared.Invalid("packagesPerOrder must be between 1 and %d", MaxPackagesPerOrder)
-	case in.SharePercent < 1 || in.SharePercent > MaxSharePercent:
+	}
+	if in.SharePercent < 1 || in.SharePercent > MaxSharePercent {
 		return shared.Invalid("capacitySharePercent must be between 1 and %d", MaxSharePercent)
 	}
 	return validateDeadlines(in.Deadlines)
@@ -115,12 +117,13 @@ func validateDeadlines(ds []Deadline) error {
 }
 
 func validateDeadline(d Deadline) error {
-	switch {
-	case !d.Tier.Valid():
+	if !d.Tier.Valid() {
 		return shared.Invalid("deadline tier %q is not a tier", d.Tier)
-	case d.RegionID != "" && !shared.ValidID(d.RegionID):
+	}
+	if d.RegionID != "" && !shared.ValidID(d.RegionID) {
 		return shared.Invalid("deadline regionId %q is not a valid id", d.RegionID)
-	case d.Minute < 0 || d.Minute >= 24*60:
+	}
+	if d.Minute < 0 || d.Minute >= 24*60 {
 		return shared.Invalid("deadline localTime must be between 00:00 and 23:59")
 	}
 	return nil

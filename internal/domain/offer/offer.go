@@ -130,20 +130,25 @@ func New(q Quote, now time.Time) (*Offer, []shared.Event, error) {
 }
 
 func validateQuote(q Quote) error {
-	switch {
-	case !shared.ValidID(string(q.ID)):
+	if !shared.ValidID(string(q.ID)) {
 		return shared.Invalid("offerId %q is not a valid id", q.ID)
-	case q.GroupNo < 1 || q.GroupNo > shared.MaxLines:
+	}
+	if q.GroupNo < 1 || q.GroupNo > shared.MaxLines {
 		return shared.Invalid("groupNo must be between 1 and %d", shared.MaxLines)
-	case !shared.ValidPostalPrefix(q.DestinationPrefix):
+	}
+	if !shared.ValidPostalPrefix(q.DestinationPrefix) {
 		return shared.Invalid("destinationPostalPrefix %q is not valid", q.DestinationPrefix)
-	case !q.Tier.Valid():
+	}
+	if !q.Tier.Valid() {
 		return shared.Invalid("tier %q is not a tier", q.Tier)
-	case !q.Basis.Valid():
+	}
+	if !q.Basis.Valid() {
 		return shared.Invalid("basis %q is not SCHEDULED or NOMINAL", q.Basis)
-	case q.PolicyVersion == "" || len(q.PolicyVersion) > shared.MaxID:
+	}
+	if q.PolicyVersion == "" || len(q.PolicyVersion) > shared.MaxID {
 		return shared.Invalid("policyVersion is required")
-	case q.TTL <= 0:
+	}
+	if q.TTL <= 0 {
 		return shared.Invalid("the offer TTL must be positive")
 	}
 	if err := shared.ValidateLines(q.Lines); err != nil {
