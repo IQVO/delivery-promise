@@ -76,7 +76,7 @@ Offer: QUOTED -> CONSUMED (Consume), QUOTED -> EXPIRED (Expire). Promise: the ta
 - A23. **Idempotency**: `Idempotency-Key` is required on every state-changing POST except the quote, where it is optional (a repeat inside the TTL returns the same offers).
 - A24. `CustomerOrderCancelled` with an empty or absent `groupNos` cancels every group of the order.
 - A25. **Out-of-order feeds**: capacity events that arrive before their schedule event create an unscheduled row that the search ignores; package outcomes and shipments are stored and the group judgement is evaluated on every event that can complete it (shipment, delivery, loss, return, lock).
-- A26. The CloudEvents entities of `BookingMoved`, `BookingFailed` (`departure`) and `PackageInductionDeferred` (`package`) are best guesses until their producers push an AsyncAPI; the consumed type table is one file (`internal/adapters/inbound/kafka/types.go`).
+- A26. The consumed types are checked against the producers' pushed AsyncAPI (re-read 2026-10-23): `BookingMoved` and `BookingFailed` have entity `departure`, `PackageInductionDeferred` has entity `packageattempthistory` (the raising aggregate, orchestrator ruling) and `trackingNumber` as its only required field; `FulfillmentUnsourceable.excludedNodes` is a list of `{nodeId, reason}` objects. The consumed type table is `Handlers` in `internal/adapters/inbound/kafka/dispatch.go`. When `assignmentId` is absent from `PackageInductionDeferred` the assignment is found through the tracking number of `FulfillmentShipped`; a package that is not known yet is ignored.
 - A27. **Re-validation at MakePromise** (documented in the model: "re-validates the offer's witness path"): the pickup, every leg and the wave of the witness must still exist, not be cancelled, and have room. A failure is `ErrPromiseCapacityExhausted` so checkout re-quotes.
 - A28. A stale write is retried up to three times by the use case, then reported as `concurrent-update`.
 - A29. Domain bounds are plain literals: quantity <= 2147483647, lines per group <= 100, ids <= 64 characters, postal prefix 1-10 alphanumerics.
@@ -84,4 +84,4 @@ Offer: QUOTED -> CONSUMED (Consume), QUOTED -> EXPIRED (Expire). Promise: the ta
 ## Consequences
 
 - Every assumption has a table-driven test in the package that enforces it.
-- `model_gaps` still open for the orchestrator: A1, A2, A12 (share formula), A17, A19, A20, A21, A26.
+- `model_gaps` still open for the orchestrator: A1, A2, A12 (share formula), A17, A19, A20, A21.

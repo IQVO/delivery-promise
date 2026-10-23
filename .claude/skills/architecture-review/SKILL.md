@@ -5,8 +5,6 @@ disable-model-invocation: true
 argument-hint: "[git range]"
 ---
 
-<!-- TEMPLATE NOTE (warehouse-harness-template v2): adapt every repo-specific example in this file (file paths, type names, field names) to THIS repo real code. Do not copy-paste verbatim. -->
-
 Perform a bounded-context boundary and ADR-compliance review of the
 current changes (or `$ARGUMENTS` if given, e.g. a branch/PR diff range).
 
@@ -35,10 +33,6 @@ check a design decision against this fleet's standing architecture.
 3. **MCP additive-boundary rule (ADR-0008 fleet-wide).** This service has no MCP adapter
    (`internal/architecture/mcp_optional_inputs_test.go` keeps one from appearing
    unannounced); any new inbound adapter must depend only on application/domain.
-2b. **Zero-write guardrails, where applicable.** If this repo has a
-   documented zero-write constraint (e.g. warehouse-ops-agent v1), check
-   no mutating HTTP method or MCP tool without `ReadOnlyHint: true` was
-   added to an outbound/inbound surface bound by that constraint.
 4. **No analytics read side.** This service keeps no separate analytics store; the
    analytics-only events go to `retailnetwork.delivery-promise.analytics` through the
    same outbox. Flag any new store, topic or projector that is not in an ADR.

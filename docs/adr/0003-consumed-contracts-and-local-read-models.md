@@ -40,4 +40,5 @@ None. No client of a sibling service exists in this repository.
 ## Consequences
 
 - A cold or stale read model yields fewer offers, never a false one: fast tiers need every input, only STANDARD falls back to nominal (A1).
-- Producer contracts still to be re-checked when they push: the entities of A26, the `window` literal of the scorecard (`30d`), and the `FulfillmentLocked` additions of E1.
+- Every consumed type was re-read against the producers' `origin/feature/service` AsyncAPI (2026-10-23); the two mismatches found (A26) were fixed on the consuming side. `PromiseBroken.cause` is `LATE`, `LOST` or `RETURNED` (A18).
+- The receive messages of `apis/asyncapi.yaml` stay tolerant copies: they list only the fields this service reads.

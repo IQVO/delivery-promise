@@ -5,8 +5,6 @@ disable-model-invocation: true
 argument-hint: "[git range]"
 ---
 
-<!-- TEMPLATE NOTE (warehouse-harness-template v2): adapt every repo-specific example in this file (file paths, type names, field names) to THIS repo real code. Do not copy-paste verbatim. -->
-
 Perform a ubiquitous-language drift review of the current changes (or
 `$ARGUMENTS` if given), comparing new/changed code against
 `.claude/rules/domain-model.md` (the ubiquitous language of this context; the
@@ -21,9 +19,9 @@ readers can no longer map code to domain conversation.
 
 1. **A new type/field/method that duplicates an existing domain concept
    under a different name.** If the domain-model doc already names a
-   concept (e.g. this repo's "Usable inventory" — on-hand minus active
-   reservations minus held/damaged), a new calculation that computes the
-   same thing under a different name (`AvailableQty`, `FreeStock`, etc.)
+   concept (e.g. this repo's "remaining capacity" of a PromiseBook —
+   `share` minus provisional minus confirmed holds), a new calculation that
+   computes the same thing under a different name (`FreeSlots`, `Headroom`, etc.)
    is drift — even if the math is correct, it fragments the vocabulary.
    Flag it and point at the existing name.
 2. **A domain type/method named in implementation terms instead of
