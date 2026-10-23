@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -139,4 +140,42 @@ func Shutdown() {
 	if container != nil {
 		_ = testcontainers.TerminateContainer(container)
 	}
+}
+
+// BrokerList returns the brokers as the comma-separated KAFKA_BROKERS value.
+func BrokerList(t *testing.T) string { return strings.Join(Brokers(t), ",") }
+
+// SetBrokersEnv points KAFKA_BROKERS at the shared broker for the test.
+func SetBrokersEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("KAFKA_BROKERS", BrokerList(t))
+}
+
+// Stop terminates the broker mid-test (the Kafka-down subtest). Every later
+// call to Brokers would restart nothing: the broker stays down.
+func Stop(t *testing.T) {
+	t.Helper()
+	if container == nil {
+		t.Fatal("kafkatest.Stop: the broker was never started")
+	}
+	if err := testcontainers.TerminateContainer(container); err != nil {
+		t.Fatalf("stop kafka container: %v", err)
+	}
+	container = nil
+}
+
+// Count returns how many messages partition 0 of topic holds (0 when the topic
+// does not exist yet).
+func Count(t *testing.T, topic string) int64 {
+	t.Helper()
+	conn, err := kafkago.DialLeader(context.Background(), "tcp", Brokers(t)[0], topic, 0)
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = conn.Close() }()
+	first, last, err := conn.ReadOffsets()
+	if err != nil {
+		t.Fatalf("read offsets of %s: %v", topic, err)
+	}
+	return last - first
 }

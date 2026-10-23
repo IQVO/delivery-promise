@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,11 +24,17 @@ const IdempotencyKeyHeader = "Idempotency-Key"
 // binder in: adapters never import each other.
 type TxBinder func(ctx context.Context, tx pgx.Tx) context.Context
 
+// IdempotencyReplayedHeader marks a response replayed from the stored outcome.
+const IdempotencyReplayedHeader = "Idempotency-Replayed"
+
+// keyRetention is how long a stored outcome is kept; older rows are purged on
+// the next keyed write.
+const keyRetention = "24 hours"
+
 // RequireIdempotencyKey is the fleet's transactional Idempotency-Key
-// middleware (the reference implementation is order-management's), applied
-// route by route to a resource-CREATION endpoint (POST /slot-plans).
-//
-// The correctness argument in short:
+// middleware, applied route by route to the state-changing POSTs. The stored
+// key is (route, key), where the route is the method plus the chi route
+// pattern, so one caller key can be used on two operations.
 //
 //   - idempotency_keys.status_code starts NULL and is set by the SAME
 //     transaction that inserted the row, immediately before it commits. A
@@ -38,13 +45,14 @@ type TxBinder func(ctx context.Context, tx pgx.Tx) context.Context
 //     the second statement blocks until the first transaction resolves, so a
 //     reader that sees "0 rows inserted" can rely on the original transaction
 //     being finished. If it rolled back, the blocked insert succeeds instead.
-//   - The wrapped handler runs with the transaction bound into its context
-//     (TxBinder), so the idempotency row, the plan and its outbox rows commit
-//     or roll back together.
-//   - Every normal response below 500 is cached, 4xx included: the same key
-//     and body replays the same answer, a different body is 422
-//     idempotency-key-reused. A 5xx or a panic rolls everything back and is
-//     never cached, so the same key can retry the real work.
+//   - The wrapped handler runs in a SAVEPOINT of that transaction, with the
+//     savepoint bound into its context (TxBinder), so the idempotency row, the
+//     aggregates and their outbox rows commit or roll back together. A 2xx
+//     keeps the handler's writes; a 4xx rolls the savepoint back (a refused
+//     request leaves no trace) but its problem is still stored and replayed; a
+//     5xx or a panic rolls everything back and is never stored, so the same key
+//     can retry the real work.
+//   - A different body under a stored key is 422 idempotency-key-reused.
 func RequireIdempotencyKey(pool *pgxpool.Pool, bind TxBinder) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -63,6 +71,7 @@ func RequireIdempotencyKey(pool *pgxpool.Pool, bind TxBinder) func(http.Handler)
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			sum := sha256.Sum256(body)
 			requestHash := hex.EncodeToString(sum[:])
+			route := r.Method + " " + routePattern(r)
 
 			ctx := r.Context()
 			tx, err := pool.Begin(ctx)
@@ -70,29 +79,53 @@ func RequireIdempotencyKey(pool *pgxpool.Pool, bind TxBinder) func(http.Handler)
 				writeError(w, r, err)
 				return
 			}
-			tag, err := tx.Exec(ctx, `
-				INSERT INTO idempotency_keys (key, method, path, request_hash)
-				VALUES ($1, $2, $3, $4)
-				ON CONFLICT (key) DO NOTHING
-			`, key, r.Method, r.URL.Path, requestHash)
+			fresh, err := claimKey(ctx, tx, route, key, requestHash)
 			if err != nil {
 				_ = tx.Rollback(ctx)
 				writeError(w, r, err)
 				return
 			}
-			if tag.RowsAffected() == 0 {
+			if !fresh {
 				_ = tx.Rollback(ctx)
-				replayCachedResponse(w, r, pool, key, requestHash)
+				replayCachedResponse(w, r, pool, route, key, requestHash)
 				return
 			}
-			runFreshRequest(ctx, w, r, tx, bind, key, next)
+			runFreshRequest(ctx, w, r, tx, bind, route, key, next)
 		})
 	}
 }
 
+// routePattern is the chi route pattern the request matched (the raw path when
+// the middleware runs outside a router).
+func routePattern(r *http.Request) string {
+	if rc := chi.RouteContext(r.Context()); rc != nil {
+		if p := rc.RoutePattern(); p != "" {
+			return p
+		}
+	}
+	return r.URL.Path
+}
+
+// claimKey purges the expired keys and inserts the (route, key) row; fresh is
+// false when the key was already used.
+func claimKey(ctx context.Context, tx pgx.Tx, route, key, requestHash string) (bool, error) {
+	if _, err := tx.Exec(ctx, `DELETE FROM idempotency_keys WHERE created_at < now() - interval '`+keyRetention+`'`); err != nil {
+		return false, err
+	}
+	tag, err := tx.Exec(ctx, `
+		INSERT INTO idempotency_keys (route, key, request_hash)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (route, key) DO NOTHING
+	`, route, key, requestHash)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 // replayCachedResponse answers a request whose key already has a committed
 // row: the stored outcome when the body matches, 422 when it does not.
-func replayCachedResponse(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, key, requestHash string) {
+func replayCachedResponse(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, route, key, requestHash string) {
 	var (
 		storedHash string
 		statusCode *int
@@ -101,8 +134,8 @@ func replayCachedResponse(w http.ResponseWriter, r *http.Request, pool *pgxpool.
 	)
 	err := pool.QueryRow(r.Context(), `
 		SELECT request_hash, status_code, response_body, response_headers
-		FROM idempotency_keys WHERE key = $1
-	`, key).Scan(&storedHash, &statusCode, &body, &headersRaw)
+		FROM idempotency_keys WHERE route = $1 AND key = $2
+	`, route, key).Scan(&storedHash, &statusCode, &body, &headersRaw)
 	if err != nil {
 		writeError(w, r, err)
 		return
@@ -118,6 +151,7 @@ func replayCachedResponse(w http.ResponseWriter, r *http.Request, pool *pgxpool.
 		return
 	}
 	copyStoredHeaders(w.Header(), headersRaw)
+	w.Header().Set(IdempotencyReplayedHeader, "true")
 	w.WriteHeader(*statusCode)
 	_, _ = w.Write(body)
 }
@@ -166,10 +200,16 @@ func (c *capture) Write(b []byte) (int, error) {
 	return c.body.Write(b)
 }
 
-// runFreshRequest handles a genuinely new key: capture the response, persist
-// the outcome in the same transaction, commit, and only then write to the
-// real client.
-func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, tx pgx.Tx, bind TxBinder, key string, next http.Handler) {
+// runFreshRequest handles a genuinely new key: run the handler in a savepoint,
+// persist the outcome in the same transaction, commit, and only then write to
+// the real client.
+func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, tx pgx.Tx, bind TxBinder, route, key string, next http.Handler) {
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		writeError(w, r, err)
+		return
+	}
 	defer func() {
 		if p := recover(); p != nil {
 			_ = tx.Rollback(ctx)
@@ -177,7 +217,7 @@ func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request
 		}
 	}()
 	rec := &capture{header: http.Header{}}
-	next.ServeHTTP(rec, r.WithContext(bind(ctx, tx)))
+	next.ServeHTTP(rec, r.WithContext(bind(ctx, sp)))
 	if rec.code == 0 {
 		rec.code = http.StatusOK
 	}
@@ -188,17 +228,12 @@ func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request
 		flush(w, rec)
 		return
 	}
-	headers, err := json.Marshal(rec.header)
-	if err != nil {
+	if err := settleSavepoint(ctx, sp, rec.code); err != nil {
 		_ = tx.Rollback(ctx)
 		writeError(w, r, err)
 		return
 	}
-	if _, err := tx.Exec(ctx, `
-		UPDATE idempotency_keys
-		SET status_code = $1, response_body = $2, response_headers = $3, completed_at = now()
-		WHERE key = $4
-	`, rec.code, rec.body.Bytes(), headers, key); err != nil {
+	if err := storeOutcome(ctx, tx, route, key, rec); err != nil {
 		_ = tx.Rollback(ctx)
 		writeError(w, r, err)
 		return
@@ -208,6 +243,28 @@ func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 	flush(w, rec)
+}
+
+// settleSavepoint keeps the handler's writes on a 2xx/3xx and discards them on
+// a 4xx.
+func settleSavepoint(ctx context.Context, sp pgx.Tx, code int) error {
+	if code >= http.StatusBadRequest {
+		return sp.Rollback(ctx)
+	}
+	return sp.Commit(ctx)
+}
+
+func storeOutcome(ctx context.Context, tx pgx.Tx, route, key string, rec *capture) error {
+	headers, err := json.Marshal(rec.header)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		UPDATE idempotency_keys
+		SET status_code = $1, response_body = $2, response_headers = $3, completed_at = now()
+		WHERE route = $4 AND key = $5
+	`, rec.code, rec.body.Bytes(), headers, route, key)
+	return err
 }
 
 // flush copies the captured response onto the real client connection.

@@ -29,6 +29,10 @@ const (
 	templateName = "delivery_promise_template"
 )
 
+// Pool is the pgx pool type, re-exported so integration test files can name it
+// without importing pgx themselves.
+type Pool = pgxpool.Pool
+
 var (
 	once      sync.Once
 	container *tcpostgres.PostgresContainer
@@ -114,11 +118,37 @@ func URL(t *testing.T) string {
 	return url
 }
 
-// NewPool returns a pool on a fresh database (migrations applied), closed
-// when the test ends.
-func NewPool(t *testing.T) *pgxpool.Pool {
+// EmptyURL returns the DSN of a fresh database with NO migration applied: the
+// binary under test migrates at boot.
+func EmptyURL(t *testing.T) string {
 	t.Helper()
-	pool, err := postgres.NewPool(context.Background(), URL(t))
+	once.Do(start)
+	if startErr != nil {
+		t.Fatalf("start postgres container: %v", startErr)
+	}
+	ctx := context.Background()
+	name := fmt.Sprintf("e_%d", seq.Add(1))
+	if err := adminExec(ctx, `CREATE DATABASE `+name); err != nil {
+		t.Fatalf("create database %s: %v", name, err)
+	}
+	url, err := databaseURL(ctx, name)
+	if err != nil {
+		t.Fatalf("database url: %v", err)
+	}
+	return url
+}
+
+// NewPool returns a pool on a fresh migrated database, closed when the test
+// ends.
+func NewPool(t *testing.T) *Pool {
+	t.Helper()
+	return OpenPool(t, URL(t))
+}
+
+// OpenPool returns a pool on url, closed when the test ends.
+func OpenPool(t *testing.T, url string) *Pool {
+	t.Helper()
+	pool, err := postgres.NewPool(context.Background(), url)
 	if err != nil {
 		t.Fatalf("pool: %v", err)
 	}
@@ -128,7 +158,7 @@ func NewPool(t *testing.T) *pgxpool.Pool {
 
 // WaitAllPublished fails the test unless every outbox row has been published
 // within a few seconds.
-func WaitAllPublished(t *testing.T, pool *pgxpool.Pool) {
+func WaitAllPublished(t *testing.T, pool *Pool) {
 	t.Helper()
 	var unpublished int
 	deadline := time.Now().Add(10 * time.Second)
@@ -147,7 +177,7 @@ func WaitAllPublished(t *testing.T, pool *pgxpool.Pool) {
 // InsertOutboxRow writes one unpublished outbox_events row directly (topic
 // test.integration, a stub value, no stored headers) and returns its id, so
 // relay tests control event_type and key exactly.
-func InsertOutboxRow(t *testing.T, pool *pgxpool.Pool, eventType, key string) int64 {
+func InsertOutboxRow(t *testing.T, pool *Pool, eventType, key string) int64 {
 	t.Helper()
 	var id int64
 	err := pool.QueryRow(context.Background(), `
@@ -163,7 +193,7 @@ func InsertOutboxRow(t *testing.T, pool *pgxpool.Pool, eventType, key string) in
 
 // OutboxRowState returns the attempts, last_error and published flag of one
 // outbox_events row.
-func OutboxRowState(t *testing.T, pool *pgxpool.Pool, id int64) (attempts int, lastErr string, published bool) {
+func OutboxRowState(t *testing.T, pool *Pool, id int64) (attempts int, lastErr string, published bool) {
 	t.Helper()
 	err := pool.QueryRow(context.Background(), `
 		SELECT attempts, coalesce(last_error, ''), published_at IS NOT NULL

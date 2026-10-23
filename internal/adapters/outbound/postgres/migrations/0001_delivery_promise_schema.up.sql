@@ -101,13 +101,14 @@ CREATE INDEX outbox_events_unpublished ON outbox_events (id) WHERE published_at 
 -- transaction and its outcome is written just before that transaction commits,
 -- so a committed row always carries its outcome.
 CREATE TABLE idempotency_keys (
-    key              text        PRIMARY KEY,
-    method           text        NOT NULL,
-    path             text        NOT NULL,
+    route            text        NOT NULL,
+    key              text        NOT NULL,
     request_hash     text        NOT NULL,
     status_code      integer,
     response_body    bytea,
     response_headers jsonb,
     created_at       timestamptz NOT NULL DEFAULT now(),
-    completed_at     timestamptz
+    completed_at     timestamptz,
+    PRIMARY KEY (route, key)
 );
+CREATE INDEX idempotency_keys_created ON idempotency_keys (created_at);
