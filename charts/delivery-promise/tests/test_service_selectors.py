@@ -7,9 +7,12 @@ ALL of them, so a request for the api could be answered by another component.
 Every Deployment here carries `app.kubernetes.io/component` in
 selector.matchLabels and its pod labels, and every Service selects on it, so each
 Service selects EXACTLY ONE Deployment. This test fails if that ever stops being
-true. delivery-promise has one component, `api`; the test is written over
-whatever Deployments and Services the chart renders, so a component added later
-is covered without edits.
+true. delivery-promise has one always-on component (`api`) plus the
+optional `mcp` (ADR 0007) and `frontend` (ADR 0008, the delivery_promise_mfe
+remote's nginx pod), both default OFF; the test renders everything at once,
+so each Service must still select EXACTLY ONE Deployment. It also pins the
+env isolation: the mcp pod never sees Kafka/relay/consumer/sweeper env, and
+the frontend pod never sees a database or Kafka variable.
 
 Run: python3 charts/delivery-promise/tests/test_service_selectors.py
 Needs: helm, PyYAML.
@@ -41,6 +44,11 @@ ENABLE_EVERYTHING = BASE + [
     "--set", "config.outboxRelayInterval=500ms",
     "--set", "config.sweepInterval=15s",
     "--set", "config.shutdownDrainDelay=5s",
+    "--set", "mcp.enabled=true",
+    "--set", "mcp.route.enabled=true",
+    "--set", "mcp.route.parentRefs[0].name=example-gateway",
+    "--set", "mcp.route.parentRefs[0].namespace=gateway",
+    "--set", "frontend.enabled=true",
 ]
 
 # Every variable cmd/api reads; each has a dedicated chart value.
@@ -54,6 +62,13 @@ ALWAYS_ON = {
     "DELIVERY_PROMISE_CONSUMER_GROUP", "OUTBOX_MAX_ATTEMPTS",
 }
 COMPONENT = "app.kubernetes.io/component"
+# The MCP server is read-only: no Kafka, no outbox relay, no consumer, no sweeper.
+MCP_STRAY = {
+    "KAFKA_BROKERS", "DELIVERY_PROMISE_CONSUMER_GROUP", "OUTBOX_RELAY_INTERVAL", "OUTBOX_MAX_ATTEMPTS",
+    "SWEEP_INTERVAL", "SHUTDOWN_DRAIN_DELAY", "EVENT_PUBLISHER",
+}
+# Every env var cmd/mcp reads that has a dedicated chart value.
+MCP_ENV = ("MCP_ADDR", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_URL", "MIGRATIONS_DATABASE_URL")
 
 
 def helm_template(extra_args: list[str]) -> subprocess.CompletedProcess:
@@ -99,19 +114,29 @@ def env_value(dep: dict, name: str) -> str | None:
     return next((e.get("value") for e in env_of(dep) if e["name"] == name), None)
 
 
+def command_of(dep: dict) -> list[str] | None:
+    return dep["spec"]["template"]["spec"]["containers"][0].get("command")
+
+
 def check_components(docs: list[dict], failures: list[str]) -> None:
     services = {d["metadata"]["name"]: d for d in docs if d.get("kind") == "Service"}
     deployments = {d["metadata"]["name"]: d for d in docs if d.get("kind") == "Deployment"}
     fullname = f"{RELEASE}"
 
+    mcp, frontend = f"{fullname}-mcp", f"{fullname}-frontend"
     if fullname not in services:
         failures.append("the api Service was not rendered")
     elif selector_of(services[fullname]).get(COMPONENT) != "api":
         failures.append("the api Service selector must pin component=api")
-    if set(deployments) != {fullname}:
-        failures.append(f"the chart must render exactly the api Deployment, got {sorted(deployments)}")
-    if set(services) != {fullname}:
-        failures.append(f"the chart must render exactly the api Service, got {sorted(services)}")
+    # mcp (ADR 0007) and frontend (ADR 0008) render their own Deployment and
+    # Service when enabled (they are in ENABLE_EVERYTHING).
+    if set(deployments) != {fullname, mcp, frontend}:
+        failures.append(f"the chart must render exactly the api, mcp and frontend Deployments, got {sorted(deployments)}")
+    if set(services) != {fullname, mcp, frontend}:
+        failures.append(f"the chart must render exactly the api, mcp and frontend Services, got {sorted(services)}")
+    for name, component in ((mcp, "mcp"), (frontend, "frontend")):
+        if selector_of(services.get(name, {})).get(COMPONENT) != component:
+            failures.append(f"the {component} Service selector must pin component={component}")
 
     # Every Deployment's own selector must pin a component too, and be satisfied
     # by its pod labels.
@@ -163,6 +188,38 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
     for name, want in (("SWEEP_INTERVAL", "15s"), ("OUTBOX_RELAY_INTERVAL", "500ms"), ("SHUTDOWN_DRAIN_DELAY", "5s")):
         if env_value(api, name) != want:
             failures.append(f"the api Deployment renders {name}={env_value(api, name)!r}, want {want!r}")
+
+    # --- mcp (ADR 0007): its own env, never the api's Kafka/relay/consumer env ---
+    mcp_dep = deployments.get(f"{fullname}-mcp")
+    if mcp_dep is None:
+        failures.append("the mcp Deployment was not rendered")
+    else:
+        if command_of(mcp_dep) != ["/app/mcp"]:
+            failures.append(f"the mcp Deployment must run /app/mcp, got {command_of(mcp_dep)}")
+        mcp_env = env_names(mcp_dep)
+        for want in MCP_ENV:
+            if want not in mcp_env:
+                failures.append(f"the mcp Deployment does not render {want}, which cmd/mcp reads")
+        stray = sorted(MCP_STRAY & set(mcp_env))
+        if stray:
+            failures.append(f"the mcp Deployment renders write-side env {stray}: the MCP server is read-only")
+
+    # --- frontend (ADR 0008): static nginx, no database, no Kafka ---
+    fe_dep = deployments.get(f"{fullname}-frontend")
+    if fe_dep is None:
+        failures.append("the frontend Deployment was not rendered")
+    else:
+        fe_env = set(env_names(fe_dep))
+        if fe_env & {"DATABASE_URL", "KAFKA_BROKERS", "DELIVERY_PROMISE_CONSUMER_GROUP"}:
+            failures.append(f"the frontend Deployment renders database/Kafka env: {sorted(fe_env)}")
+    for d in docs:
+        if d.get("kind") == "Service" and d["metadata"]["name"] == f"{fullname}-frontend":
+            if d["spec"].get("type") != "ClusterIP":
+                failures.append("the frontend Service must stay ClusterIP")
+        if d.get("kind") == "HTTPRoute" and d["metadata"]["name"] == f"{fullname}-mcp":
+            rules = d["spec"]["rules"]
+            if not any(f.get("type") == "URLRewrite" for r in rules for f in r.get("filters", [])):
+                failures.append("the mcp HTTPRoute must rewrite the host prefix to /mcp")
 
 
 def check_refusals(failures: list[str]) -> None:

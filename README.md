@@ -61,6 +61,35 @@ bash charts/delivery-promise/tests/render_test.sh
 python3 charts/delivery-promise/tests/test_service_selectors.py
 ```
 
+## MCP server (read-only)
+
+`cmd/mcp` (ADR 0007) exposes the five REST reads to AI agents over the Model Context Protocol, Streamable HTTP on `:8090`:
+
+| Tool | Reads |
+| --- | --- |
+| `get_delivery_offer` | `GET /delivery-offers/{offerId}` |
+| `get_promise` | `GET /promises/{promiseId}` |
+| `list_promises_by_order` | `GET /promises?orderId=` |
+| `list_promise_books` | `GET /promise-books?nodeId=&date=` |
+| `get_current_policy` | `GET /promise-policies/current` |
+
+It drives the same use cases as the REST adapter, writes nothing (no outbox, no consumer, no sweeper, never dials Kafka) and carries **no auth** -- the fleet-wide decision; the in-cluster ClusterIP boundary is the access control. Run it locally:
+
+```
+DATABASE_URL=postgres://... go run ./cmd/mcp    # MCP_ADDR :8090, LOG_LEVEL, SERVICE_VERSION, ENVIRONMENT
+```
+
+The chart deploys it with `mcp.enabled=true` (plus `mcp.route.enabled=true` for the Kong route `/api/mcp/delivery-promise` -> `/mcp`).
+
+## Web remote (console MFE)
+
+`web/` (ADR 0008) is the `delivery_promise_mfe` Module Federation remote for the warehouse console: four read-only screens (Promises of an order, one Offer, a node's capacity Books, the current Policy) over the REST GETs above. Dev/preview port **4013**, production base `/mfes/delivery-promise/` behind the Nginx web gateway, API base from the shell's `/config.json` (`apiOrigin` + `/api/delivery-promise`). `npm` runs only inside `web/`:
+
+```
+cd web && npm install && npm run dev     # :4013, proxies nothing; run cmd/api for data
+npm run lint && npx tsc -b && npm test && npm run build
+```
+
 ## Develop
 
 ```

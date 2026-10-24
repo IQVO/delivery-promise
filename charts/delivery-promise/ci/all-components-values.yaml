@@ -1,0 +1,41 @@
+# Used by `helm lint` / `ct lint`: every optional value and component set at
+# once (api + mcp + its Kong route + the web remote + the optional templates
+# of ci/optional-templates-values.yaml).
+database:
+  existingSecret: "delivery-promise-db"
+config:
+  eventPublisher: "kafka"
+  consumerGroup: "delivery-promise-consumer"
+  outboxRelayInterval: "500ms"
+  outboxMaxAttempts: 20
+  sweepInterval: "15s"
+  shutdownDrainDelay: "5s"
+  logLevel: "debug"
+kafka:
+  brokers: "kafka.example.invalid:9092"
+ingress:
+  enabled: true
+gatewayApi:
+  enabled: true
+  parentRefs:
+    - name: example-gateway
+      namespace: gateway
+      sectionName: http
+  hosts:
+    - path: /api/delivery-promise
+      pathType: PathPrefix
+autoscaling:
+  api:
+    enabled: true
+mcp:
+  enabled: true
+  serviceVersion: "0.1.0"
+  environment: "ci"
+  route:
+    enabled: true
+    parentRefs:
+      - name: example-gateway
+        namespace: gateway
+        sectionName: http
+frontend:
+  enabled: true
