@@ -3,7 +3,7 @@
 harness-template: v4
 
 Retail network, bounded context Delivery Promise (Core, commerce tier). Quotes delivery offers only from a feasible witness path (node cutoff, scheduled departures, delivery wave with room), holds capacity in a PromiseBook until the order is placed or the hold expires, and judges every promise kept or broken. Publishes twelve event types (six integration, six analytics-only), consumes 34 types from eight producers and calls no sibling.
-Design source of truth: IQVO/retail-network-docs `model/model.yaml` (context delivery-promise). This service belongs to the retail network, not the warehouse-systems fleet.
+Design source of truth: IQVO/warehouse-docs `network/model/model.yaml` (context delivery-promise). This service belongs to the retail network, not the warehouse-systems fleet.
 This project is a domain-driven design study, not associated with any company: never name a real company, brand or product in code, comments, ADRs, specs, tests or fixtures (README `## Disclaimer`).
 
 ## Commands
