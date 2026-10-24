@@ -6,8 +6,11 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
+	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -21,20 +24,31 @@ type fakeReader struct {
 	msgs      []kafkago.Message
 	committed []kafkago.Message
 	commitErr []error // consumed one per CommitMessages call
+	fetchErrs []error // consumed one per FetchMessage call, BEFORE msgs
+	alwaysErr error   // returned once msgs and fetchErrs are exhausted
 	eofAtEnd  bool
 	closed    bool
 }
 
 func (r *fakeReader) FetchMessage(ctx context.Context) (kafkago.Message, error) {
 	r.mu.Lock()
+	if len(r.fetchErrs) > 0 {
+		err := r.fetchErrs[0]
+		r.fetchErrs = r.fetchErrs[1:]
+		r.mu.Unlock()
+		return kafkago.Message{}, err
+	}
 	if len(r.msgs) > 0 {
 		m := r.msgs[0]
 		r.msgs = r.msgs[1:]
 		r.mu.Unlock()
 		return m, nil
 	}
-	eof := r.eofAtEnd
+	eof, always := r.eofAtEnd, r.alwaysErr
 	r.mu.Unlock()
+	if always != nil {
+		return kafkago.Message{}, always
+	}
 	if eof {
 		return kafkago.Message{}, io.EOF
 	}
@@ -109,7 +123,12 @@ func TestTheLoopCommitsOnlyAfterSuccessfulHandling(t *testing.T) {
 }
 
 func TestATransientFailureIsRetriedWithDoublingBackoffThenSucceeds(t *testing.T) {
-	r := &fakeReader{msgs: []kafkago.Message{msg(1, "a")}, eofAtEnd: true}
+	// The reader blocks once its script is empty (io.EOF is no longer a
+	// terminal fetch error -- a cleanly closed broker connection is retried),
+	// so the loop is ended by cancelling the context in the successful
+	// handling, keeping this test about the HANDLING backoff only.
+	ctx, cancel := context.WithCancel(context.Background())
+	r := &fakeReader{msgs: []kafkago.Message{msg(1, "a")}}
 	var delays []time.Duration
 	calls := 0
 	l := &consumeLoop{reader: r, logger: discard(), name: "t", retry: RetryPolicy{Initial: 10 * time.Millisecond, Max: 25 * time.Millisecond},
@@ -119,9 +138,10 @@ func TestATransientFailureIsRetriedWithDoublingBackoffThenSucceeds(t *testing.T)
 			if calls < 4 {
 				return errors.New("transient")
 			}
+			cancel()
 			return nil
 		}}
-	_ = l.run(context.Background())
+	_ = l.run(ctx)
 	want := []time.Duration{10 * time.Millisecond, 20 * time.Millisecond, 25 * time.Millisecond}
 	if calls != 4 || len(delays) != 3 || delays[0] != want[0] || delays[1] != want[1] || delays[2] != want[2] {
 		t.Fatalf("calls %d delays %v", calls, delays)
@@ -284,5 +304,89 @@ func TestNewConsumerBuildsWithoutDialingAndCloses(t *testing.T) {
 	}
 	if err := c.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// idleTimeout is the error shape kafka-go surfaces when a long-lived broker
+// connection's read deadline fires on an idle topic: *net.OpError with
+// Timeout() true.
+func idleTimeout() error {
+	return &net.OpError{Op: "read", Net: "tcp", Err: os.ErrDeadlineExceeded}
+}
+
+func TestTransientFetchErrorClassification(t *testing.T) {
+	refused := &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}
+	for _, c := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"idle read timeout", idleTimeout(), true},
+		{"connection reset", &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}, true},
+		{"broken pipe", &net.OpError{Op: "write", Net: "tcp", Err: syscall.EPIPE}, true},
+		{"clean close", io.EOF, true},
+		{"wrapped clean close", fmtErrorw(io.EOF), true},
+		{"connection refused stays fatal", refused, false},
+		{"canceled context stays fatal", context.Canceled, false},
+		{"caller deadline stays fatal", context.DeadlineExceeded, false},
+		{"plain error stays fatal", errors.New("kafka: group rebalanced"), false},
+		{"nil", nil, false},
+	} {
+		if got := transientFetchError(c.err); got != c.want {
+			t.Fatalf("%s: transientFetchError = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func fmtErrorw(err error) error { return errors.Join(errors.New("fetch: "), err) }
+
+func TestFetchRetriesStalledBrokerConnectionsAndAResetFollowsSuccess(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	r := &fakeReader{fetchErrs: []error{idleTimeout(), idleTimeout()}, msgs: []kafkago.Message{msg(1, "a")}, alwaysErr: idleTimeout()}
+	var slept []time.Duration
+	handled := 0
+	l := &consumeLoop{reader: r, logger: discard(), name: "t",
+		sleep: func(_ context.Context, d time.Duration) error {
+			slept = append(slept, d)
+			if len(slept) == 3 { // two blips before the message, one after it
+				cancel()
+				return ctx.Err()
+			}
+			return nil
+		},
+		handle: func(context.Context, kafkago.Message) error { handled++; return nil }}
+	err := l.run(ctx)
+	if !errors.Is(err, context.Canceled) || handled != 1 || len(r.committed) != 1 {
+		t.Fatalf("err %v handled %d committed %d", err, handled, len(r.committed))
+	}
+	// Before the message: backoff doubles from the initial 200ms. After the
+	// successful fetch the counter AND the delay reset, so the third sleep is
+	// the initial 200ms again, not the doubled 800ms.
+	if len(slept) != 3 || slept[0] != 200*time.Millisecond || slept[1] != 400*time.Millisecond || slept[2] != 200*time.Millisecond {
+		t.Fatalf("backoff sequence = %v", slept)
+	}
+}
+
+func TestAPersistentlyStalledBrokerStillFailsTheWorker(t *testing.T) {
+	r := &fakeReader{alwaysErr: idleTimeout()}
+	sleeps := 0
+	l := &consumeLoop{reader: r, logger: discard(), name: "t",
+		sleep:  func(context.Context, time.Duration) error { sleeps++; return nil },
+		handle: func(context.Context, kafkago.Message) error { return nil }}
+	err := l.run(context.Background())
+	var netErr net.Error
+	if !errors.As(err, &netErr) || !netErr.Timeout() || sleeps != maxTransientFetchFailures {
+		t.Fatalf("err %v sleeps %d", err, sleeps)
+	}
+}
+
+func TestAFatalFetchErrorIsNotRetried(t *testing.T) {
+	r := &fakeReader{alwaysErr: &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}}
+	sleeps := 0
+	l := &consumeLoop{reader: r, logger: discard(), name: "t",
+		sleep:  func(context.Context, time.Duration) error { sleeps++; return nil },
+		handle: func(context.Context, kafkago.Message) error { return nil }}
+	if err := l.run(context.Background()); err == nil || sleeps != 0 {
+		t.Fatalf("err %v sleeps %d", err, sleeps)
 	}
 }
