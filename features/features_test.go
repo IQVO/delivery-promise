@@ -30,8 +30,7 @@ func TestFeatures(t *testing.T) {
 	}
 }
 
-// initializeScenario gives every scenario a fresh world and registers the
-// steps of every feature area.
+// register the steps of every feature area.
 func initializeScenario(sc *godog.ScenarioContext) {
 	w := newWorld()
 	sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
@@ -43,4 +42,6 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	registerPromiseSteps(sc, w)
 	registerRiskSteps(sc, w)
 	registerOutcomeSteps(sc, w)
+	registerFactSteps(sc, w)
+	registerRestSteps(sc, w)
 }
