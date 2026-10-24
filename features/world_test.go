@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"time"
 
+	inboundhttp "github.com/claudioed/delivery-promise/internal/adapters/inbound/http"
 	"github.com/claudioed/delivery-promise/internal/adapters/outbound/memory"
 	"github.com/claudioed/delivery-promise/internal/application/usecases"
 	"github.com/claudioed/delivery-promise/internal/application/views"
@@ -20,11 +23,14 @@ func at(day, h, m int) time.Time { return time.Date(2026, 10, day, h, m, 0, 0, c
 
 // world is the state of one scenario: the in-memory store behind the use
 // cases, the offers of the last quote, the promise the scenario works on and
-// the outcome of the last command.
+// the outcome of the last command. The REST steps reuse the same service
+// through the real chi router, so an HTTP scenario exercises the adapter too.
 type world struct {
-	store *memory.Store
-	clock *memory.FakeClock
-	svc   *usecases.Service
+	store   *memory.Store
+	clock   *memory.FakeClock
+	svc     *usecases.Service
+	router  http.Handler
+	lastRes *httptest.ResponseRecorder
 
 	events       int
 	lastQuote    views.QuoteResult
@@ -52,6 +58,11 @@ func (w *world) reset() {
 		Policies: w.store.Policies(), Network: w.store.Network(), Shipments: w.store.Shipments(), Outbox: w.store.Outbox(),
 		Inbox: w.store.Inbox(), Clock: w.clock, IDs: &memory.SeqIDs{},
 	})
+	// The real REST adapter over the same in-memory doubles; Idempotency stays
+	// nil because the transactional middleware is Postgres-bound and is proven
+	// by the integration suite.
+	w.router = inboundhttp.NewRouter(&inboundhttp.Server{API: w.svc})
+	w.lastRes = nil
 	w.events, w.lastQuote, w.promiseID, w.firstPromise, w.created, w.lastErr, w.ran = 0, views.QuoteResult{}, "", "", false, nil, false
 	w.counts, w.outboxLen = memory.Counts{}, 0
 }

@@ -44,3 +44,28 @@ Feature: Quoting delivery offers
     Then the command is refused with "ErrValidation"
     When I quote 2 of "ci-1001" for postal prefix "78 7"
     Then the command is refused with "ErrValidation"
+
+  Scenario: STANDARD keeps a NOMINAL path when no wave can serve it
+    Given the network changes: the delivery wave is cancelled
+    When I quote 2 of "ci-1001" for postal prefix "787"
+    Then the quote offers exactly the tiers "STANDARD"
+    And the STANDARD offer is NOMINAL from the node "N-AUS3"
+    And the STANDARD offer promises delivery between "2026-10-23T09:00:00-05:00" and "2026-10-23T21:00:00-05:00"
+
+  Scenario: A promise made from a NOMINAL offer holds the nominal book
+    Given the network changes: the delivery wave is cancelled
+    And I quote 2 of "ci-1001" for postal prefix "787" on the tier STANDARD
+    When I make a promise from the STANDARD offer
+    Then the command succeeds
+    And the promise is PROVISIONAL
+    And the book "N-AUS3:nominal-20261022T2300Z" holds 1 provisional and 0 confirmed
+    And the book "N-AUS3:nominal-20261022T2300Z" has a share of 2500
+    And the last command published the event "PromiseMade" 1 time
+
+  Scenario: The sweeper expires the quoted offers past their TTL
+    When I quote 2 of "ci-1001" for postal prefix "787"
+    Then the NEXT_DAY offer is QUOTED
+    When the clock advances 11 minutes
+    And the sweeper expires the quoted offers
+    Then the NEXT_DAY offer is EXPIRED
+    And the last command published no events
