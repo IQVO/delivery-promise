@@ -1,0 +1,810 @@
+[
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read the current promise policy: policyVersion (v0 is the built-in default when nothing was published), offerTtlMinutes and holdTtlMinutes, packagesPerOrder, capacitySharePercent and the per-tier order deadlines (localTime in the destination region's time zone). Publishing a policy is a REST operation. Read-only; takes no arguments.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "name": "get_current_policy",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "capacitySharePercent": {
+          "type": "integer"
+        },
+        "holdTtlMinutes": {
+          "type": "integer"
+        },
+        "offerTtlMinutes": {
+          "type": "integer"
+        },
+        "orderDeadlines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "localTime": {
+                "type": "string"
+              },
+              "regionId": {
+                "type": "string"
+              },
+              "tier": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tier",
+              "localTime"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "packagesPerOrder": {
+          "type": "integer"
+        },
+        "policyVersion": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "policyVersion",
+        "version",
+        "offerTtlMinutes",
+        "holdTtlMinutes",
+        "packagesPerOrder",
+        "capacitySharePercent",
+        "orderDeadlines",
+        "publishedAt"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read one delivery offer in any state (QUOTED, EXPIRED or CONSUMED): its tier, groupNo, destination postal prefix, lines, delivery window, the witness path that proves feasibility (node, pickup departure, legs, delivery wave), basis (SCHEDULED or NOMINAL), the policyVersion it was quoted under, and quotedAt/expiresAt. Offers are kept for a retention period after they expire. Read-only; an unknown offer fails with not-found.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "offerId": {
+          "description": "the delivery offer id returned by quote, e.g. off-1",
+          "type": "string"
+        }
+      },
+      "required": [
+        "offerId"
+      ],
+      "type": "object"
+    },
+    "name": "get_delivery_offer",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "string"
+        },
+        "destinationPostalPrefix": {
+          "type": "string"
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "groupNo": {
+          "type": "integer"
+        },
+        "lines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "catalogItemId": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "catalogItemId",
+              "quantity"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "offerId": {
+          "type": "string"
+        },
+        "policyVersion": {
+          "type": "string"
+        },
+        "quotedAt": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "tier": {
+          "type": "string"
+        },
+        "window": {
+          "additionalProperties": false,
+          "properties": {
+            "earliest": {
+              "type": "string"
+            },
+            "latest": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "earliest",
+            "latest"
+          ],
+          "type": "object"
+        },
+        "witnessPath": {
+          "additionalProperties": false,
+          "properties": {
+            "deliveryWaveId": {
+              "type": "string"
+            },
+            "legs": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "nodeId": {
+              "type": "string"
+            },
+            "pickupDepartureId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "nodeId",
+            "legs"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "offerId",
+        "state",
+        "groupNo",
+        "destinationPostalPrefix",
+        "tier",
+        "lines",
+        "window",
+        "witnessPath",
+        "basis",
+        "policyVersion",
+        "quotedAt",
+        "expiresAt"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read one promise in any state (PROVISIONAL, CONFIRMED, AT_RISK, KEPT, BROKEN, RELEASED or CANCELLED): its terms (tier, shipBy, deliverByEarliest, deliverByLatest, basis, policyVersion), the witness path, holdExpiresAt, the revisions that moved it and the final judgement (outcome KEPT or BROKEN, cause, lateByMinutes). A promise is never deleted; terminal states stay readable. Read-only; an unknown promise fails with not-found.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "promiseId": {
+          "description": "the promise id, e.g. prm-1",
+          "type": "string"
+        }
+      },
+      "required": [
+        "promiseId"
+      ],
+      "type": "object"
+    },
+    "name": "get_promise",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "atRiskReason": {
+          "type": "string"
+        },
+        "cancelReason": {
+          "type": "string"
+        },
+        "destinationPostalPrefix": {
+          "type": "string"
+        },
+        "groupNo": {
+          "type": "integer"
+        },
+        "holdExpiresAt": {
+          "type": "string"
+        },
+        "judgement": {
+          "additionalProperties": false,
+          "properties": {
+            "cause": {
+              "type": "string"
+            },
+            "deliveredAt": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "lateByMinutes": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "outcome": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "outcome"
+          ],
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "lines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "catalogItemId": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "catalogItemId",
+              "quantity"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "offerId": {
+          "type": "string"
+        },
+        "orderId": {
+          "type": "string"
+        },
+        "promiseId": {
+          "type": "string"
+        },
+        "releaseReason": {
+          "type": "string"
+        },
+        "revisions": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "previousTerms": {
+                "additionalProperties": false,
+                "properties": {
+                  "basis": {
+                    "type": "string"
+                  },
+                  "deliverByEarliest": {
+                    "type": "string"
+                  },
+                  "deliverByLatest": {
+                    "type": "string"
+                  },
+                  "policyVersion": {
+                    "type": "string"
+                  },
+                  "shipBy": {
+                    "type": "string"
+                  },
+                  "tier": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tier",
+                  "shipBy",
+                  "deliverByEarliest",
+                  "deliverByLatest",
+                  "basis",
+                  "policyVersion"
+                ],
+                "type": "object"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "revisedAt": {
+                "type": "string"
+              },
+              "revisionNo": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "revisionNo",
+              "previousTerms",
+              "reason",
+              "revisedAt"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "state": {
+          "type": "string"
+        },
+        "terms": {
+          "additionalProperties": false,
+          "properties": {
+            "basis": {
+              "type": "string"
+            },
+            "deliverByEarliest": {
+              "type": "string"
+            },
+            "deliverByLatest": {
+              "type": "string"
+            },
+            "policyVersion": {
+              "type": "string"
+            },
+            "shipBy": {
+              "type": "string"
+            },
+            "tier": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tier",
+            "shipBy",
+            "deliverByEarliest",
+            "deliverByLatest",
+            "basis",
+            "policyVersion"
+          ],
+          "type": "object"
+        },
+        "version": {
+          "type": "integer"
+        },
+        "witnessPath": {
+          "additionalProperties": false,
+          "properties": {
+            "deliveryWaveId": {
+              "type": "string"
+            },
+            "legs": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "nodeId": {
+              "type": "string"
+            },
+            "pickupDepartureId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "nodeId",
+            "legs"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "promiseId",
+        "offerId",
+        "state",
+        "destinationPostalPrefix",
+        "lines",
+        "terms",
+        "witnessPath",
+        "holdExpiresAt",
+        "revisions",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "List the capacity ledger books of one fulfillment node whose pickup cutoff falls on one date (YYYY-MM-DD in the node's own time zone), ordered by cutoffAt: one book per cutoff (bookId is nodeId:pickupDepartureId), its OPEN or CLOSED state and its capacity (share, provisional and confirmed holds). Read-only; a malformed node id or date fails with validation-failed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "description": "the cutoff date, YYYY-MM-DD, in the node's own time zone",
+          "type": "string"
+        },
+        "nodeId": {
+          "description": "the fulfillment node id whose books to list, e.g. N-AUS3",
+          "type": "string"
+        }
+      },
+      "required": [
+        "nodeId",
+        "date"
+      ],
+      "type": "object"
+    },
+    "name": "list_promise_books",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bookId": {
+                "type": "string"
+              },
+              "capacity": {
+                "additionalProperties": false,
+                "properties": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "provisional": {
+                    "type": "integer"
+                  },
+                  "share": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "share",
+                  "provisional",
+                  "confirmed"
+                ],
+                "type": "object"
+              },
+              "cutoffAt": {
+                "type": "string"
+              },
+              "nodeId": {
+                "type": "string"
+              },
+              "pickupDepartureId": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "bookId",
+              "nodeId",
+              "pickupDepartureId",
+              "cutoffAt",
+              "state",
+              "capacity",
+              "version"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "List the promises of one customer order, one per shipment group, ordered by groupNo: each with its state, terms, witness path and judgement (the same shape as get_promise). Only CONFIRMED promises belong to an order, so this is the checkout view of what was promised. Read-only; a malformed order id fails with validation-failed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "orderId": {
+          "description": "the customer order id (from CustomerOrderPlaced) whose confirmed promises to list, e.g. ord-1001",
+          "type": "string"
+        }
+      },
+      "required": [
+        "orderId"
+      ],
+      "type": "object"
+    },
+    "name": "list_promises_by_order",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "atRiskReason": {
+                "type": "string"
+              },
+              "cancelReason": {
+                "type": "string"
+              },
+              "destinationPostalPrefix": {
+                "type": "string"
+              },
+              "groupNo": {
+                "type": "integer"
+              },
+              "holdExpiresAt": {
+                "type": "string"
+              },
+              "judgement": {
+                "additionalProperties": false,
+                "properties": {
+                  "cause": {
+                    "type": "string"
+                  },
+                  "deliveredAt": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "lateByMinutes": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "outcome": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "outcome"
+                ],
+                "type": [
+                  "null",
+                  "object"
+                ]
+              },
+              "lines": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "catalogItemId": {
+                      "type": "string"
+                    },
+                    "quantity": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "catalogItemId",
+                    "quantity"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "offerId": {
+                "type": "string"
+              },
+              "orderId": {
+                "type": "string"
+              },
+              "promiseId": {
+                "type": "string"
+              },
+              "releaseReason": {
+                "type": "string"
+              },
+              "revisions": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "previousTerms": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "basis": {
+                          "type": "string"
+                        },
+                        "deliverByEarliest": {
+                          "type": "string"
+                        },
+                        "deliverByLatest": {
+                          "type": "string"
+                        },
+                        "policyVersion": {
+                          "type": "string"
+                        },
+                        "shipBy": {
+                          "type": "string"
+                        },
+                        "tier": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tier",
+                        "shipBy",
+                        "deliverByEarliest",
+                        "deliverByLatest",
+                        "basis",
+                        "policyVersion"
+                      ],
+                      "type": "object"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "revisedAt": {
+                      "type": "string"
+                    },
+                    "revisionNo": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "revisionNo",
+                    "previousTerms",
+                    "reason",
+                    "revisedAt"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "state": {
+                "type": "string"
+              },
+              "terms": {
+                "additionalProperties": false,
+                "properties": {
+                  "basis": {
+                    "type": "string"
+                  },
+                  "deliverByEarliest": {
+                    "type": "string"
+                  },
+                  "deliverByLatest": {
+                    "type": "string"
+                  },
+                  "policyVersion": {
+                    "type": "string"
+                  },
+                  "shipBy": {
+                    "type": "string"
+                  },
+                  "tier": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tier",
+                  "shipBy",
+                  "deliverByEarliest",
+                  "deliverByLatest",
+                  "basis",
+                  "policyVersion"
+                ],
+                "type": "object"
+              },
+              "version": {
+                "type": "integer"
+              },
+              "witnessPath": {
+                "additionalProperties": false,
+                "properties": {
+                  "deliveryWaveId": {
+                    "type": "string"
+                  },
+                  "legs": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  },
+                  "nodeId": {
+                    "type": "string"
+                  },
+                  "pickupDepartureId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "nodeId",
+                  "legs"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "promiseId",
+              "offerId",
+              "state",
+              "destinationPostalPrefix",
+              "lines",
+              "terms",
+              "witnessPath",
+              "holdExpiresAt",
+              "revisions",
+              "version"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    }
+  }
+]
