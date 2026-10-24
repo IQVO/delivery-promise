@@ -120,3 +120,19 @@ Feature: Making and confirming promises
     Then the command is refused with "ErrIllegalTransition"
     And the promise is PROVISIONAL
     And the book "N-AUS3:dep-AUS3-1800" holds 1 provisional and 0 confirmed
+
+  Scenario: The sweeper closes the book at its cutoff
+    Given I quote 2 of "ci-1001" for postal prefix "787"
+    And a promise exists from the NEXT_DAY offer
+    When the clock advances 245 minutes
+    And the sweeper closes the due books
+    Then the book "N-AUS3:dep-AUS3-1800" is CLOSED
+    And the book "N-AUS3:dep-AUS3-1800" holds 1 provisional and 0 confirmed
+
+  Scenario: The order's promises are listed one per group
+    Given I quote 2 of "ci-1001" for postal prefix "787"
+    And a promise exists from the NEXT_DAY offer
+    And I confirm the promise for the order "ord-1" group 1
+    Then the promise "{promiseId}" is listed for the order "ord-1" in group 1
+    When I list the promises of the order ""
+    Then the command is refused with "ErrValidation"

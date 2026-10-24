@@ -62,3 +62,41 @@ Feature: Keeping the promise
     When the package "TRK-2" is returned
     Then the promise is BROKEN
     And the judgement cause is "RETURNED"
+
+  Scenario Outline: A risk fact of a producer flags and re-promises the confirmed promise
+    Given the assignment "asg-1" of the order "ord-1" is locked and shipped with the packages "TRK-1"
+    When <fact>
+    Then the last command published the event "PromiseAtRisk" 1 time
+    And the last command published a "PromiseAtRisk" event whose "Reason" is "<reason>"
+    And the last command published the event "PromiseRevised" 1 time
+    And the promise is CONFIRMED
+    And the promise has 1 revision with the reason "<reason>"
+
+    Examples:
+      | fact                                                                            | reason             |
+      | the booking of the assignment "asg-1" is moved from the departure "dep-AUS3-1800" | BOOKING_MOVED      |
+      | the booking of the assignment "asg-1" on the departure "dep-AUS3-1800" fails      | BOOKING_FAILED     |
+      | the induction of the package "TRK-1" is deferred                                 | INDUCTION_DEFERRED |
+      | a package of the assignment "asg-1" raises an exception                          | PACKAGE_EXCEPTION  |
+
+  Scenario: An unsourceable fulfilment leaves the promise at risk and unkeepable
+    Given the assignment "asg-1" of the order "ord-1" is locked and shipped with the packages "TRK-1"
+    When the fulfilment of the promise is unsourceable at the node "N-AUS3"
+    Then the promise is AT_RISK
+    And the promise is at risk with the reason "NODE_UNSOURCEABLE"
+    And the last command published the event "PromiseAtRisk" 1 time
+    And the last command published a "PromiseAtRisk" event whose "Reason" is "NODE_UNSOURCEABLE"
+    And the last command published the event "PromiseUnkeepable" 1 time
+    And the last command published a "PromiseUnkeepable" event whose "Reason" is "NODE_UNSOURCEABLE"
+
+  Scenario: A booking moved onto another departure is re-promised at once
+    Given an earlier pickup "dep-AUS3-1730" is scheduled
+    And the assignment "asg-1" of the order "ord-1" is locked and shipped with the packages "TRK-1"
+    When the booking of the assignment "asg-1" is moved from the departure "dep-AUS3-1800"
+    Then the promise is CONFIRMED
+    And the promise has 1 revision with the reason "BOOKING_MOVED"
+    And the promise ships from the pickup "dep-AUS3-1730"
+    And the book "N-AUS3:dep-AUS3-1800" holds 0 provisional and 0 confirmed
+    And the book "N-AUS3:dep-AUS3-1730" holds 0 provisional and 1 confirmed
+    And the last command published the event "PromiseAtRisk" 1 time
+    And the last command published the event "PromiseRevised" 1 time
