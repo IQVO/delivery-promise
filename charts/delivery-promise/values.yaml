@@ -189,3 +189,74 @@ terminationGracePeriodSeconds: 60
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# ---------------------------------------------------------------------------
+# Optional components (ADR 0007 MCP, ADR 0008 web remote). Both are OFF by
+# default: a default render is the api alone.
+# ---------------------------------------------------------------------------
+
+# cmd/mcp (ADR 0007): the read-only MCP server (Streamable HTTP on /mcp plus
+# an open /healthz). It reads the service database through the same use
+# cases as the API and writes nothing: no outbox relay, no consumer, no
+# sweeper, no Kafka. No auth, by fleet decision: the in-cluster ClusterIP
+# boundary is the access control.
+mcp:
+  enabled: false
+  replicaCount: 1
+  httpAddr: ":8090"                  # MCP_ADDR (keep mcp.service.targetPort in step)
+  # SERVICE_VERSION / ENVIRONMENT: free-form identity reported in the boot
+  # log line, nothing more.
+  serviceVersion: ""
+  environment: ""
+  service:
+    type: ClusterIP
+    port: 8090
+    targetPort: 8090
+  # Kong exposure: /api/mcp/delivery-promise -> Service :8090, prefix
+  # rewritten to /mcp. Needs the Gateway parentRef from warehouse-infra.
+  route:
+    enabled: false
+    path: "/api/mcp/delivery-promise"
+    parentRefs:
+      - name: ""
+        namespace: ""
+        sectionName: "http"
+  extraEnv: []
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# web/ (delivery_promise_mfe, ADR 0008): the Module Federation remote served
+# by its own nginx pod, reached through warehouse-infra's Nginx web gateway
+# at /mfes/delivery-promise/. Never routed by this chart; ClusterIP only.
+frontend:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: warehouse/delivery-promise-frontend
+    pullPolicy: IfNotPresent
+    tag: ""
+  service:
+    port: 80
+    targetPort: 8080
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    fsGroup: 101
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
