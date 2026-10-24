@@ -40,7 +40,7 @@ Contracts: [`apis/openapi.yaml`](apis/openapi.yaml), [`apis/asyncapi.yaml`](apis
 
 ## Status and design
 
-The design is proposed in [retail-network-docs](https://iqvo.github.io/retail-network-docs/contexts/delivery-promise); `model/model.yaml` there is the single source of truth. This repository is a service of the retail network, not of the warehouse-systems fleet; the fleet reaches the network only through the `vendor-connectivity` Vendor API.
+The design is proposed in [retail-network docs](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise); `model/model.yaml` there is the single source of truth. This repository is a service of the retail network, not of the warehouse-systems fleet; the fleet reaches the network only through the `vendor-connectivity` Vendor API.
 
 Decisions are in [`docs/adr/`](docs/adr/index.md): the bounded context (0001), the aggregates, invariants and numbered assumptions (0002), consumed contracts and local read models (0003), the CloudEvents catalogue (0004), the outbox relay (0005), the HTTP adapter, consumer, sweeper and readiness (0006). Configuration, probes and shutdown are in [`docs/runtime.md`](docs/runtime.md); the packaging checklist is [`docs/before-first-release.md`](docs/before-first-release.md).
 
