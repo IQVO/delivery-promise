@@ -10,3 +10,5 @@ The decisions of `delivery-promise`, in the order they were taken. The ADR bodie
 | [0004](./0004-cloudevents-envelope-and-type-catalogue.md) | CloudEvents envelope and type catalogue | Accepted (2026-10-23) |
 | [0005](./0005-outbox-relay-and-attempt-cap.md) | the outbox relay, its attempt cap and the CloudEvents encoder | Accepted (2026-10-23) |
 | [0006](./0006-http-adapter-consumer-and-readiness.md) | the HTTP adapter, the consumer, the sweeper and readiness | Accepted (2026-10-23) |
+| [0007](./0007-mcp-server-adoption.md) | a read-only MCP server | Accepted (2026-10-24) |
+| [0008](./0008-console-remote.md) | a warehouse-console web remote | Accepted (2026-10-24) |

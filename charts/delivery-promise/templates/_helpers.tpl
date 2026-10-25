@@ -41,9 +41,10 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-Selector labels. The chart has one component (api); every Deployment and
-Service still pins app.kubernetes.io/component so a component added later
-cannot be selected by accident (tests/test_service_selectors.py).
+Selector labels. The chart has one always-on component (api) plus the
+optional mcp and frontend (default OFF); every Deployment and Service pins
+app.kubernetes.io/component so a Service can never select another
+component's pods by accident (tests/test_service_selectors.py).
 */}}
 {{- define "delivery-promise.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "delivery-promise.name" . }}
