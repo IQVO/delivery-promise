@@ -64,7 +64,7 @@ func (o *Outbox) Append(ctx context.Context, events ...shared.Event) error {
 		if err != nil {
 			return fmt.Errorf("encode %s: %w", e.EventName(), err)
 		}
-		headers, err := marshalHeaders(m.Headers)
+		headers, err := marshalHeaders(withTraceHeaders(ctx, m.Headers))
 		if err != nil {
 			return fmt.Errorf("marshal outbox headers for %s: %w", m.EventType, err)
 		}

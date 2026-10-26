@@ -16,6 +16,10 @@
 //	SWEEP_INTERVAL                clock-driven sweep interval (default 15s)
 //	SHUTDOWN_DRAIN_DELAY          wait after flipping /readyz before closing (default 5s)
 //	LOG_LEVEL                     debug|info|warn|error (default info)
+//	OTEL_SERVICE_NAME             service.name of spans and metrics (default delivery-promise)
+//	OTEL_EXPORTER_OTLP_ENDPOINT   Collector OTLP/gRPC endpoint (default telemetry.DefaultEndpoint); export never blocks
+//	SERVICE_VERSION               service.version (default dev)
+//	ENVIRONMENT                   deployment.environment.name (default local)
 //
 // GET /readyz is 200 only while Postgres answers a ping AND a Kafka broker
 // answers a metadata request (verdict cached 3s, bounded 2s); /healthz is
@@ -41,6 +45,8 @@ import (
 	"github.com/claudioed/delivery-promise/internal/adapters/outbound/ids"
 	outboundkafka "github.com/claudioed/delivery-promise/internal/adapters/outbound/kafka"
 	"github.com/claudioed/delivery-promise/internal/adapters/outbound/postgres"
+	"github.com/claudioed/delivery-promise/internal/adapters/outbound/telemetry"
+	"github.com/claudioed/delivery-promise/internal/application/ports"
 	"github.com/claudioed/delivery-promise/internal/application/usecases"
 	"github.com/claudioed/delivery-promise/internal/bootretry"
 )
@@ -63,16 +69,33 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// Telemetry comes up before the router is built (otelchimetric binds the
+	// global MeterProvider at construction) and is flushed LAST: deferred before
+	// the pool, so the final spans of the drain still leave the process.
+	tel := loadTelemetryEnv(os.Getenv)
+	flushTelemetry, err := startTelemetry(logger, tel)
+	if err != nil {
+		return err
+	}
+	defer flushTelemetry()
+
 	pool, err := openPostgres(ctx, rt, logger)
 	if err != nil {
 		return err
 	}
-	// pool.Close is deferred FIRST so it runs LAST, after the HTTP drain, the
-	// consumer, the sweeper and the relay have stopped.
+	// pool.Close is deferred FIRST of the adapters so it runs LAST of them, after
+	// the HTTP drain, the consumer, the sweeper and the relay have stopped.
 	defer pool.Close()
 
+	// The business counter binds to the MeterProvider telemetry.Setup installed.
+	promiseMetrics, err := telemetry.NewPromiseMetrics()
+	if err != nil {
+		return err
+	}
+
 	outbox := postgres.NewOutbox(pool, outboundkafka.NewEncoder())
-	svc := buildService(pool, outbox, logger)
+	svc := buildService(pool, outbox, logger, promiseMetrics)
 	readiness := inboundhttp.NewReadiness(inboundhttp.DefaultReadinessTTL, inboundhttp.DefaultReadinessTimeout,
 		inboundhttp.Dependency{Name: "postgres", Check: pool.Ping},
 		inboundhttp.Dependency{Name: "kafka", Check: outboundkafka.NewBrokerCheck(rt.brokers).Check},
@@ -81,10 +104,10 @@ func run(ctx context.Context) error {
 		API:         svc,
 		Readiness:   readiness,
 		Idempotency: inboundhttp.RequireIdempotencyKey(pool, postgres.BindTx),
-	})
+	}, logger, tel.serviceName)
 	httpServer := &http.Server{
 		Addr:              rt.httpAddr,
-		Handler:           inboundhttp.AccessLog(logger)(inboundhttp.Recoverer(router)),
+		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -114,8 +137,9 @@ func openPostgres(ctx context.Context, rt runtimeEnv, logger *slog.Logger) (*pgx
 	return pool, nil
 }
 
-// buildService wires the Postgres adapters into the use cases.
-func buildService(pool *pgxpool.Pool, outbox *postgres.Outbox, logger *slog.Logger) *usecases.Service {
+// buildService wires the Postgres adapters into the use cases. metrics may be
+// nil (a no-op, as in tests).
+func buildService(pool *pgxpool.Pool, outbox *postgres.Outbox, logger *slog.Logger, metrics ports.PromiseMetrics) *usecases.Service {
 	network := postgres.NewNetworkViews(pool)
 	return usecases.New(usecases.Deps{
 		UoW:       postgres.NewUnitOfWork(pool),
@@ -130,6 +154,7 @@ func buildService(pool *pgxpool.Pool, outbox *postgres.Outbox, logger *slog.Logg
 		Clock:     clock.System{},
 		IDs:       ids.UUID{},
 		Logger:    logger,
+		Metrics:   metrics,
 	})
 }
 

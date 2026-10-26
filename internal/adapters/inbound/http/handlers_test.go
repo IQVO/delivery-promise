@@ -93,7 +93,7 @@ func do(h http.Handler, method, path, body string) *httptest.ResponseRecorder {
 
 func TestEveryOperationCallsItsUseCaseAndAnswers(t *testing.T) {
 	api := &fakeAPI{created: true}
-	h := NewRouter(&Server{API: api})
+	h := NewRouter(&Server{API: api}, nil, "")
 
 	cases := []struct {
 		name, method, path, body string
@@ -149,7 +149,7 @@ func assertRecordedCalls(t *testing.T, api *fakeAPI) {
 }
 
 func TestAReplayedMakePromiseAnswers200(t *testing.T) {
-	rec := do(NewRouter(&Server{API: &fakeAPI{}}), "POST", "/promises", `{"offerId":"off-1","lines":[{"catalogItemId":"ci-1","quantity":1}]}`)
+	rec := do(NewRouter(&Server{API: &fakeAPI{}}, nil, ""), "POST", "/promises", `{"offerId":"off-1","lines":[{"catalogItemId":"ci-1","quantity":1}]}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)
 	}
@@ -180,7 +180,7 @@ func TestEveryDomainErrorIsItsDocumentedProblem(t *testing.T) {
 		{errors.New("boom: secret detail"), 500, "internal-error"},
 	}
 	for _, c := range cases {
-		rec := do(NewRouter(&Server{API: &fakeAPI{err: c.err}}), "GET", "/promises/prm-1", "")
+		rec := do(NewRouter(&Server{API: &fakeAPI{err: c.err}}, nil, ""), "GET", "/promises/prm-1", "")
 		var p problemDetail
 		if err := json.Unmarshal(rec.Body.Bytes(), &p); err != nil {
 			t.Fatalf("%v: %v", c.err, err)
@@ -199,7 +199,7 @@ func TestEveryDomainErrorIsItsDocumentedProblem(t *testing.T) {
 
 func TestMalformedBodiesAre400AndNeverReachTheUseCase(t *testing.T) {
 	api := &fakeAPI{}
-	h := NewRouter(&Server{API: api})
+	h := NewRouter(&Server{API: api}, nil, "")
 	for name, c := range map[string][2]string{
 		"bad json":      {"/promises", `{"offerId":`},
 		"unknown field": {"/promises", `{"offerId":"o","lines":[],"extra":1}`},
@@ -224,7 +224,7 @@ func TestMalformedBodiesAre400AndNeverReachTheUseCase(t *testing.T) {
 
 func TestOmittedPolicyValuesTakeTheDefaults(t *testing.T) {
 	api := &fakeAPI{}
-	if rec := do(NewRouter(&Server{API: api}), "POST", "/promise-policies", `{}`); rec.Code != 201 {
+	if rec := do(NewRouter(&Server{API: api}, nil, ""), "POST", "/promise-policies", `{}`); rec.Code != 201 {
 		t.Fatalf("status %d %s", rec.Code, rec.Body)
 	}
 	d := policy.Default()
@@ -255,7 +255,7 @@ func TestOnlyTheMutatingRoutesAreWrappedByTheIdempotencyMiddleware(t *testing.T)
 			next.ServeHTTP(w, r)
 		})
 	}
-	h := NewRouter(&Server{API: &fakeAPI{}, Idempotency: mw})
+	h := NewRouter(&Server{API: &fakeAPI{}, Idempotency: mw}, nil, "")
 	do(h, "POST", "/delivery-offers:quote", `{"destinationPostalPrefix":"787","lines":[]}`)
 	do(h, "POST", "/promises", `{"offerId":"o","lines":[]}`)
 	do(h, "POST", "/promises/prm-1:confirm", `{"orderId":"o","groupNo":1}`)
@@ -270,7 +270,7 @@ func TestOnlyTheMutatingRoutesAreWrappedByTheIdempotencyMiddleware(t *testing.T)
 
 func TestNULBytesAreRejectedBeforeAnyUseCase(t *testing.T) {
 	api := &fakeAPI{}
-	h := NewRouter(&Server{API: api})
+	h := NewRouter(&Server{API: api}, nil, "")
 	if rec := do(h, "GET", "/promises/prm%00x", ``); rec.Code != 404 {
 		t.Errorf("NUL in path: %d", rec.Code)
 	}
@@ -286,7 +286,7 @@ func TestNULBytesAreRejectedBeforeAnyUseCase(t *testing.T) {
 }
 
 func TestUnknownRoutesAndMethodsAreNotFoundOrNotAllowed(t *testing.T) {
-	h := NewRouter(&Server{API: &fakeAPI{}})
+	h := NewRouter(&Server{API: &fakeAPI{}}, nil, "")
 	if rec := do(h, "GET", "/nope", ``); rec.Code != 404 {
 		t.Errorf("unknown route: %d", rec.Code)
 	}
@@ -300,7 +300,7 @@ func TestTheQuoteIsKeyedOnlyWhenTheCallerSendsAKey(t *testing.T) {
 	mw := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { keyed++; next.ServeHTTP(w, r) })
 	}
-	h := NewRouter(&Server{API: &fakeAPI{}, Idempotency: mw})
+	h := NewRouter(&Server{API: &fakeAPI{}, Idempotency: mw}, nil, "")
 	body := `{"destinationPostalPrefix":"787","lines":[{"catalogItemId":"ci-1","quantity":1}]}`
 	if rec := do(h, "POST", "/delivery-offers:quote", body); rec.Code != 200 || keyed != 0 {
 		t.Fatalf("no key: %d, middleware ran %d times", rec.Code, keyed)

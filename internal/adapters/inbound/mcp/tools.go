@@ -53,7 +53,7 @@ type listBooksInput struct {
 func (d Deps) getDeliveryOffer(ctx context.Context, in offerIDInput) (views.Offer, error) {
 	out, err := d.Reads.GetOffer(ctx, in.OfferID)
 	if err != nil {
-		return views.Offer{}, mapError(err)
+		return views.Offer{}, mapError(ctx, err)
 	}
 	return out, nil
 }
@@ -61,7 +61,7 @@ func (d Deps) getDeliveryOffer(ctx context.Context, in offerIDInput) (views.Offe
 func (d Deps) getPromise(ctx context.Context, in promiseIDInput) (views.Promise, error) {
 	out, err := d.Reads.GetPromise(ctx, in.PromiseID)
 	if err != nil {
-		return views.Promise{}, mapError(err)
+		return views.Promise{}, mapError(ctx, err)
 	}
 	return out, nil
 }
@@ -69,7 +69,7 @@ func (d Deps) getPromise(ctx context.Context, in promiseIDInput) (views.Promise,
 func (d Deps) listPromisesByOrder(ctx context.Context, in orderInput) (views.PromiseList, error) {
 	out, err := d.Reads.ListPromisesByOrder(ctx, in.OrderID)
 	if err != nil {
-		return views.PromiseList{}, mapError(err)
+		return views.PromiseList{}, mapError(ctx, err)
 	}
 	return out, nil
 }
@@ -77,7 +77,7 @@ func (d Deps) listPromisesByOrder(ctx context.Context, in orderInput) (views.Pro
 func (d Deps) listPromiseBooks(ctx context.Context, in listBooksInput) (views.BookList, error) {
 	out, err := d.Reads.ListPromiseBooks(ctx, in.NodeID, in.Date)
 	if err != nil {
-		return views.BookList{}, mapError(err)
+		return views.BookList{}, mapError(ctx, err)
 	}
 	return out, nil
 }
@@ -85,7 +85,7 @@ func (d Deps) listPromiseBooks(ctx context.Context, in listBooksInput) (views.Bo
 func (d Deps) getCurrentPolicy(ctx context.Context, _ struct{}) (views.Policy, error) {
 	out, err := d.Reads.CurrentPolicy(ctx)
 	if err != nil {
-		return views.Policy{}, mapError(err)
+		return views.Policy{}, mapError(ctx, err)
 	}
 	return out, nil
 }
