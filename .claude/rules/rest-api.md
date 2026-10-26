@@ -47,8 +47,9 @@ the wiring is `cmd/api/main.go` `run`:
 - Bodies are decoded strictly (`decodeJSON`): unknown fields are 400
   `malformed-request`; a value the domain refuses is 422.
 - **Handlers hold no business logic**: decode, call a use case, encode the view.
-- **Middleware** order (`cmd/api/main.go`): access log outermost, then `Recoverer`
-  (a panic becomes a 500 problem and is logged as such), then the router.
+- **Middleware** order (`NewRouter`, ADR 0009): `RequestID`, otelchi, otelchimetric,
+  `requestlog.RequestLogger`, then this adapter's `Recoverer` (a panic becomes a 500
+  problem and is logged as such), then `rejectNUL` and the routes.
 - **Auth**: none. REST is unauthenticated, as in the rest of the network
   (`internal/architecture/fitness_test.go` `TestNoAuthMiddlewareReintroduced` keeps it so).
 - Unit tests (`handlers_test.go`) drive the router over a fake `API`; the real
