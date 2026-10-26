@@ -230,6 +230,28 @@ mcp_route="$(render "${base[@]}" --set mcp.enabled=true --set mcp.route.enabled=
 grep -q 'kind: HTTPRoute' <<<"$mcp_route" || fail "the mcp HTTPRoute was not rendered with mcp.route.enabled=true"
 grep -q 'replacePrefixMatch: /mcp' <<<"$mcp_route" || fail "the mcp HTTPRoute must rewrite its prefix to /mcp"
 
+# --- observability (ADR 0009): OTEL_* / SERVICE_VERSION / ENVIRONMENT on every component -
+otel_mcp="$(render "${base[@]}" --set mcp.enabled=true --show-only templates/mcp-deployment.yaml)"
+[[ "$(env_value "$deployment" OTEL_EXPORTER_OTLP_ENDPOINT)" == otel-collector.observability.svc.cluster.local:4317 ]] || fail "the api must export OTLP to the fleet Collector by default"
+[[ "$(env_value "$deployment" OTEL_SERVICE_NAME)" == delivery-promise ]] || fail "the api OTEL_SERVICE_NAME must default to delivery-promise"
+[[ "$(env_value "$otel_mcp" OTEL_SERVICE_NAME)" == delivery-promise-mcp ]] || fail "the mcp OTEL_SERVICE_NAME must be delivery-promise-mcp"
+[[ "$(env_value "$otel_mcp" OTEL_EXPORTER_OTLP_ENDPOINT)" == otel-collector.observability.svc.cluster.local:4317 ]] || fail "the mcp must export OTLP to the fleet Collector by default"
+for component in api mcp; do
+  dep="$(render "${base[@]}" --set mcp.enabled=true --set image.tag=v9.9.9 --set environment=staging \
+    --show-only "templates/$([[ $component == mcp ]] && echo mcp-)deployment.yaml")"
+  [[ "$(env_value "$dep" SERVICE_VERSION)" == v9.9.9 ]] || fail "the $component SERVICE_VERSION must be the image tag"
+  [[ "$(env_value "$dep" ENVIRONMENT)" == staging ]] || fail "the $component ENVIRONMENT must follow the environment value"
+done
+[[ -n "$(env_value "$deployment" SERVICE_VERSION)" ]] || fail "SERVICE_VERSION must fall back to the chart appVersion"
+off="$(render "${base[@]}" --set mcp.enabled=true --set otel.enabled=false)"
+if grep -q 'name: OTEL_' <<<"$off"; then fail "otel.enabled=false must render no OTEL_* env"; fi
+renamed="$(render "${base[@]}" --set mcp.enabled=true --set otel.serviceName=dp --set otel.endpoint=c.example.invalid:4317)"
+grep -q 'value: "dp"' <<<"$renamed" && grep -q 'value: "dp-mcp"' <<<"$renamed" || fail "otel.serviceName must name the api and, with -mcp, the mcp"
+grep -q 'value: "c.example.invalid:4317"' <<<"$renamed" || fail "otel.endpoint must reach OTEL_EXPORTER_OTLP_ENDPOINT"
+for owned in OTEL_SERVICE_NAME OTEL_EXPORTER_OTLP_ENDPOINT SERVICE_VERSION ENVIRONMENT; do
+  expect_refusal "a chart-owned $owned through extraEnv" "$owned" "${base[@]}" --set "extraEnv[0].name=$owned" --set 'extraEnv[0].value=x'
+done
+
 # --- the web remote (ADR 0008): its own nginx pod, no DB/Kafka env, no route -
 frontend_dep="$(render "${base[@]}" --set frontend.enabled=true --show-only templates/frontend-deployment.yaml)"
 frontend_svc="$(render "${base[@]}" --set frontend.enabled=true --show-only templates/frontend-service.yaml)"

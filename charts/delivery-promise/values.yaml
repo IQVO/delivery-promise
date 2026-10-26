@@ -148,6 +148,22 @@ database:
 kafka:
   brokers: ""
 
+# Observability (ADR 0009): the fleet pipeline is pod --OTLP/gRPC--> Collector
+# --> Jaeger (traces) and Prometheus (metrics); logs are stdout JSON for Alloy
+# and Loki. Export never blocks, so a Collector that is down costs telemetry and
+# nothing else, but otel.enabled=false renders no OTEL_* env at all (the binaries
+# then fall back to localhost:4317). serviceName is OTEL_SERVICE_NAME of the api;
+# the mcp component gets "<serviceName>-mcp". SERVICE_VERSION is the image tag
+# (appVersion when empty), ENVIRONMENT is `environment`.
+otel:
+  enabled: true
+  endpoint: "otel-collector.observability.svc.cluster.local:4317"
+  serviceName: "delivery-promise"
+
+# ENVIRONMENT of the api: deployment.environment.name on every span, metric and
+# log of the api. (mcp.environment overrides it for the mcp component.)
+environment: "production"
+
 # Extra env vars appended to the api container as a raw list. The chart refuses
 # any *_MODE variable, EVENT_PUBLISHER other than "kafka", and any variable that
 # has a dedicated value above.
@@ -204,8 +220,9 @@ mcp:
   enabled: false
   replicaCount: 1
   httpAddr: ":8090"                  # MCP_ADDR (keep mcp.service.targetPort in step)
-  # SERVICE_VERSION / ENVIRONMENT: free-form identity reported in the boot
-  # log line, nothing more.
+  # SERVICE_VERSION (default: the image tag) / ENVIRONMENT (default: the
+  # top-level `environment`): service.version and deployment.environment.name
+  # of the mcp component, also reported in the boot log line.
   serviceVersion: ""
   environment: ""
   service:

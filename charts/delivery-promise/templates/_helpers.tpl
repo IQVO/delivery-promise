@@ -123,7 +123,7 @@ reads none; the real runtime has no mode switch). It also may not set a
 variable the chart renders from a dedicated value, so nothing is set twice.
 */}}
 {{- define "delivery-promise.requireCleanExtraEnv" -}}
-{{- $dedicated := list "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "DELIVERY_PROMISE_CONSUMER_GROUP" "EVENT_PUBLISHER" "HTTP_ADDR" "LOG_LEVEL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SWEEP_INTERVAL" "SHUTDOWN_DRAIN_DELAY" -}}
+{{- $dedicated := list "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "DELIVERY_PROMISE_CONSUMER_GROUP" "EVENT_PUBLISHER" "HTTP_ADDR" "LOG_LEVEL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SWEEP_INTERVAL" "SHUTDOWN_DRAIN_DELAY" "ENVIRONMENT" "SERVICE_VERSION" "OTEL_SERVICE_NAME" "OTEL_EXPORTER_OTLP_ENDPOINT" -}}
 {{- range .Values.extraEnv -}}
 {{- $name := toString .name -}}
 {{- $value := toString (default "" .value) -}}
