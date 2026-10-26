@@ -81,6 +81,14 @@ DATABASE_URL=postgres://... go run ./cmd/mcp    # MCP_ADDR :8090, LOG_LEVEL, SER
 
 The chart deploys it with `mcp.enabled=true` (plus `mcp.route.enabled=true` for the Kong route `/api/mcp/delivery-promise` -> `/mcp`).
 
+## Observability
+
+Logs, metrics and traces follow the fleet standard ([ADR 0009](docs/adr/0009-fleet-observability-standard.md)): JSON logs on stdout carry `trace_id`/`span_id`
+and a `request_id`; `cmd/api` and `cmd/mcp` export OTLP/gRPC to the Collector (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SERVICE_VERSION`, `ENVIRONMENT`;
+export never blocks, so no Collector costs telemetry, nothing else) with HTTP request duration, Go runtime metrics and the business counter
+`promising.promises.made` (`outcome`, `reason`); the trace continues across Kafka in the `traceparent` header of each published event and is picked up by the
+consumer. The chart's `otel.*` values render the env.
+
 ## Web remote (console MFE)
 
 `web/` (ADR 0008) is the `delivery_promise_mfe` Module Federation remote for the warehouse console: four read-only screens (Promises of an order, one Offer, a node's capacity Books, the current Policy) over the REST GETs above. Dev/preview port **4013**, production base `/mfes/delivery-promise/` behind the Nginx web gateway, API base from the shell's `/config.json` (`apiOrigin` + `/api/delivery-promise`). `npm` runs only inside `web/`:
