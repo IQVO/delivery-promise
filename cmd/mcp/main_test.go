@@ -21,7 +21,7 @@ func quietLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard
 // a Reads stub is enough for the transport tests) behind the real router.
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	srv := httptest.NewServer(newRouter(inboundmcp.Handler(inboundmcp.NewServer(inboundmcp.Deps{Reads: stubReads{}}))))
+	srv := httptest.NewServer(newRouter(inboundmcp.Handler(inboundmcp.NewServer(inboundmcp.Deps{Reads: stubReads{}})), quietLogger(), "delivery-promise-mcp"))
 	t.Cleanup(srv.Close)
 	return srv
 }
