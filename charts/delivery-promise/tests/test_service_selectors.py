@@ -8,11 +8,12 @@ Every Deployment here carries `app.kubernetes.io/component` in
 selector.matchLabels and its pod labels, and every Service selects on it, so each
 Service selects EXACTLY ONE Deployment. This test fails if that ever stops being
 true. delivery-promise has one always-on component (`api`) plus the
-optional `mcp` (ADR 0007) and `frontend` (ADR 0008, the delivery_promise_mfe
-remote's nginx pod), both default OFF; the test renders everything at once,
-so each Service must still select EXACTLY ONE Deployment. It also pins the
-env isolation: the mcp pod never sees Kafka/relay/consumer/sweeper env, and
-the frontend pod never sees a database or Kafka variable.
+optional `mcp` (ADR 0007), `a2a` (ADR 0010) and `frontend` (ADR 0008, the
+delivery_promise_mfe remote's nginx pod), all default OFF; the test renders
+everything at once, so each Service must still select EXACTLY ONE Deployment.
+It also pins the env isolation: the mcp and a2a pods never see
+Kafka/relay/consumer/sweeper env, and the frontend pod never sees a database
+or Kafka variable.
 
 Run: python3 charts/delivery-promise/tests/test_service_selectors.py
 Needs: helm, PyYAML.
@@ -48,6 +49,10 @@ ENABLE_EVERYTHING = BASE + [
     "--set", "mcp.route.enabled=true",
     "--set", "mcp.route.parentRefs[0].name=example-gateway",
     "--set", "mcp.route.parentRefs[0].namespace=gateway",
+    "--set", "a2a.enabled=true",
+    "--set", "a2a.route.enabled=true",
+    "--set", "a2a.route.parentRefs[0].name=example-gateway",
+    "--set", "a2a.route.parentRefs[0].namespace=gateway",
     "--set", "frontend.enabled=true",
 ]
 
@@ -69,6 +74,10 @@ MCP_STRAY = {
 }
 # Every env var cmd/mcp reads that has a dedicated chart value.
 MCP_ENV = ("MCP_ADDR", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_URL", "MIGRATIONS_DATABASE_URL")
+# The A2A agent is read-only too (ADR 0010): same stray set as the MCP server.
+A2A_STRAY = MCP_STRAY
+# Every env var cmd/a2a reads that has a dedicated chart value.
+A2A_ENV = ("A2A_ADDR", "A2A_AGENT_URL", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_URL", "MIGRATIONS_DATABASE_URL")
 
 
 def helm_template(extra_args: list[str]) -> subprocess.CompletedProcess:
@@ -123,18 +132,18 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
     deployments = {d["metadata"]["name"]: d for d in docs if d.get("kind") == "Deployment"}
     fullname = f"{RELEASE}"
 
-    mcp, frontend = f"{fullname}-mcp", f"{fullname}-frontend"
+    mcp, a2a, frontend = f"{fullname}-mcp", f"{fullname}-a2a", f"{fullname}-frontend"
     if fullname not in services:
         failures.append("the api Service was not rendered")
     elif selector_of(services[fullname]).get(COMPONENT) != "api":
         failures.append("the api Service selector must pin component=api")
-    # mcp (ADR 0007) and frontend (ADR 0008) render their own Deployment and
-    # Service when enabled (they are in ENABLE_EVERYTHING).
-    if set(deployments) != {fullname, mcp, frontend}:
-        failures.append(f"the chart must render exactly the api, mcp and frontend Deployments, got {sorted(deployments)}")
-    if set(services) != {fullname, mcp, frontend}:
-        failures.append(f"the chart must render exactly the api, mcp and frontend Services, got {sorted(services)}")
-    for name, component in ((mcp, "mcp"), (frontend, "frontend")):
+    # mcp (ADR 0007), a2a (ADR 0010) and frontend (ADR 0008) render their own
+    # Deployment and Service when enabled (they are in ENABLE_EVERYTHING).
+    if set(deployments) != {fullname, mcp, a2a, frontend}:
+        failures.append(f"the chart must render exactly the api, mcp, a2a and frontend Deployments, got {sorted(deployments)}")
+    if set(services) != {fullname, mcp, a2a, frontend}:
+        failures.append(f"the chart must render exactly the api, mcp, a2a and frontend Services, got {sorted(services)}")
+    for name, component in ((mcp, "mcp"), (a2a, "a2a"), (frontend, "frontend")):
         if selector_of(services.get(name, {})).get(COMPONENT) != component:
             failures.append(f"the {component} Service selector must pin component={component}")
 
@@ -204,6 +213,26 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
         if stray:
             failures.append(f"the mcp Deployment renders write-side env {stray}: the MCP server is read-only")
 
+    # --- a2a (ADR 0010): its own env, never the api's Kafka/relay/consumer env ---
+    a2a_dep = deployments.get(f"{fullname}-a2a")
+    if a2a_dep is None:
+        failures.append("the a2a Deployment was not rendered")
+    else:
+        if command_of(a2a_dep) != ["/app/a2a"]:
+            failures.append(f"the a2a Deployment must run /app/a2a, got {command_of(a2a_dep)}")
+        a2a_env = env_names(a2a_dep)
+        for want in A2A_ENV:
+            if want not in a2a_env:
+                failures.append(f"the a2a Deployment does not render {want}, which cmd/a2a reads")
+        stray = sorted(A2A_STRAY & set(a2a_env))
+        if stray:
+            failures.append(f"the a2a Deployment renders write-side env {stray}: the A2A agent is read-only")
+        if env_value(a2a_dep, "A2A_ADDR") != ":8093":
+            failures.append(f"the a2a Deployment must listen on :8093, got {env_value(a2a_dep, 'A2A_ADDR')!r}")
+        agent_url = env_value(a2a_dep, "A2A_AGENT_URL") or ""
+        if not agent_url.startswith("http://") or not agent_url.endswith("-a2a.default.svc.cluster.local:8093/"):
+            failures.append(f"the a2a Deployment must advertise its in-cluster Service DNS, got {agent_url!r}")
+
     # --- frontend (ADR 0008): static nginx, no database, no Kafka ---
     fe_dep = deployments.get(f"{fullname}-frontend")
     if fe_dep is None:
@@ -220,6 +249,13 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
             rules = d["spec"]["rules"]
             if not any(f.get("type") == "URLRewrite" for r in rules for f in r.get("filters", [])):
                 failures.append("the mcp HTTPRoute must rewrite the host prefix to /mcp")
+        if d.get("kind") == "HTTPRoute" and d["metadata"]["name"] == f"{fullname}-a2a":
+            targets = [
+                f["urlRewrite"]["path"].get("replacePrefixMatch")
+                for r in d["spec"]["rules"] for f in r.get("filters", []) if f.get("type") == "URLRewrite"
+            ]
+            if targets != ["/"]:
+                failures.append(f"the a2a HTTPRoute must rewrite the host prefix to /, got {targets}")
 
 
 def check_refusals(failures: list[str]) -> None:
@@ -289,7 +325,7 @@ def main() -> int:
         return 1
 
     print("PASS: every Service selects exactly one Deployment (api); HPA, Ingress and HTTPRoute are off by default; "
-          "every cmd/api env var has a dedicated value; the chart refuses to render without a database source, brokers "
+          "every cmd/api env var has a dedicated value; the a2a agent is isolated like the mcp server; the chart refuses to render without a database source, brokers "
           "or the consumer group, with a log/unknown publisher or a *_MODE variable, with a grace period under the "
           "shutdown sum, or with a malformed duration")
     return 0

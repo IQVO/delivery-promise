@@ -91,8 +91,8 @@ others; the sweeper is the only place the clock drives the domain.
 
 ## Deployment (Helm chart)
 
-`charts/delivery-promise` deploys the `api` component only (no MCP, frontend, projector or
-reports). Values map 1:1 to the variables above:
+`charts/delivery-promise` deploys the `api` component by default; `mcp` (ADR 0007), `a2a` (ADR 0010)
+and `frontend` are optional and OFF (no projector or reports). Values map 1:1 to the variables above:
 
 | Value | Variable | Rule |
 |---|---|---|
@@ -102,7 +102,7 @@ reports). Values map 1:1 to the variables above:
 | `config.consumerGroup` | `DELIVERY_PROMISE_CONSUMER_GROUP` | required, stable and service-prefixed (one consumer group for the eight topics), never the pod name |
 | `config.eventPublisher` | `EVENT_PUBLISHER` | only `kafka` |
 | `config.httpAddr`, `config.logLevel` | `HTTP_ADDR`, `LOG_LEVEL` | |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SERVICE_VERSION`, `ENVIRONMENT` | `otel.endpoint`, `otel.serviceName` (`<name>-mcp` for the mcp component), `image.tag` or appVersion, `environment` | `otel.enabled=false` renders no OTEL_* |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SERVICE_VERSION`, `ENVIRONMENT` | `otel.endpoint`, `otel.serviceName` (`<name>-mcp` / `<name>-a2a` for the mcp / a2a components), `image.tag` or appVersion, `environment` | `otel.enabled=false` renders no OTEL_* |
 | `config.outboxMaxAttempts`, `config.outboxRelayInterval` | `OUTBOX_MAX_ATTEMPTS`, `OUTBOX_RELAY_INTERVAL` | interval empty = binary default |
 | `config.sweepInterval`, `config.shutdownDrainDelay` | `SWEEP_INTERVAL`, `SHUTDOWN_DRAIN_DELAY` | empty = binary default; malformed = refused |
 
