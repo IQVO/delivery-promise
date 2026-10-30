@@ -42,7 +42,7 @@ Contracts: [`apis/openapi.yaml`](apis/openapi.yaml), [`apis/asyncapi.yaml`](apis
 
 The design is proposed in [retail-network docs](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise); `model/model.yaml` there is the single source of truth. This repository is a service of the retail network, not of the warehouse-systems fleet; the fleet reaches the network only through the `vendor-connectivity` Vendor API.
 
-Decisions are in [`docs/adr/`](docs/adr/index.md): the bounded context (0001), the aggregates, invariants and numbered assumptions (0002), consumed contracts and local read models (0003), the CloudEvents catalogue (0004), the outbox relay (0005), the HTTP adapter, consumer, sweeper and readiness (0006). Configuration, probes and shutdown are in [`docs/runtime.md`](docs/runtime.md); the packaging checklist is [`docs/before-first-release.md`](docs/before-first-release.md).
+Decisions are in [`docs/adr/`](docs/adr/index.md): the bounded context (0001), the aggregates, invariants and numbered assumptions (0002), consumed contracts and local read models (0003), the CloudEvents catalogue (0004), the outbox relay (0005), the HTTP adapter, consumer, sweeper and readiness (0006), the read-only MCP server (0007), the A2A agent (0010). Configuration, probes and shutdown are in [`docs/runtime.md`](docs/runtime.md); the packaging checklist is [`docs/before-first-release.md`](docs/before-first-release.md).
 
 ## Runtime
 
@@ -81,10 +81,27 @@ DATABASE_URL=postgres://... go run ./cmd/mcp    # MCP_ADDR :8090, LOG_LEVEL, SER
 
 The chart deploys it with `mcp.enabled=true` (plus `mcp.route.enabled=true` for the Kong route `/api/mcp/delivery-promise` -> `/mcp`).
 
+## A2A agent (read-only)
+
+`cmd/a2a` (ADR 0010) makes the context reachable as an Agent2Agent agent: JSON-RPC 2.0 on `/` and `/a2a` (`:8093`), the Agent Card at `/.well-known/agent-card.json`. It carries the *delegation of a goal*, never data sync (facts stay CloudEvents on Kafka). Two goal-shaped skills, both reads derived from the MCP tools (the MCP charter is read-only, so the agent is too):
+
+| Skill | Arguments | Reads |
+| --- | --- | --- |
+| `promise_status` | exactly one of `orderId`, `promiseId` | the promises of an order, or one promise: state, terms, witness path, revisions, judgement |
+| `book_capacity` | `nodeId`, `date` (YYYY-MM-DD) | the node's promise books on that day: share, provisional and confirmed holds |
+
+A request is a message whose first part is `{"skill":"promise_status","arguments":{"orderId":"ord-1001"}}` (Data part, or Text part holding that JSON); unknown fields are refused. The answer is one message: a Data part `{skill, data | problem}` and a one-line Text summary. Rejections are RFC 7807-style `problem`s inside the message with the REST status classification (400 request shape, 404 `not-found`, 422 `validation-failed`, 500 `internal-error`), never JSON-RPC errors. Like MCP it writes nothing (no outbox, consumer, sweeper or Kafka) and carries **no auth**. Run it locally:
+
+```
+DATABASE_URL=postgres://... A2A_AGENT_URL=http://localhost:8093/ go run ./cmd/a2a    # A2A_ADDR :8093, LOG_LEVEL, SERVICE_VERSION, ENVIRONMENT
+```
+
+`A2A_AGENT_URL` (absolute http(s) URL advertised on the card) is mandatory; the binary refuses to boot without it. The chart deploys it with `a2a.enabled=true` (it defaults the URL to the release's in-cluster Service DNS; `a2a.agentUrl` overrides it; `a2a.route.enabled=true` adds the Kong route `/api/a2a/delivery-promise` -> `/`).
+
 ## Observability
 
 Logs, metrics and traces follow the fleet standard ([ADR 0009](docs/adr/0009-fleet-observability-standard.md)): JSON logs on stdout carry `trace_id`/`span_id`
-and a `request_id`; `cmd/api` and `cmd/mcp` export OTLP/gRPC to the Collector (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SERVICE_VERSION`, `ENVIRONMENT`;
+and a `request_id`; `cmd/api`, `cmd/mcp` and `cmd/a2a` export OTLP/gRPC to the Collector (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SERVICE_VERSION`, `ENVIRONMENT`;
 export never blocks, so no Collector costs telemetry, nothing else) with HTTP request duration, Go runtime metrics and the business counter
 `promising.promises.made` (`outcome`, `reason`); the trace continues across Kafka in the `traceparent` header of each published event and is picked up by the
 consumer. The chart's `otel.*` values render the env.
