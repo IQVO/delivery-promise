@@ -59,6 +59,7 @@ func (s *searcher) nominalWindow(arrive time.Time) shared.Window {
 	return shared.Window{
 		Earliest: time.Date(y, m, d+1, NominalWindowStart/60, NominalWindowStart%60, 0, 0, loc).UTC(),
 		Latest:   time.Date(y, m, d+1, NominalWindowEnd/60, NominalWindowEnd%60, 0, 0, loc).UTC(),
+		TimeZone: s.timeZone(),
 	}
 }
 

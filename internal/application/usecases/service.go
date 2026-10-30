@@ -33,6 +33,9 @@ type Deps struct {
 	Clock     ports.Clock
 	IDs       ports.IDGenerator
 	Logger    *slog.Logger
+	// Metrics records the business outcome of each MakePromise; nil records
+	// nothing, so unit tests need no wiring.
+	Metrics ports.PromiseMetrics
 }
 
 // Service holds every use case of the context.
@@ -44,6 +47,9 @@ type Service struct {
 func New(d Deps) *Service {
 	if d.Logger == nil {
 		d.Logger = slog.New(slog.DiscardHandler)
+	}
+	if d.Metrics == nil {
+		d.Metrics = noMetrics{}
 	}
 	return &Service{Deps: d}
 }

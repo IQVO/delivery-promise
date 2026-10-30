@@ -182,3 +182,18 @@ type IDGenerator interface {
 	NewOfferID() offer.ID
 	NewPromiseID() promise.ID
 }
+
+// PromiseMetrics records the business outcome of every MakePromise attempt
+// (Tier 2 of the fleet metrics convention). The use case calls it once per
+// attempt: PromiseMade when a new promise was held, PromiseRefused otherwise,
+// with the problem slug that says why (the `type` suffix the REST adapter
+// answers with). A replay of an earlier request is not an attempt. The
+// implementation lives in internal/adapters/outbound/telemetry; a nil
+// Deps.Metrics records nothing.
+type PromiseMetrics interface {
+	// PromiseMade counts a promise that was made and its capacity held.
+	PromiseMade(ctx context.Context)
+	// PromiseRefused counts a MakePromise that made no promise; reason is a
+	// stable, low-cardinality slug.
+	PromiseRefused(ctx context.Context, reason string)
+}

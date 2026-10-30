@@ -31,7 +31,8 @@ export interface Offer {
   destinationPostalPrefix: string;
   tier: Tier;
   lines: GroupLine[];
-  window: { earliest: string; latest: string };
+  /** timeZone: the delivery station's IANA zone, the local calendar of the window (ADR 0011). */
+  window: { earliest: string; latest: string; timeZone?: string };
   witnessPath: WitnessPath;
   basis: "SCHEDULED" | "NOMINAL";
   policyVersion: string;
@@ -45,6 +46,8 @@ export interface PromiseTerms {
   shipBy: string;
   deliverByEarliest: string;
   deliverByLatest: string;
+  /** The delivery station's IANA zone, the local calendar of the window (ADR 0011). */
+  timeZone?: string;
   basis: "SCHEDULED" | "NOMINAL";
   policyVersion: string;
 }

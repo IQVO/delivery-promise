@@ -16,6 +16,7 @@
     "nodeId": "N-AUS3",
     "offerId": "off-1",
     "policyVersion": "v2",
-    "tier": "NEXT_DAY"
+    "tier": "NEXT_DAY",
+    "timeZone": "America/Chicago"
   }
 }

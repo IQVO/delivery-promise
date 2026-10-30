@@ -113,6 +113,11 @@ func New(q Quote, now time.Time) (*Offer, []shared.Event, error) {
 	if err := validateQuote(q); err != nil {
 		return nil, nil, err
 	}
+	// A new offer always names its local calendar; a persisted one may predate
+	// the zone, so Restore does not ask for it (ADR 0011).
+	if q.Window.TimeZone == "" {
+		return nil, nil, shared.Invalid("a quoted window needs the delivery station's time zone")
+	}
 	now = shared.UTC(now)
 	if !q.ExpiresAt.After(now) || q.ExpiresAt.After(now.Add(q.TTL)) || q.ExpiresAt.After(q.LatestMeetableAt) {
 		return nil, nil, fmt.Errorf("%w: expiresAt %s, quotedAt %s", ErrOfferExpiryTooLate, q.ExpiresAt.UTC().Format(time.RFC3339), now.Format(time.RFC3339))

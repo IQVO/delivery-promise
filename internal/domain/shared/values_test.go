@@ -103,12 +103,42 @@ func TestValidPostalPrefix(t *testing.T) {
 
 func TestWindowValidate(t *testing.T) {
 	t0 := time.Date(2026, 10, 23, 9, 0, 0, 0, time.UTC)
-	if err := (Window{t0, t0}).Validate(); err != nil {
+	if err := (Window{Earliest: t0, Latest: t0}).Validate(); err != nil {
 		t.Fatalf("a zero-length window is legal: %v", err)
 	}
-	for name, w := range map[string]Window{"inverted": {t0.Add(time.Hour), t0}, "no earliest": {Latest: t0}, "no latest": {Earliest: t0}} {
+	if err := (Window{Earliest: t0, Latest: t0.Add(time.Hour), TimeZone: "America/Chicago"}).Validate(); err != nil {
+		t.Fatalf("a window with a zone is legal: %v", err)
+	}
+	for name, w := range map[string]Window{
+		"inverted": {Earliest: t0.Add(time.Hour), Latest: t0}, "no earliest": {Latest: t0}, "no latest": {Earliest: t0},
+		"bad zone": {Earliest: t0, Latest: t0, TimeZone: "America/Chi cago"},
+	} {
 		if err := w.Validate(); !errors.Is(err, ErrValidation) {
 			t.Errorf("%s: err = %v", name, err)
+		}
+	}
+}
+
+func TestWindowUTCKeepsTheZone(t *testing.T) {
+	cdt := time.FixedZone("CDT", -5*3600)
+	w := Window{Earliest: time.Date(2026, 10, 31, 9, 0, 0, 0, cdt), Latest: time.Date(2026, 10, 31, 21, 0, 0, 0, cdt), TimeZone: "America/Chicago"}
+	got := w.UTC()
+	want := Window{Earliest: time.Date(2026, 10, 31, 14, 0, 0, 0, time.UTC), Latest: time.Date(2026, 11, 1, 2, 0, 0, 0, time.UTC), TimeZone: "America/Chicago"}
+	if got != want || got.Earliest.Location() != time.UTC || got.Latest.Location() != time.UTC {
+		t.Fatalf("UTC() = %+v, want %+v", got, want)
+	}
+}
+
+func TestValidTimeZone(t *testing.T) {
+	long := strings.Repeat("A", MaxTimeZone)
+	for _, s := range []string{"UTC", "America/Chicago", "America/Argentina/Buenos_Aires", "Etc/GMT+3", "Etc/GMT-14", "America/Port-au-Prince", "Z", long} {
+		if !ValidTimeZone(s) {
+			t.Errorf("%q must be valid", s)
+		}
+	}
+	for _, s := range []string{"", long + "A", "/America", "America/", "America/Chi cago", "America:Chicago", "Europe/Zürich", "America.Chicago", "a@b"} {
+		if ValidTimeZone(s) {
+			t.Errorf("%q must be invalid", s)
 		}
 	}
 }

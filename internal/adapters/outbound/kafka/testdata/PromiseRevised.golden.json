@@ -16,6 +16,7 @@
     "promiseId": "prm-1",
     "reason": "DEPARTURE_CANCELLED",
     "revisionNo": 1,
-    "shipBy": "2026-10-22T23:00:00Z"
+    "shipBy": "2026-10-22T23:00:00Z",
+    "timeZone": "America/Chicago"
   }
 }

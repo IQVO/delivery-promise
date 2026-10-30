@@ -19,6 +19,9 @@ alternative runtime and no log sink. Next to the REST API it runs one Kafka cons
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row; `0` = unlimited (ADR 0005). |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait between flipping `/readyz` to 503 and closing the listener; `0` disables. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`. |
+| `OTEL_SERVICE_NAME` | `delivery-promise` | `service.name` of spans and metrics (ADR 0009). |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | Collector OTLP/gRPC, `host:port` or URL; export never blocks. |
+| `SERVICE_VERSION` / `ENVIRONMENT` | `dev` / `local` | `service.version` / `deployment.environment.name`. |
 
 Configuration errors are raised before anything is opened or bound. An invalid optional
 duration logs a warning and uses the default.
@@ -88,8 +91,8 @@ others; the sweeper is the only place the clock drives the domain.
 
 ## Deployment (Helm chart)
 
-`charts/delivery-promise` deploys the `api` component only (no MCP, frontend, projector or
-reports). Values map 1:1 to the variables above:
+`charts/delivery-promise` deploys the `api` component by default; `mcp` (ADR 0007), `a2a` (ADR 0010)
+and `frontend` are optional and OFF (no projector or reports). Values map 1:1 to the variables above:
 
 | Value | Variable | Rule |
 |---|---|---|
@@ -99,6 +102,7 @@ reports). Values map 1:1 to the variables above:
 | `config.consumerGroup` | `DELIVERY_PROMISE_CONSUMER_GROUP` | required, stable and service-prefixed (one consumer group for the eight topics), never the pod name |
 | `config.eventPublisher` | `EVENT_PUBLISHER` | only `kafka` |
 | `config.httpAddr`, `config.logLevel` | `HTTP_ADDR`, `LOG_LEVEL` | |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME`, `SERVICE_VERSION`, `ENVIRONMENT` | `otel.endpoint`, `otel.serviceName` (`<name>-mcp` / `<name>-a2a` for the mcp / a2a components), `image.tag` or appVersion, `environment` | `otel.enabled=false` renders no OTEL_* |
 | `config.outboxMaxAttempts`, `config.outboxRelayInterval` | `OUTBOX_MAX_ATTEMPTS`, `OUTBOX_RELAY_INTERVAL` | interval empty = binary default |
 | `config.sweepInterval`, `config.shutdownDrainDelay` | `SWEEP_INTERVAL`, `SHUTDOWN_DRAIN_DELAY` | empty = binary default; malformed = refused |
 

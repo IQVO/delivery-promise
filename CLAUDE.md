@@ -38,3 +38,5 @@ Aggregates, invariants and assumptions A1-A30 in docs/adr/0002; consumed contrac
 ## Workflow
 GitFlow: feature/* -> PR into develop, CI green before merge, never push develop or main. lefthook: pre-commit fmt/vet/lint, pre-push `make check`. Commit and push after each step.
 Deployment: `charts/delivery-promise` (api only; Helm chart tests `bash charts/delivery-promise/tests/render_test.sh` and `python3 charts/delivery-promise/tests/test_service_selectors.py`; CI `helm-lint` + `chart-tests`). The chart refuses to render without `database.*`, `kafka.brokers`, `config.consumerGroup`, with a `*_MODE` in extraEnv or with `terminationGracePeriodSeconds` <= drain delay + 40s. Open: registry secrets (docs/before-first-release.md row 11).
+
+A2A: `cmd/a2a` (port 8093) is this context's read-only Agent2Agent agent, skills `promise_status` (read), `book_capacity` (read), decided in `docs/adr/0010-a2a-inbound-adapter.md`; delegation only (facts stay CloudEvents on Kafka), unauthenticated like REST and MCP; rules in `.claude/rules/fleet/a2a.md`.

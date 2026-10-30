@@ -15,7 +15,7 @@ func quote() Quote {
 	return Quote{
 		ID: "off-1", GroupNo: 1, DestinationPrefix: "787", Tier: shared.TierNextDay,
 		Lines:   []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}},
-		Window:  shared.Window{Earliest: now.Add(18 * time.Hour), Latest: now.Add(30 * time.Hour)},
+		Window:  shared.Window{Earliest: now.Add(18 * time.Hour), Latest: now.Add(30 * time.Hour), TimeZone: "America/Chicago"},
 		Witness: shared.Witness{NodeID: "n1", PickupDepartureID: "d1", Legs: []string{"d2"}, DeliveryWaveID: "w1"},
 		Basis:   shared.BasisScheduled, PolicyVersion: "v3", TTL: 10 * time.Minute,
 		ExpiresAt: now.Add(10 * time.Minute), LatestMeetableAt: now.Add(3 * time.Hour), PickupCutoffAt: now.Add(4 * time.Hour),
@@ -49,6 +49,8 @@ func TestNewValidation(t *testing.T) {
 		"zero ttl":    func(q *Quote) { q.TTL = 0 },
 		"no lines":    func(q *Quote) { q.Lines = nil },
 		"bad window":  func(q *Quote) { q.Window = shared.Window{Earliest: now.Add(time.Hour), Latest: now} },
+		"no zone":     func(q *Quote) { q.Window.TimeZone = "" },
+		"bad zone":    func(q *Quote) { q.Window.TimeZone = "Mars/Olympus Mons" },
 		"bad witness": func(q *Quote) { q.Witness.DeliveryWaveID = "" },
 	}
 	for name, mut := range cases {
@@ -197,6 +199,12 @@ func TestRestoreRejectsCorruptRows(t *testing.T) {
 	s.ExpiresAt = s.QuotedAt.Add(1)
 	if _, err := Restore(s); err != nil {
 		t.Errorf("expiresAt just after quotedAt: %v", err)
+	}
+	// a row persisted before the window named its zone stays readable (ADR 0011)
+	legacy := base
+	legacy.Window.TimeZone = ""
+	if got, err := Restore(legacy); err != nil || got.Window().TimeZone != "" {
+		t.Errorf("a row without a zone: %v", err)
 	}
 	closed := base
 	closed.State, closed.ClosedAt = StateConsumed, now

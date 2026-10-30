@@ -5,16 +5,22 @@ package http
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/riandyrn/otelchi"
+	otelchimetric "github.com/riandyrn/otelchi/metric"
 
+	"github.com/claudioed/delivery-promise/internal/adapters/inbound/requestlog"
 	"github.com/claudioed/delivery-promise/internal/application/usecases"
 	"github.com/claudioed/delivery-promise/internal/application/views"
 	"github.com/claudioed/delivery-promise/internal/domain/policy"
 )
 
-// DefaultServiceName names the service in logs.
+// DefaultServiceName names the server spans, the HTTP metrics and the logs when
+// the composition root passes no service name.
 const DefaultServiceName = "delivery-promise"
 
 // API is the set of use cases the REST adapter drives; *usecases.Service is the
@@ -64,9 +70,25 @@ func (s *Server) idempotent(h http.HandlerFunc) http.Handler {
 }
 
 // NewRouter builds the chi router: /healthz and /readyz, then the operations of
-// apis/openapi.yaml behind the NUL-rejecting middleware.
-func NewRouter(s *Server) http.Handler {
+// apis/openapi.yaml behind the NUL-rejecting middleware. A nil logger defaults
+// to slog.Default(); an empty serviceName to DefaultServiceName.
+//
+// Middleware order is the fleet observability standard: RequestID, otelchi (the
+// server span, named after the route pattern), the request-duration histogram,
+// RequestLogger (inside the span, so its record carries trace_id and span_id),
+// then Recoverer (this adapter's, which answers the internal-error problem).
+// telemetry.Setup must have run before this call: otelchimetric binds the
+// global MeterProvider when it is constructed.
+func NewRouter(s *Server, logger *slog.Logger, serviceName string) http.Handler {
+	if serviceName == "" {
+		serviceName = DefaultServiceName
+	}
 	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(otelchi.Middleware(serviceName, otelchi.WithChiRoutes(r)))
+	r.Use(otelchimetric.NewServerRequestDuration(otelchimetric.NewBaseConfig(serviceName)))
+	r.Use(requestlog.RequestLogger(logger))
+	r.Use(Recoverer)
 	r.Use(rejectNUL)
 	r.Get("/healthz", s.handleHealthz)
 	r.Get("/readyz", s.handleReadyz)

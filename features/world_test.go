@@ -61,7 +61,7 @@ func (w *world) reset() {
 	// The real REST adapter over the same in-memory doubles; Idempotency stays
 	// nil because the transactional middleware is Postgres-bound and is proven
 	// by the integration suite.
-	w.router = inboundhttp.NewRouter(&inboundhttp.Server{API: w.svc})
+	w.router = inboundhttp.NewRouter(&inboundhttp.Server{API: w.svc}, nil, "")
 	w.lastRes = nil
 	w.events, w.lastQuote, w.promiseID, w.firstPromise, w.created, w.lastErr, w.ran = 0, views.QuoteResult{}, "", "", false, nil, false
 	w.counts, w.outboxLen = memory.Counts{}, 0

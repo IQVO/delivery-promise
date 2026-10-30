@@ -555,6 +555,17 @@ func assertTopics(t *testing.T, s *service) {
 	assertKept(t, s)
 }
 
+// onlyTraceExtras reports that, besides content-type, the headers are at most
+// the W3C trace context the outbox stamps (ADR 0009); no other header may appear.
+func onlyTraceExtras(headers map[string]string) bool {
+	for k := range headers {
+		if k != "content-type" && k != "traceparent" && k != "tracestate" {
+			return false
+		}
+	}
+	return true
+}
+
 func assertMessage(t *testing.T, msg kafkatest.Message, row outboxRow, stream string) {
 	t.Helper()
 	e, err := cloudevents.Decode(msg.Value)
@@ -571,7 +582,7 @@ func assertMessage(t *testing.T, msg kafkatest.Message, row outboxRow, stream st
 		e.DataContentType() != "application/json" || e.SpecVersion() != "1.0" ||
 		e.DataSchema() != "urn:retailnetwork:delivery-promise:"+stream+":"+name+":v1":
 		t.Errorf("%s: attributes type %q source %q dct %q dataschema %q spec %q", name, e.Type(), e.Source(), e.DataContentType(), e.DataSchema(), e.SpecVersion())
-	case len(msg.Headers) != 1 || msg.Headers["content-type"] != cloudevents.MediaType:
+	case msg.Headers["content-type"] != cloudevents.MediaType || !onlyTraceExtras(msg.Headers):
 		t.Errorf("%s: headers %v", name, msg.Headers)
 	case e.Time().IsZero() || e.Time().Location() != time.UTC:
 		t.Errorf("%s: time %v is not a UTC instant", name, e.Time())

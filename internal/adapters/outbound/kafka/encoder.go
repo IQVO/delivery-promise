@@ -120,11 +120,11 @@ func payload(e shared.Event) (any, error) {
 	case promise.PromiseAtRisk:
 		return map[string]any{"promiseId": ev.PromiseID, "orderId": ev.OrderID, "reason": ev.Reason, "detectedAt": utc(ev.DetectedAt)}, nil
 	case promise.PromiseRevised:
-		return map[string]any{
+		return withZone(map[string]any{
 			"promiseId": ev.PromiseID, "orderId": ev.OrderID, "revisionNo": ev.RevisionNo,
 			"previousDeliverByLatest": utc(ev.PreviousDeliverByLatest), "deliverByEarliest": utc(ev.Terms.Window.Earliest),
 			"deliverByLatest": utc(ev.Terms.Window.Latest), "shipBy": utc(ev.Terms.ShipBy), "nodeId": ev.NodeID, "reason": ev.Reason,
-		}, nil
+		}, ev.Terms.Window), nil
 	case promise.PromiseKept:
 		return map[string]any{
 			"promiseId": ev.PromiseID, "orderId": ev.OrderID, "nodeId": ev.NodeID,
@@ -141,11 +141,11 @@ func payload(e shared.Event) (any, error) {
 	case book.PromiseBookExhausted:
 		return map[string]any{"bookId": ev.BookID, "nodeId": ev.NodeID, "pickupDepartureId": ev.PickupDepartureID, "share": ev.Share}, nil
 	case offer.DeliveryOfferQuoted:
-		return map[string]any{
+		return withZone(map[string]any{
 			"offerId": ev.OfferID, "tier": ev.Tier, "destinationPostalPrefix": ev.DestinationPrefix, "nodeId": ev.NodeID,
 			"deliverByEarliest": utc(ev.Window.Earliest), "deliverByLatest": utc(ev.Window.Latest), "basis": ev.Basis,
 			"policyVersion": ev.PolicyVersion, "expiresAt": utc(ev.ExpiresAt),
-		}, nil
+		}, ev.Window), nil
 	case policy.PromisePolicyPublished:
 		return policyData(ev), nil
 	}
@@ -160,6 +160,16 @@ func madeData(ev promise.PromiseMade) map[string]any {
 	}
 	if ev.Witness.PickupDepartureID != "" { // a NOMINAL promise has none (contracts-delta E8)
 		d["pickupDepartureId"] = ev.Witness.PickupDepartureID
+	}
+	return withZone(d, ev.Terms.Window)
+}
+
+// withZone adds the optional timeZone of the window to a payload that carries
+// deliverByEarliest/Latest; a window persisted before the zone was carried
+// omits it (ADR 0011).
+func withZone(d map[string]any, w shared.Window) map[string]any {
+	if w.TimeZone != "" {
+		d["timeZone"] = w.TimeZone
 	}
 	return d
 }
