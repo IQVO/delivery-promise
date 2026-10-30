@@ -13,6 +13,7 @@ Feature: Quoting delivery offers
     And the quote offers exactly the tiers "NEXT_DAY,TWO_DAY,STANDARD"
     And the NEXT_DAY offer is SCHEDULED from the node "N-AUS3" via the pickup "dep-AUS3-1800" and the wave "W-DAU1-1023-A"
     And the NEXT_DAY offer promises delivery between "2026-10-23T09:00:00-05:00" and "2026-10-23T21:00:00-05:00"
+    And the NEXT_DAY offer window is in the time zone "America/Chicago"
     And the NEXT_DAY offer is QUOTED
     And the tier SAME_DAY is unavailable with "DELIVERY_SLA_UNAVAILABLE"
     And the last command published the event "DeliveryOfferQuoted" 3 times
@@ -51,6 +52,7 @@ Feature: Quoting delivery offers
     Then the quote offers exactly the tiers "STANDARD"
     And the STANDARD offer is NOMINAL from the node "N-AUS3"
     And the STANDARD offer promises delivery between "2026-10-23T09:00:00-05:00" and "2026-10-23T21:00:00-05:00"
+    And the STANDARD offer window is in the time zone "America/Chicago"
 
   Scenario: A promise made from a NOMINAL offer holds the nominal book
     Given the network changes: the delivery wave is cancelled

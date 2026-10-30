@@ -24,6 +24,7 @@
     "policyVersion": "v2",
     "promiseId": "prm-1",
     "shipBy": "2026-10-22T23:00:00Z",
-    "tier": "NEXT_DAY"
+    "tier": "NEXT_DAY",
+    "timeZone": "America/Chicago"
   }
 }

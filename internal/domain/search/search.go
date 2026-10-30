@@ -84,6 +84,10 @@ func newSearcher(in Input) *searcher {
 	return s
 }
 
+// timeZone is the IANA name of the delivery station's zone: the local calendar
+// every window of this search belongs to (ADR 0011).
+func (s *searcher) timeZone() string { return s.stationSched.Loc.String() }
+
 func (s *searcher) requestedTiers() []shared.Tier {
 	if len(s.in.Tiers) == 0 {
 		return shared.AllTiers()
@@ -324,7 +328,7 @@ func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool)
 	}
 	id, op, _ := s.bookFor(n, d.ID, d.CutoffAt, false)
 	return Candidate{
-		NodeID: n.ID, ShipBy: d.CutoffAt, Window: shared.Window{Earliest: w.WindowStart, Latest: w.WindowEnd}, Basis: shared.BasisScheduled,
+		NodeID: n.ID, ShipBy: d.CutoffAt, Window: shared.Window{Earliest: w.WindowStart, Latest: w.WindowEnd, TimeZone: s.timeZone()}, Basis: shared.BasisScheduled,
 		Witness: shared.Witness{NodeID: n.ID, PickupDepartureID: d.ID, Legs: arr.legs, DeliveryWaveID: w.ID}, BookID: string(id),
 		ExpiresAt: expires, LatestMeetableAt: meet, Grade: s.in.Grades[n.ID], InRegion: n.RegionID == s.in.AreaRegionID,
 		LegCount: len(arr.legs), Direct: d.Dest == s.in.Station.ID && (n.Subtype == SubtypeSubSameDay || n.Subtype == SubtypeMicro), Opening: op,

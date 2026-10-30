@@ -206,7 +206,7 @@ func validateTerms(t Terms) error {
 
 func normTerms(t Terms) Terms {
 	t.ShipBy = shared.UTC(t.ShipBy)
-	t.Window = shared.Window{Earliest: shared.UTC(t.Window.Earliest), Latest: shared.UTC(t.Window.Latest)}
+	t.Window = t.Window.UTC()
 	return t
 }
 

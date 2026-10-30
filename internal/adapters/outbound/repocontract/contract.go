@@ -95,7 +95,7 @@ func NewOffer(t *testing.T, id string) *offer.Offer {
 	o, _, err := offer.New(offer.Quote{
 		ID: offer.ID(id), GroupNo: 1, DestinationPrefix: "787", Tier: shared.TierNextDay,
 		Lines:   []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}},
-		Window:  shared.Window{Earliest: T0.Add(18 * time.Hour), Latest: T0.Add(30 * time.Hour)},
+		Window:  shared.Window{Earliest: T0.Add(18 * time.Hour), Latest: T0.Add(30 * time.Hour), TimeZone: "America/Chicago"},
 		Witness: shared.Witness{NodeID: "N-AUS3", PickupDepartureID: "dep-1800", Legs: []string{"dep-2200"}, DeliveryWaveID: "w-1"},
 		Basis:   shared.BasisScheduled, PolicyVersion: "v0", TTL: 10 * time.Minute, ExpiresAt: T0.Add(10 * time.Minute),
 		LatestMeetableAt: T0.Add(3 * time.Hour), PickupCutoffAt: T0.Add(4 * time.Hour),
@@ -120,7 +120,7 @@ func NewPromise(t *testing.T, id, offerID, node, pickup string) *promise.Promise
 		ID: promise.ID(id), OfferID: offerID, DestinationPrefix: "787", Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}},
 		Terms: promise.Terms{
 			Tier: shared.TierNextDay, ShipBy: T0.Add(4 * time.Hour), Basis: shared.BasisScheduled, PolicyVersion: "v0",
-			Window: shared.Window{Earliest: T0.Add(18 * time.Hour), Latest: T0.Add(30 * time.Hour)},
+			Window: shared.Window{Earliest: T0.Add(18 * time.Hour), Latest: T0.Add(30 * time.Hour), TimeZone: "America/Chicago"},
 		},
 		Witness: shared.Witness{NodeID: node, PickupDepartureID: pickup, Legs: []string{"dep-2200"}, DeliveryWaveID: "w-1"},
 		BookID:  string(book.MakeID(node, pickup)), HoldTTL: 15 * time.Minute, Available: map[string]int{"ci-1001": 2},
