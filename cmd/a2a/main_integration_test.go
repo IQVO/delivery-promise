@@ -184,54 +184,70 @@ func seedThroughWriteUseCases(t *testing.T, url string) (promiseID string) {
 	return promiseID
 }
 
+// ask sends one skill request over the wire and returns the answer's data,
+// failing the test on a transport error or a problem answer.
+func ask(t *testing.T, client *a2aclient.Client, skill string, args map[string]any) map[string]any {
+	t.Helper()
+	msg := a2a.NewMessage(a2a.MessageRoleUser, a2a.NewDataPart(map[string]any{"skill": skill, "arguments": args}))
+	resp, err := client.SendMessage(context.Background(), &a2a.SendMessageRequest{Message: msg})
+	if err != nil {
+		t.Fatalf("%s: %v", skill, err)
+	}
+	reply, ok := resp.(*a2a.Message)
+	if !ok || len(reply.Parts) < 1 {
+		t.Fatalf("%s: reply = %T", skill, resp)
+	}
+	data, ok := reply.Parts[0].Content.(a2a.Data)
+	if !ok {
+		t.Fatalf("%s: first part is %T", skill, reply.Parts[0].Content)
+	}
+	env, ok := data.Value.(map[string]any)
+	if !ok || env["problem"] != nil {
+		t.Fatalf("%s: envelope = %#v", skill, data.Value)
+	}
+	out, _ := env["data"].(map[string]any)
+	return out
+}
+
 // assertSeededReads reads back, through both skills over the wire, what
 // seedThroughWriteUseCases persisted.
 func assertSeededReads(t *testing.T, client *a2aclient.Client, promiseID string) {
 	t.Helper()
-	ask := func(skill string, args map[string]any) map[string]any {
-		t.Helper()
-		msg := a2a.NewMessage(a2a.MessageRoleUser, a2a.NewDataPart(map[string]any{"skill": skill, "arguments": args}))
-		resp, err := client.SendMessage(context.Background(), &a2a.SendMessageRequest{Message: msg})
-		if err != nil {
-			t.Fatalf("%s: %v", skill, err)
-		}
-		reply, ok := resp.(*a2a.Message)
-		if !ok || len(reply.Parts) < 1 {
-			t.Fatalf("%s: reply = %T", skill, resp)
-		}
-		data, ok := reply.Parts[0].Content.(a2a.Data)
-		if !ok {
-			t.Fatalf("%s: first part is %T", skill, reply.Parts[0].Content)
-		}
-		env, ok := data.Value.(map[string]any)
-		if !ok || env["problem"] != nil {
-			t.Fatalf("%s: envelope = %#v", skill, data.Value)
-		}
-		return env["data"].(map[string]any)
-	}
+	assertPromiseReads(t, client, promiseID)
+	assertBookRead(t, client)
+}
 
-	byOrder := ask("promise_status", map[string]any{"orderId": "ord-1001"})["promiseStatus"].(map[string]any)
-	promises := byOrder["promises"].([]any)
+func assertPromiseReads(t *testing.T, client *a2aclient.Client, promiseID string) {
+	t.Helper()
+	byOrder, _ := ask(t, client, "promise_status", map[string]any{"orderId": "ord-1001"})["promiseStatus"].(map[string]any)
+	promises, _ := byOrder["promises"].([]any)
 	if len(promises) != 1 {
 		t.Fatalf("promise_status by order = %v", byOrder)
 	}
-	p := promises[0].(map[string]any)
+	p, _ := promises[0].(map[string]any)
 	witness, _ := p["witnessPath"].(map[string]any)
 	if p["promiseId"] != promiseID || p["state"] != "CONFIRMED" || p["orderId"] != "ord-1001" || witness["nodeId"] != "N-AUS3" {
 		t.Fatalf("promise = %v", p)
 	}
 
-	byID := ask("promise_status", map[string]any{"promiseId": promiseID})["promiseStatus"].(map[string]any)
-	if got := byID["promises"].([]any); len(got) != 1 || got[0].(map[string]any)["promiseId"] != promiseID {
+	byID, _ := ask(t, client, "promise_status", map[string]any{"promiseId": promiseID})["promiseStatus"].(map[string]any)
+	got, _ := byID["promises"].([]any)
+	if len(got) != 1 {
 		t.Fatalf("promise_status by id = %v", byID)
 	}
+	if first, _ := got[0].(map[string]any); first["promiseId"] != promiseID {
+		t.Fatalf("promise_status by id = %v", byID)
+	}
+}
 
-	books := ask("book_capacity", map[string]any{"nodeId": "N-AUS3", "date": "2026-10-22"})["bookCapacity"].(map[string]any)
-	items := books["books"].([]any)
+func assertBookRead(t *testing.T, client *a2aclient.Client) {
+	t.Helper()
+	books, _ := ask(t, client, "book_capacity", map[string]any{"nodeId": "N-AUS3", "date": "2026-10-22"})["bookCapacity"].(map[string]any)
+	items, _ := books["books"].([]any)
 	if len(items) != 1 {
 		t.Fatalf("book_capacity = %v", books)
 	}
-	b := items[0].(map[string]any)
+	b, _ := items[0].(map[string]any)
 	capacity, _ := b["capacity"].(map[string]any)
 	if b["bookId"] != "N-AUS3:dep-AUS3-1800" || capacity["confirmed"] != 1.0 {
 		t.Fatalf("book = %v: the confirmed hold must be on the book", b)
