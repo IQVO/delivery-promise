@@ -34,6 +34,7 @@ func offerRoundTrip(t *testing.T, f Fixture) {
 	eqTime(t, "expiresAt", got.ExpiresAt(), o.ExpiresAt())
 	eqTime(t, "pickup cutoff", got.PickupCutoffAt(), o.PickupCutoffAt())
 	eqTime(t, "window latest", got.Window().Latest, o.Window().Latest)
+	eq(t, "window time zone", got.Window().TimeZone, "America/Chicago")
 	noErr(t, got.Consume(T0.Add(time.Minute)))
 	noErr(t, f.Offers.Save(ctx, got))
 	again, err := f.Offers.Get(ctx, "off-1")
@@ -140,6 +141,8 @@ func promiseRoundTrip(t *testing.T, f Fixture) {
 	eq(t, "witness has no pickup", got.Witness().PickupDepartureID, "")
 	eq(t, "revisions", len(got.Revisions()), 1)
 	eq(t, "previous tier", got.Revisions()[0].PreviousTerms.Tier, shared.TierNextDay)
+	eq(t, "time zone", got.Terms().Window.TimeZone, "America/Denver")
+	eq(t, "previous time zone", got.Revisions()[0].PreviousTerms.Window.TimeZone, "America/Chicago")
 	eq(t, "revision reason", got.Revisions()[0].Reason, "DEPARTURE_CANCELLED")
 	j := got.Judgement()
 	if j == nil {
@@ -155,7 +158,7 @@ func nominalRevision() promise.Revising {
 	return promise.Revising{
 		Terms: promise.Terms{
 			Tier: shared.TierStandard, ShipBy: T0.Add(30 * time.Hour), Basis: shared.BasisNominal, PolicyVersion: "v1",
-			Window: shared.Window{Earliest: T0.Add(50 * time.Hour), Latest: T0.Add(60 * time.Hour)},
+			Window: shared.Window{Earliest: T0.Add(50 * time.Hour), Latest: T0.Add(60 * time.Hour), TimeZone: "America/Denver"},
 		},
 		Witness: shared.Witness{NodeID: "N-DFW7"}, BookID: "N-DFW7:nominal-x", Reason: "DEPARTURE_CANCELLED",
 	}

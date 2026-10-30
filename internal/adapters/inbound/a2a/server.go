@@ -82,7 +82,7 @@ func Card(cfg Config) *a2a.AgentCard {
 			{
 				ID:          skillPromiseStatus,
 				Name:        "Status of the delivery promises of an order",
-				Description: "Read the delivery promise(s) behind one customer order: pass orderId for every promise of the order (one per shipment group) or promiseId for one promise. Each promise carries its state (PROVISIONAL, CONFIRMED, AT_RISK, KEPT, BROKEN, RELEASED or CANCELLED), terms (tier, shipBy, deliverByEarliest, deliverByLatest, basis, policyVersion), witness path, holdExpiresAt, revisions and, once judged, the judgement (outcome, cause, lateByMinutes). Pass exactly one of orderId and promiseId. Read-only; an unknown promise is answered as a 404 problem, an order with no promise as an empty list.",
+				Description: "Read the delivery promise(s) behind one customer order: pass orderId for every promise of the order (one per shipment group) or promiseId for one promise. Each promise carries its state (PROVISIONAL, CONFIRMED, AT_RISK, KEPT, BROKEN, RELEASED or CANCELLED), terms (tier, shipBy, deliverByEarliest, deliverByLatest, timeZone of the local calendar, basis, policyVersion), witness path, holdExpiresAt, revisions and, once judged, the judgement (outcome, cause, lateByMinutes). Pass exactly one of orderId and promiseId. Read-only; an unknown promise is answered as a 404 problem, an order with no promise as an empty list.",
 				Tags:        []string{"delivery-promise", "promise", "read"},
 				InputModes:  []string{"application/json"},
 				Examples: []string{

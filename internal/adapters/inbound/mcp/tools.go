@@ -102,7 +102,8 @@ func (d Deps) registerTools(server *mcp.Server) {
 	addTool(server, &mcp.Tool{
 		Name: "get_delivery_offer",
 		Description: "Read one delivery offer in any state (QUOTED, EXPIRED or CONSUMED): its tier, groupNo, " +
-			"destination postal prefix, lines, delivery window, the witness path that proves feasibility (node, pickup " +
+			"destination postal prefix, lines, delivery window (earliest, latest and the delivery station's IANA timeZone, " +
+			"the local calendar of its days), the witness path that proves feasibility (node, pickup " +
 			"departure, legs, delivery wave), basis (SCHEDULED or NOMINAL), the policyVersion it was quoted under, and " +
 			"quotedAt/expiresAt. Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
 			"fails with not-found.",
@@ -112,7 +113,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 	addTool(server, &mcp.Tool{
 		Name: "get_promise",
 		Description: "Read one promise in any state (PROVISIONAL, CONFIRMED, AT_RISK, KEPT, BROKEN, RELEASED or " +
-			"CANCELLED): its terms (tier, shipBy, deliverByEarliest, deliverByLatest, basis, policyVersion), the witness " +
+			"CANCELLED): its terms (tier, shipBy, deliverByEarliest, deliverByLatest, timeZone, basis, policyVersion), the witness " +
 			"path, holdExpiresAt, the revisions that moved it and the final judgement (outcome KEPT or BROKEN, cause, " +
 			"lateByMinutes). A promise is never deleted; terminal states stay readable. Read-only; an unknown promise " +
 			"fails with not-found.",

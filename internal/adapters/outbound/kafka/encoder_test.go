@@ -30,13 +30,15 @@ var (
 	cdt  = time.FixedZone("CDT", -5*3600) // the instants below are written in local time on purpose
 	hdr  = shared.Header{Version: 3, At: t0}
 	wit  = shared.Witness{NodeID: "N-AUS3", PickupDepartureID: "dep-AUS3-1800", Legs: []string{"dep-SAU1-DAU1-2200"}, DeliveryWaveID: "W-DAU1-1023-A"}
-	win  = shared.Window{Earliest: time.Date(2026, 10, 23, 9, 0, 0, 0, cdt), Latest: time.Date(2026, 10, 23, 21, 0, 0, 0, cdt)}
+	win  = shared.Window{Earliest: time.Date(2026, 10, 23, 9, 0, 0, 0, cdt), Latest: time.Date(2026, 10, 23, 21, 0, 0, 0, cdt), TimeZone: "America/Chicago"}
 	term = promise.Terms{Tier: shared.TierNextDay, ShipBy: time.Date(2026, 10, 22, 18, 0, 0, 0, cdt), Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2"}
 )
 
 func goldenCases() map[string]shared.Event {
 	nominal := term
 	nominal.Basis, nominal.Tier = shared.BasisNominal, shared.TierStandard
+	legacy := term // a promise persisted before windows named their zone (ADR 0011)
+	legacy.Window.TimeZone = ""
 	return map[string]shared.Event{
 		"PromiseMade": promise.PromiseMade{Header: hdr, PromiseID: "prm-1", OfferID: "off-1", Terms: term, Witness: wit,
 			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}}},
@@ -46,6 +48,8 @@ func goldenCases() map[string]shared.Event {
 		"PromiseAtRisk":    promise.PromiseAtRisk{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", Reason: "DEPARTURE_CANCELLED", DetectedAt: t0},
 		"PromiseRevised": promise.PromiseRevised{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", RevisionNo: 1, NodeID: "N-AUS3",
 			PreviousDeliverByLatest: win.Latest, Terms: term, Reason: "DEPARTURE_CANCELLED"},
+		"PromiseRevised_noTimeZone": promise.PromiseRevised{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", RevisionNo: 1, NodeID: "N-AUS3",
+			PreviousDeliverByLatest: win.Latest, Terms: legacy, Reason: "DEPARTURE_CANCELLED"},
 		"PromiseKept": promise.PromiseKept{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", NodeID: "N-AUS3",
 			DeliveredAt: time.Date(2026, 10, 23, 15, 0, 0, 0, cdt), DeliverByLatest: win.Latest},
 		"PromiseBroken_late": promise.PromiseBroken{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", NodeID: "N-AUS3",

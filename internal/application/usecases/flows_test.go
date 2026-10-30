@@ -62,6 +62,7 @@ func TestQuoteReturnsTheWorkedExampleAndPersistsTheOffers(t *testing.T) {
 	eq(t, "pickup", o.WitnessPath.PickupDepartureID, "dep-AUS3-1800")
 	eq(t, "wave", o.WitnessPath.DeliveryWaveID, "W-DAU1-1023-A")
 	eq(t, "legs", len(o.WitnessPath.Legs), 1)
+	eq(t, "window names the station's zone", o.Window.TimeZone, "America/Chicago")
 	if !o.Window.Earliest.Equal(at(23, 9, 0)) || !o.Window.Latest.Equal(at(23, 21, 0)) || !o.ExpiresAt.Equal(at(22, 14, 15)) {
 		t.Fatalf("offer = %+v", o)
 	}
@@ -131,6 +132,7 @@ func TestMakePromiseHoldsCapacityAndConsumesTheOffer(t *testing.T) {
 	eq(t, "node", p.WitnessPath.NodeID, "N-AUS3")
 	eq(t, "hold expires", p.HoldExpiresAt.Equal(at(22, 14, 24)), true)
 	eq(t, "shipBy", p.Terms.ShipBy.Equal(at(22, 18, 0)), true)
+	eq(t, "terms name the station's zone", p.Terms.TimeZone, "America/Chicago")
 	b := e.bookOf("N-AUS3:dep-AUS3-1800")
 	eq(t, "provisional", b.Provisional(), 1)
 	eq(t, "share from the slot", b.Share(), 2500)

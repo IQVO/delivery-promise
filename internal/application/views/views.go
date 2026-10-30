@@ -21,10 +21,13 @@ type Line struct {
 	Quantity      int    `json:"quantity"`
 }
 
-// Window is a delivery window.
+// Window is a delivery window. TimeZone is the IANA name of the delivery
+// station serving the destination: the local calendar the window's days belong
+// to (ADR 0011); omitted only for an offer persisted before it was carried.
 type Window struct {
 	Earliest time.Time `json:"earliest"`
 	Latest   time.Time `json:"latest"`
+	TimeZone string    `json:"timeZone,omitempty"`
 }
 
 // Witness is the witness path.
@@ -70,8 +73,10 @@ type Terms struct {
 	ShipBy            time.Time `json:"shipBy"`
 	DeliverByEarliest time.Time `json:"deliverByEarliest"`
 	DeliverByLatest   time.Time `json:"deliverByLatest"`
-	Basis             string    `json:"basis"`
-	PolicyVersion     string    `json:"policyVersion"`
+	// TimeZone names the local calendar of deliverByEarliest/Latest (ADR 0011).
+	TimeZone      string `json:"timeZone,omitempty"`
+	Basis         string `json:"basis"`
+	PolicyVersion string `json:"policyVersion"`
 }
 
 // Revision is one re-promise.
@@ -176,7 +181,7 @@ func witness(w shared.Witness) Witness {
 func terms(t promise.Terms) Terms {
 	return Terms{
 		Tier: string(t.Tier), ShipBy: t.ShipBy.UTC(), DeliverByEarliest: t.Window.Earliest.UTC(), DeliverByLatest: t.Window.Latest.UTC(),
-		Basis: string(t.Basis), PolicyVersion: t.PolicyVersion,
+		TimeZone: t.Window.TimeZone, Basis: string(t.Basis), PolicyVersion: t.PolicyVersion,
 	}
 }
 
@@ -184,7 +189,7 @@ func terms(t promise.Terms) Terms {
 func FromOffer(o *offer.Offer) Offer {
 	return Offer{
 		OfferID: string(o.ID()), State: string(o.State()), GroupNo: o.GroupNo(), DestinationPostalPrefix: o.DestinationPrefix(),
-		Tier: string(o.Tier()), Lines: lines(o.Lines()), Window: Window{Earliest: o.Window().Earliest.UTC(), Latest: o.Window().Latest.UTC()},
+		Tier: string(o.Tier()), Lines: lines(o.Lines()), Window: Window{Earliest: o.Window().Earliest.UTC(), Latest: o.Window().Latest.UTC(), TimeZone: o.Window().TimeZone},
 		WitnessPath: witness(o.Witness()), Basis: string(o.Basis()), PolicyVersion: o.PolicyVersion(), QuotedAt: o.QuotedAt().UTC(), ExpiresAt: o.ExpiresAt().UTC(),
 	}
 }

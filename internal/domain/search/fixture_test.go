@@ -10,8 +10,9 @@ import (
 )
 
 // The worked example of the promise model: Thursday 2026-10-22 14:05 in Austin
-// (CDT, UTC-5), a shopper in postal prefix 787 asks for ci-1001 x2.
-var cdt = time.FixedZone("CDT", -5*3600)
+// (CDT, UTC-5), a shopper in postal prefix 787 asks for ci-1001 x2. The fixed
+// offset carries the IANA name of the station's zone, which every window names.
+var cdt = time.FixedZone("America/Chicago", -5*3600)
 
 func at(day, h, m int) time.Time { return time.Date(2026, 10, day, h, m, 0, 0, cdt).UTC() }
 
