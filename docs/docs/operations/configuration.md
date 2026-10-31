@@ -9,7 +9,7 @@ description: "Every environment variable read by the three Delivery Promise bina
 
 Delivery Promise ships three binaries. Each reads its own environment; there is no config file and no flag parsing. A variable that several binaries read has a row in **each** table below, with that binary's own default. Test-only variables are left out.
 
-Missing or malformed mandatory variables are refused **before** anything is opened or bound: the boot error names the variable (`cmd/api/config.go`, `cmd/a2a/main.go`, `cmd/mcp/main.go`). The Helm chart (`charts/delivery-promise`) renders exactly these variables, see [Runbook](/docs/operations/runbook#deployment-helm-chart).
+Missing or malformed mandatory variables are refused **before** anything is opened or bound: the boot error names the variable (`cmd/api/config.go`, `cmd/a2a/main.go`, `cmd/mcp/main.go`). The Helm chart (`charts/delivery-promise`) renders exactly these variables, see [Runbook](/docs/operations/runbook#deployment).
 
 Durations accept a Go duration (`500ms`, `2s`) or a plain number of seconds. An unset, malformed or non-positive value logs a warning and uses the default (`parseDuration` in `cmd/api/config.go`), except where a row says otherwise.
 
