@@ -1,10 +1,17 @@
+---
+id: runtime
+title: Runtime
+sidebar_label: Runtime
+description: "How the Delivery Promise binaries boot, serve probes, consume, sweep, relay the outbox and shut down; chart values mapped to variables."
+---
+
 # Runtime: configuration, probes, shutdown, workers and the outbox
 
-`cmd/api` is the only binary. It runs on real PostgreSQL and real Kafka; there is no
-alternative runtime and no log sink. Next to the REST API it runs one Kafka consumer
-(eight topics, one group), a clock sweeper and the outbox relay.
+`cmd/api` is the main binary; `cmd/mcp` and `cmd/a2a` are two read-only siblings that share its use cases and database. All three run on real PostgreSQL; only `cmd/api` uses Kafka. There is no
+alternative runtime and no log sink. Next to the REST API, `cmd/api` runs one Kafka consumer
+(eight topics, one group), a clock sweeper and the outbox relay. The complete variable list per binary is in [Configuration](/docs/operations/configuration); the operating procedures are in the [Runbook](/docs/operations/runbook).
 
-## Environment
+## Environment (`cmd/api`)
 
 | Variable | Default | Meaning |
 | --- | --- | --- |

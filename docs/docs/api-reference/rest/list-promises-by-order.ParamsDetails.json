@@ -1,0 +1,1 @@
+{"parameters":[{"name":"orderId","in":"query","required":true,"description":"The customer order id (from CustomerOrderPlaced).","schema":{"type":"string"}}]}

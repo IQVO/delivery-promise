@@ -1,0 +1,70 @@
+---
+id: publish-promise-policy
+title: "Publish a new promise policy version (PublishPromisePolicy)"
+description: "Stores the next policy version (strictly increasing) and publishes PromisePolicyPublished on the analytics topic. Offers and promises made afterwards record the new policyVersion."
+sidebar_label: "Publish a new promise policy version (PublishPromisePolicy)"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Publish a new promise policy version (PublishPromisePolicy)"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/promise-policies"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Stores the next policy version (strictly increasing) and publishes PromisePolicyPublished on the analytics topic. Offers and promises made afterwards record the new policyVersion.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./publish-promise-policy.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./publish-promise-policy.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./publish-promise-policy.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
