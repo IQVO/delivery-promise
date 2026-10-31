@@ -1,0 +1,1 @@
+{"parameters":[{"name":"Idempotency-Key","in":"header","required":true,"description":"Client-chosen key; a repeat with the same key and body returns the first result.","schema":{"type":"string","maxLength":128}},{"name":"promiseId","in":"path","required":true,"description":"The Promise id.","schema":{"type":"string"}}]}
