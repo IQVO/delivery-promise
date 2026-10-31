@@ -1,0 +1,70 @@
+---
+id: make-promise
+title: "Make a provisional promise for one shipment group from a quoted offer"
+description: "MakePromise. Consumes the offer (CONSUMED), creates the promise in PROVISIONAL with holdExpiresAt, and holds capacity on the witness PromiseBook (nodeId:pickupDepartureId), opening the book lazily on the first hold, in ONE transaction (documented exception to one aggregate per transaction, G22). A retry with the same Idempotency-Key and body replays the first response (200). Errors: not-found (404); offer-not-quotable, promise-capacity-exhausted, book-closed, concurrent-update (409); group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier, idempotency-key-reused, validation-failed (422)."
+sidebar_label: "Make a provisional promise for one shipment group from a quoted offer"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Make a provisional promise for one shipment group from a quoted offer"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/promises"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+MakePromise. Consumes the offer (CONSUMED), creates the promise in PROVISIONAL with holdExpiresAt, and holds capacity on the witness PromiseBook (nodeId:pickupDepartureId), opening the book lazily on the first hold, in ONE transaction (documented exception to one aggregate per transaction, G22). A retry with the same Idempotency-Key and body replays the first response (200). Errors: not-found (404); offer-not-quotable, promise-capacity-exhausted, book-closed, concurrent-update (409); group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier, idempotency-key-reused, validation-failed (422).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./make-promise.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./make-promise.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./make-promise.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

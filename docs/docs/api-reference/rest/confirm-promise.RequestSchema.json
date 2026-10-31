@@ -1,0 +1,1 @@
+{"title":"Body","body":{"required":true,"content":{"application/json":{"schema":{"type":"object","required":["orderId","groupNo"],"properties":{"orderId":{"type":"string","description":"The customer order id."},"groupNo":{"type":"integer","minimum":1,"description":"The shipment group number within the order."}},"title":"ConfirmPromiseRequest"}}}}}

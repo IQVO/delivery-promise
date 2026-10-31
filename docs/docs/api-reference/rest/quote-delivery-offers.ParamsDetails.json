@@ -1,0 +1,1 @@
+{"parameters":[{"name":"Idempotency-Key","in":"header","required":false,"description":"Client-chosen key; a repeat with the same key returns the first result.","schema":{"type":"string","maxLength":128}}]}

@@ -1,3 +1,11 @@
+---
+id: index
+title: Architecture decision records
+sidebar_label: ADR index
+slug: /
+sidebar_position: 0
+---
+
 # Architecture decision records
 
 The decisions of `delivery-promise`, in the order they were taken. The ADR bodies are immutable; a changed decision gets a new ADR that supersedes the old one. The *Status* column is copied from each ADR's own `## Status` section.

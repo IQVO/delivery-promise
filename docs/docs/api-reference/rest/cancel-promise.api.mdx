@@ -1,0 +1,70 @@
+---
+id: cancel-promise
+title: "Cancel a confirmed promise on request (CancelPromise)"
+description: "Called by customer-ordering to compensate a checkout whose later group failed to confirm: the promises already CONFIRMED are cancelled so their capacity is given back. No request body. A CONFIRMED or AT_RISK promise becomes CANCELLED (cancelReason CANCELLED_ON_REQUEST), the confirmed hold goes back to its PromiseBook and PromiseCancelled goes to the analytics topic, in one transaction. Idempotent: cancelling an already CANCELLED promise is a no-op returning 200 with the same view. A PROVISIONAL, KEPT, BROKEN or RELEASED promise is refused with illegal-transition (409); a provisional hold is never cancelled, it lapses by itself (ReleaseExpiredHolds)."
+sidebar_label: "Cancel a confirmed promise on request (CancelPromise)"
+hide_title: true
+hide_table_of_contents: true
+api: eJztWm1z27gR/is7+CRNSVl2fT1H6XRGsXU5NY7sk5W7thlPDiJXEk4gwACgbJ1H/72zIEjRkmL7ru20M80XvRDEYrF49h0PzPG5Zb2P7NroTFi07DZiOkfDndBqmLIeS7hKUIZxFrEUbWJETuOsx865lJjCdA1JYZ3O0MTapGiEmoPTkOgsR2W5Q+CQLDBZ6sLB3UJbBMkdGpgbXeQw44LI+BlqJkzWA7dAyANXwKVBnq7h/Gr03XD8fnAB3CCUrNFEq+l9YSDhOU+EW4OwMBcrVDDlybIDIw0GPxdoHUx1uu5Av0FLG+hPPo2HN++qFWGKic7Qwnl/dD64vBxcQKtcbYzcarV9/ulq9Gk8+OHD4GbSjjzTYQeYwkLLFOYarWeCdiechSDKN1ovgau0+n9eb8bPcH5HwBWXaycSepCLJAKhQCsEZ7iyPKFT6MAwxSzXDpXrVTIh+XO1lVu9jWqDwgIHpWOdg0FXGEUzTrpduBNu4Ze2PENYCbwjYV2Pr34c3gyvRv3LCN4NricRvBlfvRuMSHjjweWgf/OYuMFZYTEtyQkpcc5l7LkWxDS0Truv2q+B05yVsEIrLkuBCQsKV2i2xxuBcCB5TkiYrkmIKGfQGqNEbnFwnwuD6fdaprbdYRHLueEZOjSE7AemeIasx2ohJev4Ha5ZxAQBeIE8RcMiRvAgOqznTIF7OJcClYsTQq6CJa6JdYM5crcjsSWu/bESzIJorR+dCWMdGLSFdMSmTRaYcdZ7YG6dE4fWkdqwiGX8/hLV3C1Y7/jkbLOJ6k0EAQ/Tiv2cu8WzzE8WWKEMRPrU2pvNLRGzuVZkDHoP7KTbpa99gvuQanFZ6iEJRvJSDOEvyUmrJiS3yhvm+7NLtCIc05I8z6VIvCE6+sXSug/7fOvpL5i4RxL4+EhKejZD439Zx10wYE4oT/daW8fltcGZuGcRk0KhZRFzaDL6vhNOobXXpYwJnCXWbL9cscQtvblCQz/JeuaG7KcTpfi2rOzLesvcwTEyo4fGdk/3BsmiovKi9rNIhXLJE0yhVVu5doeoenM70g2qQjmcew3IhBJZkbHe8b+0RCnnA2yjIuIfWcOWsIjVs1nEghVmESMTwyJW2hgWscrE0IQKeOx2U53ZdjVuDPfK7TCzzwEl4Y5LPR86zDxEPhdcOeHW++f4+M1D51XPfVq0m03EnHCSxt/SYVwKhcw/9ah7hmMnPD27EPmbtYeCFCs0b9YDbqRA65rPLrkrn0y5FQTTXEuRrH/8Elg98RfgzaxEgkBvQysAvDMRaLwGV6d8038/+HTR/zuL2Gjwt0n4OfnpKvy6mfRHF/3xBbFRCYSIeAiV2zvAykybjDvWYyl3GDuR7Yck1yJZFjkkhdOzGXDnQRtUGZRO0aN0X3AvW22zL98XT6Tvf2h1UDkaNv9PpxHDe57lXib9DI1I+NH5QiR8rve2O+yP+kCU4VcKDPTM7zfwuAbSRvK3lk6NgjI/WFvAMmSROuESEi5RpdzAnmy8Jd/ZNkxRah/ldaAv7/jagsXSyIPCu8qqvwadCecwBa3kGmbalD7fewzrtKHoEWfaIDn5O24h4cYIsiv9izF0u8fHbR/13C1EsoCEW/InPA2nqlJ9R6MfJuf+WEukP4vhyhv611/D6Or9cNS/3LJYgfMRoM+/H1x8uPQ2KExoYveNX3mzq2QHXOx2TmBj4jV/89jhHDAE+06Y4BxBXiI+xZwbVxiMtj9B4tw2j28Nd3yF4Bbc+dALYYbciqmQwvmwuJIFRRbQqgThRdMOZ0Nq1FhCm5KmSG0v8HJRDQ7TR4v/xFf+Ec0KsKBhz6SwgFnu1tAanHlL0rR7tFFvounVfcsVhg/Z5T2GDr7lyT7vRb4Ap7RBfbO1EGG7T2Pgp8aZb3ajjBeblm0w8jtdYUVgRBYmp3+6sJMQCBmf9FQxD6Z9t38EDQLPeMBd+l9d3leX99Xl/Z+6vGBaDtnkrbF5Idway4yDNfIPfynSOWYhrXzK1OjCUdln30xUA09kNY8zltut0vyGHeyfGVpUjdwr58mSz9GDpia/xRudY8ILi3B5dTMpSzOTD+PR4MIjhSpub9bvhSrco5xpa6WfWL7cmKfjl3hKFpf9yYBFjJjwuVvJA4n1JQs0jvGv9cltvpy4H8LOag+LL8lzr3InMmGdSOJEq6QwhspFEIhVhobP5wbn3GEQxrYs+BItbOy4zmQ7Jdx9Oet3UarSY0+Iu7Gwy99OR0is6qCdQzrLNht6eto93a8IjbSDmS5UCi2lXex/tssiri9yRLUB1AZKcwGp9pGkA7wX1j1R/cmNnkrM/vB8FegxU+PvzuHV6TffQiAAKToupN0NLj2VartlAaM4EGSWiz2hyIURh8yuX5omRbBwLre9oyPjGVHo7rRZdoLnq/Zpj/5sZTH/i7fEtVN84dQg5rgqhMd4v+CFdZiy7Yke0Nx6ncpP1JX0RwSCbA6pVU3itPvKayvx+fRavgbe/3Dzx16KeVxG6nH39PgMFtwnGUbrDCTOHLTsgrKGk2+63bLMJJR1pHrPuhuSSw3dV/vQvaF6VVTvN4JEaqpcky1tGAEq60uROGjtV7Oj7ZsuLvLUE/S4j0kbPhfa8anEWgkOnE4EU62Xcbn29kVKB2IsK9yN6eGtKuaOM71CG6OPXcxThdSvqvRVlf4NqrSJWIZuoalBmGufcPlORI9VUrNHD3Xte9MrnSQBAs2qaswURobD6B0d+Xh8oa3rnXXPuoz6EELNylwyMHBRBfiVXPvXw0btvce6nZNOdx+6g5sJ6aczPHG7yUJcN/zIY2HqX8R7B61zTYWURGcZmpD6tavZJXAgIIfKLUasKP4yOguDcRiMU51YyHSK8sh/dtY8k9AK69iPu5zcdgxa166bJ9/5MD0x2tq4Yi7FpMz2Szq0MRunKB2HwbcRDM4iGLx6DXNOzb25sNRofXsWwdtXEbw9po+TY/o4aXeAykhkoBCMLlzZGFRwlaOC77V1UOW+FFv6JhclMDOjVZkicQVCxdrMuRK/lnnXeegEH90UZHnQbKXvA9TdRvFruKZotUbOzt/HQCqbq2Xj9InXPN6gVbec60a00Kodmse++eTzn4Pta6GsSLHuWpeSquCy0K6skGV8WdbD7FolC6OVLqynTR1crtag3SJIAO9dD9AjWKi8cEHUuCKvMcM05KQ+1SuhQm1rXrgFKhcMuPc0lk5UNRqPM4no/Ns5GutbqSl3HHieIzeWskVipTT2vd2EuOwF5z6khtzH1FFowVK/Lk0NWtuBgTHaWC+72ht8ybWEFv/PZE1+Jvq/zVrDDVmoFOif7UEdUVLX+JRy4y/0kw/44WpgxaVIPaNxuGzQOvX4f0+SLleC1hKnfBr7jDuo+sAYoOZru/ffc+hVs9w372Kbc2VjqupYqhL4jVXGI/ZNpAiUzoTiMvbJvmeZS6nvMI1n2sRlGavc/lDNDLfOFImv5ZIceiAavfIlrmODvpcfpgzqKgvGyYKrOWmLV0bnlWGn0/7STjm1jHc65b4N7Y3GySksdGFsFdrwxIc2oS2+Z80zLpTjQpGriRqOhiA4F25RTDuJzo6GP/x4dbQ72Ts90oaMq8Ya5f0MusZS3++oUxpVXy5pnTevy7R3ndHDNi77enXm69WZ/7mrMyH6I1d1lEsuFIWHXn0eQoBX364gxXpo+Nw6yLulJgbViD+yh4cpt/jByM2GHn8u0KxZ7+NtxFbcCLKg9I+6HuUtHIoKU2FpIGW9GZd29y5LU4Fa45B4tOE/cD3noCiWuD54lWjFZUFvM7qrU77UTxLMXWNs7z4Lxbh1FE32k202/wSV97I2
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Cancel a confirmed promise on request (CancelPromise)"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/promises/{promiseId}:cancel"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Called by customer-ordering to compensate a checkout whose later group failed to confirm: the promises already CONFIRMED are cancelled so their capacity is given back. No request body. A CONFIRMED or AT_RISK promise becomes CANCELLED (cancelReason CANCELLED_ON_REQUEST), the confirmed hold goes back to its PromiseBook and PromiseCancelled goes to the analytics topic, in one transaction. Idempotent: cancelling an already CANCELLED promise is a no-op returning 200 with the same view. A PROVISIONAL, KEPT, BROKEN or RELEASED promise is refused with illegal-transition (409); a provisional hold is never cancelled, it lapses by itself (ReleaseExpiredHolds).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./cancel-promise.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./cancel-promise.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./cancel-promise.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
