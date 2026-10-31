@@ -10,6 +10,7 @@ import (
 	"time"
 
 	outboxrelay "github.com/claudioed/delivery-promise/internal/adapters/outbound/outbox"
+	"github.com/claudioed/delivery-promise/internal/adapters/outbound/telemetry"
 )
 
 // Boot errors for the variables the service cannot run without. Each message
@@ -135,6 +136,8 @@ func shutdownDrainDelay(raw string, logger *slog.Logger) time.Duration {
 }
 
 // newLogger builds the JSON logger; LOG_LEVEL debug|info|warn|warning|error.
+// The handler is wrapped so a record written with a span-carrying context (the
+// *Context slog variants) also carries trace_id and span_id.
 func newLogger(level string) *slog.Logger {
 	var lvl slog.Level
 	switch strings.ToLower(level) {
@@ -147,5 +150,5 @@ func newLogger(level string) *slog.Logger {
 	default:
 		lvl = slog.LevelInfo
 	}
-	return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl}))
+	return slog.New(telemetry.WithTraceContext(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})))
 }

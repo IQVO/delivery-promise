@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: delivery-promise Domain Events
-  version: 1.0.0
+  version: 1.1.0
   description: 'Event catalog for the **delivery-promise** bounded context of the retail network (commerce tier, Core): it
     quotes delivery offers from a feasible witness path, holds capacity in PromiseBooks, makes and judges promises (ADR 0002,
     ADR 0003).
@@ -438,6 +438,7 @@ components:
             shipBy: '2026-10-22T23:00:00Z'
             deliverByEarliest: '2026-10-23T14:00:00Z'
             deliverByLatest: '2026-10-24T02:00:00Z'
+            timeZone: America/Chicago
             basis: SCHEDULED
             policyVersion: v3
             holdExpiresAt: '2026-10-22T19:24:00Z'
@@ -537,6 +538,7 @@ components:
             previousDeliverByLatest: '2026-10-24T02:00:00Z'
             deliverByEarliest: '2026-10-24T14:00:00Z'
             deliverByLatest: '2026-10-25T02:00:00Z'
+            timeZone: America/Chicago
             shipBy: '2026-10-23T23:00:00Z'
             nodeId: N-VWS-AUS3
             reason: DEPARTURE_CANCELLED
@@ -753,6 +755,7 @@ components:
             nodeId: N-VWS-AUS3
             deliverByEarliest: '2026-10-23T14:00:00Z'
             deliverByLatest: '2026-10-24T02:00:00Z'
+            timeZone: America/Chicago
             basis: SCHEDULED
             policyVersion: v3
             expiresAt: '2026-10-22T19:15:00Z'
@@ -1921,6 +1924,12 @@ components:
                 description: The pickup cutoff at the witness node.
               deliverByEarliest: *id002
               deliverByLatest: *id002
+              timeZone:
+                type: string
+                maxLength: 64
+                description: IANA time zone of the delivery station serving the destination (e.g. America/Chicago),
+                  the local calendar deliverByEarliest/deliverByLatest belong to. Optional and additive (ADR 0011);
+                  omitted for a window persisted before it was carried.
               basis:
                 $ref: '#/components/schemas/Basis'
               policyVersion: *id001
@@ -1991,6 +2000,12 @@ components:
               previousDeliverByLatest: *id002
               deliverByEarliest: *id002
               deliverByLatest: *id002
+              timeZone:
+                type: string
+                maxLength: 64
+                description: IANA time zone of the delivery station serving the destination (e.g. America/Chicago),
+                  the local calendar deliverByEarliest/deliverByLatest belong to. Optional and additive (ADR 0011);
+                  omitted for a window persisted before it was carried.
               shipBy: *id002
               nodeId: *id001
               reason: *id001
@@ -2138,6 +2153,12 @@ components:
               nodeId: *id001
               deliverByEarliest: *id002
               deliverByLatest: *id002
+              timeZone:
+                type: string
+                maxLength: 64
+                description: IANA time zone of the delivery station serving the destination (e.g. America/Chicago),
+                  the local calendar deliverByEarliest/deliverByLatest belong to. Optional and additive (ADR 0011);
+                  omitted for a window persisted before it was carried.
               basis:
                 $ref: '#/components/schemas/Basis'
               policyVersion: *id001

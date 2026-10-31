@@ -16,7 +16,7 @@ var (
 )
 
 func terms() Terms {
-	return Terms{Tier: shared.TierNextDay, ShipBy: shipBy, Window: shared.Window{Earliest: earlier, Latest: latest}, Basis: shared.BasisScheduled, PolicyVersion: "v3"}
+	return Terms{Tier: shared.TierNextDay, ShipBy: shipBy, Window: shared.Window{Earliest: earlier, Latest: latest, TimeZone: "America/Chicago"}, Basis: shared.BasisScheduled, PolicyVersion: "v3"}
 }
 
 func making() Making {
@@ -138,6 +138,7 @@ func TestMakeValidation(t *testing.T) {
 		"unknown basis":         {func(m *Making) { m.Terms.Basis = "X" }, ErrInvalidPromiseTerms},
 		"no policy version":     {func(m *Making) { m.Terms.PolicyVersion = "" }, ErrInvalidPromiseTerms},
 		"inverted window":       {func(m *Making) { m.Terms.Window = shared.Window{Earliest: latest, Latest: earlier} }, ErrInvalidPromiseTerms},
+		"malformed zone":        {func(m *Making) { m.Terms.Window.TimeZone = "America/Chi cago" }, ErrInvalidPromiseTerms},
 		"no shipBy":             {func(m *Making) { m.Terms.ShipBy = time.Time{} }, ErrInvalidPromiseTerms},
 		"shipBy == earliest":    {func(m *Making) { m.Terms.ShipBy = earlier }, ErrInvalidPromiseTerms},
 		"shipBy after earliest": {func(m *Making) { m.Terms.ShipBy = earlier.Add(time.Second) }, ErrInvalidPromiseTerms},
@@ -168,6 +169,12 @@ func TestMakeBoundaries(t *testing.T) {
 	nominal.Terms.Tier, nominal.Terms.Basis, nominal.Witness = shared.TierStandard, shared.BasisNominal, shared.Witness{NodeID: "n1"}
 	if _, _, err := Make(nominal, t0); err != nil {
 		t.Fatalf("a NOMINAL STANDARD promise: %v", err)
+	}
+	// an offer persisted before windows named their zone still makes a promise (ADR 0011)
+	legacy := making()
+	legacy.Terms.Window.TimeZone = ""
+	if p, _, err := Make(legacy, t0); err != nil || p.Terms().Window.TimeZone != "" {
+		t.Fatalf("a window without a zone: %v", err)
 	}
 }
 

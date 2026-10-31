@@ -12,3 +12,6 @@ The decisions of `delivery-promise`, in the order they were taken. The ADR bodie
 | [0006](./0006-http-adapter-consumer-and-readiness.md) | the HTTP adapter, the consumer, the sweeper and readiness | Accepted (2026-10-23) |
 | [0007](./0007-mcp-server-adoption.md) | a read-only MCP server | Accepted (2026-10-24) |
 | [0008](./0008-console-remote.md) | a warehouse-console web remote | Accepted (2026-10-24) |
+| [0009](./0009-fleet-observability-standard.md) | the fleet observability standard (logs, metrics, traces) | Accepted (2026-10-26) |
+| [0010](./0010-a2a-inbound-adapter.md) | A2A inbound adapter | Accepted (2026-10-29) |
+| [0011](./0011-the-delivery-window-names-its-local-time-zone.md) | the delivery window names its local time zone | Accepted (2026-10-30) |

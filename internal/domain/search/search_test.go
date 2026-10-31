@@ -26,14 +26,21 @@ func best(t *testing.T, g Group, tier shared.Tier) Candidate {
 	return cs[0]
 }
 
+// assertWorkedWindow checks the worked example's window: the station's next
+// local day 09:00-21:00, naming the station's zone (ADR 0011).
+func assertWorkedWindow(t *testing.T, w shared.Window) {
+	t.Helper()
+	if !w.Earliest.Equal(at(23, 9, 0)) || !w.Latest.Equal(at(23, 21, 0)) || w.TimeZone != "America/Chicago" {
+		t.Fatalf("window = %+v", w)
+	}
+}
+
 func assertWorkedExample(t *testing.T, c Candidate) {
 	t.Helper()
 	if c.NodeID != "N-AUS3" || c.Basis != shared.BasisScheduled || !c.ShipBy.Equal(at(22, 18, 0)) {
 		t.Fatalf("node/basis/shipBy wrong: %+v", c)
 	}
-	if !c.Window.Earliest.Equal(at(23, 9, 0)) || !c.Window.Latest.Equal(at(23, 21, 0)) {
-		t.Fatalf("window = %+v", c.Window)
-	}
+	assertWorkedWindow(t, c.Window)
 	w := c.Witness
 	if w.NodeID != "N-AUS3" || w.PickupDepartureID != "dep-AUS3-1800" || len(w.Legs) != 1 || w.Legs[0] != "dep-SAU1-DAU1-2200" || w.DeliveryWaveID != "W-DAU1-1023-A" {
 		t.Fatalf("witness = %+v", w)
@@ -213,9 +220,8 @@ func TestNominalFallbackIsStandardOnly(t *testing.T) {
 		t.Fatalf("nominal candidate = %+v", c)
 	}
 	// 18:00 + 75 min lane + 120 min dwell + 90 min lane = 22:45, so the next local day 09:00-21:00
-	if !c.Window.Earliest.Equal(at(23, 9, 0)) || !c.Window.Latest.Equal(at(23, 21, 0)) {
-		t.Fatalf("window = %+v", c.Window)
-	}
+	// of the station's calendar, which the window names (ADR 0011)
+	assertWorkedWindow(t, c.Window)
 	if c.BookID != "N-AUS3:nominal-20261022T2300Z" || c.Opening.PickupDepartureID != "nominal-20261022T2300Z" || c.Opening.Share != 2500 {
 		t.Fatalf("book = %q opening %+v", c.BookID, c.Opening)
 	}
@@ -675,8 +681,12 @@ func TestSearchWithoutAPolicyUsesTheDefault(t *testing.T) {
 	}
 	in.Station.Loc = nil
 	in.Tiers = []shared.Tier{shared.TierStandard}
-	if g := onlyGroup(t, Run(in)); len(g.Candidates) == 0 {
+	g := onlyGroup(t, Run(in))
+	if len(g.Candidates) == 0 {
 		t.Fatal("a station without a zone searches in UTC")
+	}
+	if z := best(t, g, shared.TierStandard).Window.TimeZone; z != "UTC" {
+		t.Fatalf("a station without a zone names UTC, got %q", z)
 	}
 }
 

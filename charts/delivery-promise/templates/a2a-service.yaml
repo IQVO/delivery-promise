@@ -1,0 +1,22 @@
+{{- if .Values.a2a.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "delivery-promise.a2aFullname" . }}
+  labels:
+    {{- include "delivery-promise.labels" . | nindent 4 }}
+    app.kubernetes.io/component: a2a
+spec:
+  # ClusterIP only, always: access control is the in-cluster boundary (no
+  # auth, fleet decision); exposure beyond the cluster is the optional
+  # a2a-route.yaml.
+  type: {{ .Values.a2a.service.type }}
+  ports:
+    - port: {{ .Values.a2a.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "delivery-promise.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: a2a
+{{- end }}

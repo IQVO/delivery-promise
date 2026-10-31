@@ -148,6 +148,22 @@ database:
 kafka:
   brokers: ""
 
+# Observability (ADR 0009): the fleet pipeline is pod --OTLP/gRPC--> Collector
+# --> Jaeger (traces) and Prometheus (metrics); logs are stdout JSON for Alloy
+# and Loki. Export never blocks, so a Collector that is down costs telemetry and
+# nothing else, but otel.enabled=false renders no OTEL_* env at all (the binaries
+# then fall back to localhost:4317). serviceName is OTEL_SERVICE_NAME of the api;
+# the mcp component gets "<serviceName>-mcp". SERVICE_VERSION is the image tag
+# (appVersion when empty), ENVIRONMENT is `environment`.
+otel:
+  enabled: true
+  endpoint: "otel-collector.observability.svc.cluster.local:4317"
+  serviceName: "delivery-promise"
+
+# ENVIRONMENT of the api: deployment.environment.name on every span, metric and
+# log of the api. (mcp.environment overrides it for the mcp component.)
+environment: "production"
+
 # Extra env vars appended to the api container as a raw list. The chart refuses
 # any *_MODE variable, EVENT_PUBLISHER other than "kafka", and any variable that
 # has a dedicated value above.
@@ -191,7 +207,7 @@ tolerations: []
 affinity: {}
 
 # ---------------------------------------------------------------------------
-# Optional components (ADR 0007 MCP, ADR 0008 web remote). Both are OFF by
+# Optional components (ADR 0007 MCP, ADR 0010 A2A, ADR 0008 web remote). All are OFF by
 # default: a default render is the api alone.
 # ---------------------------------------------------------------------------
 
@@ -204,8 +220,9 @@ mcp:
   enabled: false
   replicaCount: 1
   httpAddr: ":8090"                  # MCP_ADDR (keep mcp.service.targetPort in step)
-  # SERVICE_VERSION / ENVIRONMENT: free-form identity reported in the boot
-  # log line, nothing more.
+  # SERVICE_VERSION (default: the image tag) / ENVIRONMENT (default: the
+  # top-level `environment`): service.version and deployment.environment.name
+  # of the mcp component, also reported in the boot log line.
   serviceVersion: ""
   environment: ""
   service:
@@ -217,6 +234,54 @@ mcp:
   route:
     enabled: false
     path: "/api/mcp/delivery-promise"
+    parentRefs:
+      - name: ""
+        namespace: ""
+        sectionName: "http"
+  extraEnv: []
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# cmd/a2a (docs/adr/0010): the read-only A2A (Agent2Agent) agent, a third
+# driving adapter over the SAME read use cases as the REST and MCP surfaces
+# (JSON-RPC 2.0 on / and /a2a, Agent Card at /.well-known/agent-card.json,
+# an open /healthz). Skills: promise_status and book_capacity, both reads: the
+# MCP charter (ADR 0007) is read-only, so the agent writes nothing and has no
+# outbox relay, consumer, sweeper or Kafka. A2A carries delegation only; facts
+# between contexts still travel as CloudEvents. No auth, by fleet decision: the
+# in-cluster ClusterIP boundary is the access control. Off by default;
+# warehouse-infra turns it on.
+a2a:
+  enabled: false
+  replicaCount: 1
+  httpAddr: ":8093"                  # A2A_ADDR (keep a2a.service.targetPort in step; 8080 api, 8090 mcp)
+  # Absolute URL advertised on the Agent Card (A2A_AGENT_URL). Empty defaults
+  # to this release's in-cluster Service DNS
+  # (http://<release>-a2a.<namespace>.svc.cluster.local:8093/); warehouse-infra
+  # can override it with the Kong URL when the agent must be reachable
+  # off-cluster.
+  agentUrl: ""
+  # SERVICE_VERSION (default: the image tag) / ENVIRONMENT (default: the
+  # top-level `environment`): service.version (also the Agent Card version)
+  # and deployment.environment.name of the a2a component.
+  serviceVersion: ""
+  environment: ""
+  service:
+    type: ClusterIP
+    port: 8093
+    targetPort: 8093
+  # Kong exposure: /api/a2a/delivery-promise -> Service :8093, prefix
+  # rewritten to / (the JSON-RPC root; the well-known agent card stays
+  # reachable under the same prefix). Needs the Gateway parentRef from
+  # warehouse-infra.
+  route:
+    enabled: false
+    path: "/api/a2a/delivery-promise"
     parentRefs:
       - name: ""
         namespace: ""

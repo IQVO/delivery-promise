@@ -140,18 +140,49 @@ func ValidPostalPrefix(s string) bool {
 	return true
 }
 
-// Window is a delivery window.
+// Window is a delivery window: two instants and the IANA time zone of the
+// delivery station serving the destination (ADR 0011). The zone names the
+// local calendar the window's days belong to; it is empty only on a window
+// persisted before the zone was carried.
 type Window struct {
 	Earliest time.Time
 	Latest   time.Time
+	TimeZone string
 }
 
-// Validate checks both instants are set and earliest <= latest.
+// MaxTimeZone is the longest accepted IANA time zone name.
+const MaxTimeZone = 64
+
+// Validate checks both instants are set, earliest <= latest, and that the
+// time zone, when present, is a well-formed IANA name.
 func (w Window) Validate() error {
 	if w.Earliest.IsZero() || w.Latest.IsZero() || w.Latest.Before(w.Earliest) {
 		return Invalid("a delivery window needs earliest <= latest")
 	}
+	if w.TimeZone != "" && !ValidTimeZone(w.TimeZone) {
+		return Invalid("a delivery window time zone %q is not an IANA name", w.TimeZone)
+	}
 	return nil
+}
+
+// UTC returns the window with both instants in UTC and the zone kept.
+func (w Window) UTC() Window {
+	return Window{Earliest: UTC(w.Earliest), Latest: UTC(w.Latest), TimeZone: w.TimeZone}
+}
+
+// ValidTimeZone reports whether s has the shape of an IANA time zone name:
+// 1..MaxTimeZone ASCII letters, digits, '/', '_', '-' or '+', neither starting
+// nor ending with '/'. It does not consult a zone database.
+func ValidTimeZone(s string) bool {
+	if s == "" || len(s) > MaxTimeZone || s[0] == '/' || s[len(s)-1] == '/' {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; !isAlnum(c) && c != '/' && c != '_' && c != '-' && c != '+' {
+			return false
+		}
+	}
+	return true
 }
 
 // Witness is the concrete path that proves a window is feasible (WitnessPath).

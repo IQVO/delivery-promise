@@ -36,9 +36,12 @@ type MakePromiseResult struct {
 // already backs a promise with the same lines returns that promise.
 func (s *Service) MakePromise(ctx context.Context, cmd MakePromiseCommand) (MakePromiseResult, error) {
 	if !shared.ValidID(cmd.OfferID) {
-		return MakePromiseResult{}, shared.Invalid("offerId %q is not a valid id", cmd.OfferID)
+		err := shared.Invalid("offerId %q is not a valid id", cmd.OfferID)
+		s.recordMakePromise(ctx, MakePromiseResult{}, err)
+		return MakePromiseResult{}, err
 	}
 	if err := shared.ValidateLines(cmd.Lines); err != nil {
+		s.recordMakePromise(ctx, MakePromiseResult{}, err)
 		return MakePromiseResult{}, err
 	}
 	var res MakePromiseResult
@@ -47,6 +50,7 @@ func (s *Service) MakePromise(ctx context.Context, cmd MakePromiseCommand) (Make
 		res, err = s.makePromise(ctx, cmd)
 		return err
 	})
+	s.recordMakePromise(ctx, res, err)
 	return res, err
 }
 

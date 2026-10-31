@@ -18,6 +18,7 @@ func registerQuoteSteps(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^the quote offers exactly the tiers "([^"]*)"$`, w.quoteOffers)
 	sc.Step(`^the (NEXT_DAY|TWO_DAY|SAME_DAY|STANDARD) offer is (SCHEDULED|NOMINAL) from the node "([^"]*)" via the pickup "([^"]*)" and the wave "([^"]*)"$`, w.offerWitness)
 	sc.Step(`^the (NEXT_DAY|TWO_DAY|SAME_DAY|STANDARD) offer promises delivery between "([^"]*)" and "([^"]*)"$`, w.offerWindow)
+	sc.Step(`^the (NEXT_DAY|TWO_DAY|SAME_DAY|STANDARD) offer window is in the time zone "([^"]*)"$`, w.offerTimeZone)
 	sc.Step(`^the (NEXT_DAY|TWO_DAY|SAME_DAY|STANDARD) offer is (QUOTED|CONSUMED|EXPIRED)$`, w.offerState)
 	sc.Step(`^the tier (NEXT_DAY|TWO_DAY|SAME_DAY|STANDARD) is unavailable with "([^"]*)"$`, w.tierUnavailable)
 	sc.Step(`^every tier is unavailable with "([^"]*)"$`, w.everyTierUnavailable)
@@ -84,6 +85,17 @@ func (w *world) offerWindow(tier, from, to string) error {
 	}
 	if !o.Window.Earliest.Equal(earliest) || !o.Window.Latest.Equal(latest) {
 		return fmt.Errorf("%s window %s..%s, want %s..%s", tier, o.Window.Earliest, o.Window.Latest, earliest, latest)
+	}
+	return nil
+}
+
+func (w *world) offerTimeZone(tier, zone string) error {
+	o, err := w.offer(tier)
+	if err != nil {
+		return err
+	}
+	if o.Window.TimeZone != zone {
+		return fmt.Errorf("%s window time zone %q, want %q", tier, o.Window.TimeZone, zone)
 	}
 	return nil
 }
