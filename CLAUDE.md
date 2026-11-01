@@ -19,7 +19,7 @@ Guides: `python3 scripts/harness/repo_lint.py`, `python3 scripts/harness/guide_l
 ## Runtime rule
 Real PostgreSQL and Kafka only. `DATABASE_URL`, `KAFKA_BROKERS` and `DELIVERY_PROMISE_CONSUMER_GROUP` are mandatory (boot error naming the variable, raised before anything opens; `MIGRATIONS_DATABASE_URL` optional direct DSN).
 Workers: one consumer, the sweeper (`SWEEP_INTERVAL` 15s: ExpireOffers, ReleaseExpiredHolds, CloseBooks, RepriceAtRisk) and the always-on outbox relay (`OUTBOX_MAX_ATTEMPTS` 20, 0 = unlimited; `OUTBOX_RELAY_INTERVAL` 1s); the process exits non-zero when any ends on its own.
-`/healthz` = liveness; `/readyz` = drain gate + Postgres ping + Kafka metadata request naming no topic. Shutdown: /readyz 503, `SHUTDOWN_DRAIN_DELAY` (5s), drain HTTP, stop consumer and sweeper, stop relay LAST, close pool. cmd/** never imports outbound/memory or repocontract. No authentication on REST. See docs/runtime.md.
+`/healthz` = liveness; `/readyz` = drain gate + Postgres ping + Kafka metadata request naming no topic. Shutdown: /readyz 503, `SHUTDOWN_DRAIN_DELAY` (5s), drain HTTP, stop consumer and sweeper, stop relay LAST, close pool. cmd/** never imports outbound/memory or repocontract. No authentication on REST. See docs/docs/overview/runtime.md.
 
 ## REST
 chi router for apis/openapi.yaml: POST /delivery-offers:quote, GET /delivery-offers/{offerId}, POST /promises, POST /promises/{promiseId}:confirm, POST /promises/{promiseId}:cancel, GET /promises/{promiseId}, GET /promises?orderId=, GET /promise-books?nodeId=&date=, POST/GET /promise-policies. `Idempotency-Key` required on every state-changing POST except the quote (optional); (route, key) scope, savepoint (ADR 0006).
@@ -37,6 +37,6 @@ Aggregates, invariants and assumptions A1-A30 in docs/adr/0002; consumed contrac
 
 ## Workflow
 GitFlow: feature/* -> PR into develop, CI green before merge, never push develop or main. lefthook: pre-commit fmt/vet/lint, pre-push `make check`. Commit and push after each step.
-Deployment: `charts/delivery-promise` (api only; Helm chart tests `bash charts/delivery-promise/tests/render_test.sh` and `python3 charts/delivery-promise/tests/test_service_selectors.py`; CI `helm-lint` + `chart-tests`). The chart refuses to render without `database.*`, `kafka.brokers`, `config.consumerGroup`, with a `*_MODE` in extraEnv or with `terminationGracePeriodSeconds` <= drain delay + 40s. Open: registry secrets (docs/before-first-release.md row 11).
+Deployment: `charts/delivery-promise` (api only; Helm chart tests `bash charts/delivery-promise/tests/render_test.sh` and `python3 charts/delivery-promise/tests/test_service_selectors.py`; CI `helm-lint` + `chart-tests`). The chart refuses to render without `database.*`, `kafka.brokers`, `config.consumerGroup`, with a `*_MODE` in extraEnv or with `terminationGracePeriodSeconds` <= drain delay + 40s. Open: registry secrets (docs/docs/operations/before-first-release.md row 11).
 
 A2A: `cmd/a2a` (port 8093) is this context's read-only Agent2Agent agent, skills `promise_status` (read), `book_capacity` (read), decided in `docs/adr/0010-a2a-inbound-adapter.md`; delegation only (facts stay CloudEvents on Kafka), unauthenticated like REST and MCP; rules in `.claude/rules/fleet/a2a.md`.
