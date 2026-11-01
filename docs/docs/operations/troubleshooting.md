@@ -37,7 +37,7 @@ Each entry is a symptom you can observe, the cause in the code, a check you can 
 
 | Symptom | Cause | Check | Fix |
 | --- | --- | --- | --- |
-| 400 `idempotency-key-required` | `POST /promises`, `:confirm`, `:cancel` and `/promise-policies` require the `Idempotency-Key` header (only the quote makes it optional) | Request headers | Send a unique key per logical operation |
+| 400 `idempotency-key-required` | `POST /promises`, `/confirmations`, `/cancellations` and `/promise-policies` require the `Idempotency-Key` header (only the quote makes it optional) | Request headers | Send a unique key per logical operation |
 | 422 `idempotency-key-reused` | Same key and route with a different body. **Also after a failed first try:** a 4xx outcome is stored under the key, so correcting the body and re-sending with the same key gives this error (seen on the quickstart run: a 422 `validation-failed` for missing `lines`, then 422 `idempotency-key-reused` on the fixed body) | Compare bodies; response lacks `Idempotency-Replayed` | Use a new key after changing the body. A 5xx or panic stores nothing, so the same key may retry. Keys are purged after 24 h |
 | 422 `validation-failed: a group needs between 1 and 100 lines` on `POST /promises` | The body must repeat the offer's `lines` as well as `offerId` | `GET /delivery-offers/{id}` for the lines | Send `offerId` and the same `lines` |
 | 409 `offer-not-quotable` | The offer is EXPIRED or CONSUMED (TTL is `offerTtlMinutes`, also capped by the pickup cutoff) | `GET /delivery-offers/{id}` state | Quote again |

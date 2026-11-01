@@ -182,15 +182,15 @@ Contract: [`apis/openapi.yaml`](apis/openapi.yaml). Errors are RFC 9457
 `offer-not-quotable`, `nominal-basis-not-allowed-for-tier`,
 `idempotency-key-reused`, `validation-failed` (422). Every state-changing
 POST takes an `Idempotency-Key`; a repeat with the same key and body replays
-the first response (`POST /promises/{promiseId}:cancel` requires it).
+the first response (`POST /promises/{promiseId}/cancellations` requires it).
 
 | Route | Use case |
 | --- | --- |
-| `POST /delivery-offers:quote` | quote offers per group and tier (optional `Idempotency-Key`) |
+| `POST /delivery-quotes` | quote offers per group and tier (optional `Idempotency-Key`) |
 | `GET /delivery-offers/{offerId}` | read an offer |
 | `POST /promises` | make a PROVISIONAL promise from an offer, holding capacity |
-| `POST /promises/{promiseId}:confirm` | confirm it for an order group (called inside checkout) |
-| `POST /promises/{promiseId}:cancel` | cancel a confirmed promise and release its capacity (checkout compensation; no body, `Idempotency-Key` required) |
+| `POST /promises/{promiseId}/confirmations` | confirm it for an order group (called inside checkout) |
+| `POST /promises/{promiseId}/cancellations` | cancel a confirmed promise and release its capacity (checkout compensation; no body, `Idempotency-Key` required) |
 | `GET /promises/{promiseId}`, `GET /promises?orderId=` | read promises |
 | `GET /promise-books?nodeId=&date=` | capacity books of a node and day |
 | `POST /promise-policies`, `GET /promise-policies/current` | publish and read the policy |

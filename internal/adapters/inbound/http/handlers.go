@@ -59,7 +59,7 @@ func (s *Server) handleConfirm(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, http.StatusOK, res, err)
 }
 
-// handleCancel serves POST /promises/{promiseId}:cancel. The route has no body.
+// handleCancel serves POST /promises/{promiseId}/cancellations. The route has no body.
 func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 	res, err := s.API.CancelPromise(r.Context(), chi.URLParam(r, "promiseId"))
 	respond(w, r, http.StatusOK, res, err)

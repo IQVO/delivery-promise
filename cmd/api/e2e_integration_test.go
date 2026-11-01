@@ -274,7 +274,8 @@ func quoteWhenProjected(s *service) map[string]any {
 	var offers []any
 	var last response
 	s.eventually(90*time.Second, "a NEXT_DAY offer once the read models are projected", func() bool {
-		last = s.call(http.MethodPost, "/delivery-offers:quote", quoteBody, "")
+		// A fresh key per attempt: a replay would repeat the first, unprojected answer.
+		last = s.call(http.MethodPost, "/delivery-quotes", quoteBody, fmt.Sprintf("quote-%d", time.Now().UnixNano()))
 		if last.status != http.StatusOK {
 			return false
 		}
@@ -310,30 +311,30 @@ func TestRealWiring(t *testing.T) {
 	t.Run("Kafka down", func(t *testing.T) { assertKafkaDown(t, s) })
 }
 
-// assertCancelRoute drives POST /promises/{id}:cancel over REST: a KEPT promise
+// assertCancelRoute drives POST /promises/{id}/cancellations over REST: a KEPT promise
 // is refused (409 illegal-transition), an unknown id is 404, the key is
 // required, and a freshly confirmed promise is cancelled (200 CANCELLED, the
 // confirmed hold given back, one PromiseCancelled row) and a repeat is a 200
 // no-op that appends nothing.
 func assertCancelRoute(t *testing.T, s *service, keptID string) {
 	t.Helper()
-	if r := s.call(http.MethodPost, "/promises/"+keptID+":cancel", "", "cancel-kept"); r.status != http.StatusConflict || !strings.Contains(string(r.body), "illegal-transition") {
+	if r := s.call(http.MethodPost, "/promises/"+keptID+"/cancellations", "", "cancel-kept"); r.status != http.StatusConflict || !strings.Contains(string(r.body), "illegal-transition") {
 		t.Fatalf("cancel of a KEPT promise = %d %s, want 409 illegal-transition", r.status, r.body)
 	}
-	if r := s.call(http.MethodPost, "/promises/prm-nope:cancel", "", "cancel-missing"); r.status != http.StatusNotFound || !strings.Contains(string(r.body), "not-found") {
+	if r := s.call(http.MethodPost, "/promises/prm-nope/cancellations", "", "cancel-missing"); r.status != http.StatusNotFound || !strings.Contains(string(r.body), "not-found") {
 		t.Fatalf("cancel of an unknown promise = %d %s, want 404 not-found", r.status, r.body)
 	}
-	if r := s.call(http.MethodPost, "/promises/"+keptID+":cancel", "", ""); r.status != http.StatusBadRequest {
+	if r := s.call(http.MethodPost, "/promises/"+keptID+"/cancellations", "", ""); r.status != http.StatusBadRequest {
 		t.Fatalf("cancel without Idempotency-Key = %d, want 400", r.status)
 	}
 
 	offer := quoteWhenProjected(s)
 	made := s.write("/promises", `{"offerId":"`+str(offer, "offerId")+`","lines":[{"catalogItemId":"ci-1001","quantity":2}]}`, http.StatusCreated)
 	id := str(made, "promiseId")
-	s.write("/promises/"+id+":confirm", `{"orderId":"ord-cancel","groupNo":1}`, http.StatusOK)
+	s.write("/promises/"+id+"/confirmations", `{"orderId":"ord-cancel","groupNo":1}`, http.StatusOK)
 	confirmed := s.count(`SELECT COALESCE(sum((snapshot->>'Confirmed')::int), 0) FROM promise_books`)
 
-	cancelled := decode(t, s.call(http.MethodPost, "/promises/"+id+":cancel", "", "cancel-1").body)
+	cancelled := decode(t, s.call(http.MethodPost, "/promises/"+id+"/cancellations", "", "cancel-1").body)
 	if str(cancelled, "state") != "CANCELLED" || str(cancelled, "promiseId") != id || str(cancelled, "cancelReason") != usecases.CancelReasonRequested {
 		t.Fatalf("cancelled = %v", cancelled)
 	}
@@ -344,11 +345,11 @@ func assertCancelRoute(t *testing.T, s *service, keptID string) {
 	if rows != 1 {
 		t.Fatalf("PromiseCancelled outbox rows = %d, want 1", rows)
 	}
-	again := s.call(http.MethodPost, "/promises/"+id+":cancel", "", "cancel-2")
+	again := s.call(http.MethodPost, "/promises/"+id+"/cancellations", "", "cancel-2")
 	if again.status != http.StatusOK || str(decode(t, again.body), "state") != "CANCELLED" {
 		t.Fatalf("repeat cancel = %d %s, want 200 CANCELLED", again.status, again.body)
 	}
-	replay := s.call(http.MethodPost, "/promises/"+id+":cancel", "", "cancel-1")
+	replay := s.call(http.MethodPost, "/promises/"+id+"/cancellations", "", "cancel-1")
 	if replay.status != http.StatusOK || replay.header.Get("Idempotency-Replayed") != "true" {
 		t.Fatalf("replay of the first key = %d replayed=%q", replay.status, replay.header.Get("Idempotency-Replayed"))
 	}
@@ -374,7 +375,7 @@ func restFlow(t *testing.T, s *service, nw network) string {
 	if str(made, "state") != "PROVISIONAL" || str(made, "offerId") != str(offer, "offerId") {
 		t.Fatalf("promise = %v", made)
 	}
-	confirmed := s.write("/promises/"+promiseID+":confirm", `{"orderId":"ord-1","groupNo":1}`, http.StatusOK)
+	confirmed := s.write("/promises/"+promiseID+"/confirmations", `{"orderId":"ord-1","groupNo":1}`, http.StatusOK)
 	if str(confirmed, "state") != "CONFIRMED" || str(confirmed, "orderId") != "ord-1" {
 		t.Fatalf("confirmed = %v", confirmed)
 	}
@@ -443,17 +444,17 @@ func assertRows(t *testing.T, s *service) {
 func assertReplay(t *testing.T, s *service, promiseID string) {
 	t.Helper()
 	body := `{"orderId":"ord-1","groupNo":1}`
-	first := s.call(http.MethodPost, "/promises/"+promiseID+":confirm", body, "replay-1")
-	second := s.call(http.MethodPost, "/promises/"+promiseID+":confirm", body, "replay-1")
+	first := s.call(http.MethodPost, "/promises/"+promiseID+"/confirmations", body, "replay-1")
+	second := s.call(http.MethodPost, "/promises/"+promiseID+"/confirmations", body, "replay-1")
 	if first.status != second.status || !bytes.Equal(first.body, second.body) || second.header.Get("Idempotency-Replayed") != "true" {
 		t.Fatalf("first %d %s, replay %d %s", first.status, first.body, second.status, second.body)
 	}
 	before := s.count(`SELECT count(*) FROM outbox_events`)
-	if r := s.call(http.MethodPost, "/promises/"+promiseID+":confirm", `{"orderId":"ord-2","groupNo":1}`, "replay-1"); r.status != http.StatusUnprocessableEntity ||
+	if r := s.call(http.MethodPost, "/promises/"+promiseID+"/confirmations", `{"orderId":"ord-2","groupNo":1}`, "replay-1"); r.status != http.StatusConflict ||
 		!strings.Contains(string(r.body), "idempotency-key-reused") {
-		t.Fatalf("conflicting body = %d %s, want 422 idempotency-key-reused", r.status, r.body)
+		t.Fatalf("conflicting body = %d %s, want 409 idempotency-key-reused", r.status, r.body)
 	}
-	if r := s.call(http.MethodPost, "/promises/"+promiseID+":confirm", body, ""); r.status != http.StatusBadRequest {
+	if r := s.call(http.MethodPost, "/promises/"+promiseID+"/confirmations", body, ""); r.status != http.StatusBadRequest {
 		t.Fatalf("no key = %d, want 400", r.status)
 	}
 	if got := s.count(`SELECT count(*) FROM outbox_events`); got != before {

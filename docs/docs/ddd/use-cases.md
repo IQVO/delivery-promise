@@ -15,10 +15,10 @@ All three binaries drive the **same** `Service`: REST (`cmd/api`) exposes the co
 
 | Use case | Trigger | Adapter | Events raised |
 | --- | --- | --- | --- |
-| `QuoteDeliveryOffers` | shopper or checkout | REST `POST /delivery-offers:quote` | `DeliveryOfferQuoted` (analytics) per offer |
+| `QuoteDeliveryOffers` | shopper or checkout | REST `POST /delivery-quotes` | `DeliveryOfferQuoted` (analytics) per offer |
 | `MakePromise` | checkout | REST `POST /promises` | `PromiseMade`, and `PromiseBookExhausted` when the hold fills the book |
-| `ConfirmPromise` | checkout, then `CustomerOrderPlaced` | REST `POST /promises/{promiseId}:confirm`; consumer `OnCustomerOrderPlaced` | `PromiseConfirmed` |
-| `CancelPromise` | checkout compensation, `CustomerOrderCancelled` | REST `POST /promises/{promiseId}:cancel`; consumer `OnCustomerOrderCancelled` | `PromiseCancelled` |
+| `ConfirmPromise` | checkout, then `CustomerOrderPlaced` | REST `POST /promises/{promiseId}/confirmations`; consumer `OnCustomerOrderPlaced` | `PromiseConfirmed` |
+| `CancelPromise` | checkout compensation, `CustomerOrderCancelled` | REST `POST /promises/{promiseId}/cancellations`; consumer `OnCustomerOrderCancelled` | `PromiseCancelled` |
 | `PublishPromisePolicy` | operator | REST `POST /promise-policies` | `PromisePolicyPublished` (analytics) |
 | Flag at risk | six consumed events | consumer | `PromiseAtRisk` |
 | `ReviseAtRisk` (RevisePromise) | right after flagging, and the sweeper | consumer, sweeper | `PromiseRevised` or `PromiseUnkeepable` |
@@ -63,7 +63,7 @@ Source: `lifecycle.go`.
 
 ## CancelPromise
 
-- **REST (`CancelPromise`):** `POST /promises/{promiseId}:cancel`, no body, `Idempotency-Key` required. A `CONFIRMED` or `AT_RISK` promise becomes `CANCELLED` with `cancelReason` `CANCELLED_ON_REQUEST`, its confirmed hold goes back to the book and `PromiseCancelled` is raised, in one transaction. An already `CANCELLED` promise is returned unchanged with no event. Any other state (PROVISIONAL, KEPT, BROKEN, RELEASED) is 409 `illegal-transition` (ADR 0002 A30).
+- **REST (`CancelPromise`):** `POST /promises/{promiseId}/cancellations`, no body, `Idempotency-Key` required. A `CONFIRMED` or `AT_RISK` promise becomes `CANCELLED` with `cancelReason` `CANCELLED_ON_REQUEST`, its confirmed hold goes back to the book and `PromiseCancelled` is raised, in one transaction. An already `CANCELLED` promise is returned unchanged with no event. Any other state (PROVISIONAL, KEPT, BROKEN, RELEASED) is 409 `illegal-transition` (ADR 0002 A30).
 - **Consumer (`CancelPromises`, `OnCustomerOrderCancelled`):** cancels the promises of the named groups of the order, or every group when none is named, with the event's reason (default `ORDER_CANCELLED`); promises already closed are skipped.
 - **Events:** `PromiseCancelled`.
 

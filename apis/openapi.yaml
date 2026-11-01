@@ -5,8 +5,8 @@ info:
   description: 'REST contract of the delivery-promise bounded context (Core, commerce tier) of the retail network,
     derived from retail-network-docs model/model.yaml (contexts[delivery-promise].rest) and the FINAL cross-context
     decisions (contracts-delta E7, E8, E9; gap register G8, G9, G19, G21, G22). The quote route is an Open Host
-    Service for the storefront and an in-organization Customer/Supplier contract for customer-ordering; POST /promises
-    POST /promises/{promiseId}:confirm and POST /promises/{promiseId}:cancel (checkout compensation) are called only
+    Service for the storefront and an in-organization Customer/Supplier contract for customer-ordering; POST /promises,
+    POST /promises/{promiseId}/confirmations and POST /promises/{promiseId}/cancellations (checkout compensation) are called only
     by customer-ordering inside checkout. The promise hot
     path makes no synchronous call to any other context: every input is an event-fed local read model. No authentication,
     consistent with the fleet. No personal data appears in any schema: the destination is a postal prefix, never
@@ -14,8 +14,9 @@ info:
     Shared slugs: not-found (404), illegal-transition (409), concurrent-update (409), validation-failed (422). Model
     slugs (kebab-case of the Err name): offer-not-quotable, promise-capacity-exhausted, book-closed, promise-hold-expired,
     promise-closed, revision-moves-earlier (409); group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier
-    (422). Infrastructure slug: idempotency-key-reused (422). Every state-changing POST takes Idempotency-Key; a
-    repeat with the same key and body replays the first response for 24 hours.'
+    (422). Infrastructure slugs: idempotency-key-required, idempotency-key-invalid (400), idempotency-key-reused (409). Every
+    POST requires Idempotency-Key (fleet REST API guideline); a repeat with the same key, method, path and body
+    replays the first response for 24 hours with the Idempotency-Replayed header.'
   contact:
     name: delivery-promise maintainers
     url: https://github.com/IQVO/delivery-promise
@@ -32,7 +33,7 @@ tags:
   description: 'Versioned promise policy: offer TTL, hold TTL, packages per order, capacity share and per-tier order
     deadlines (aggregate PromisePolicy, G19).'
 paths:
-  /delivery-offers:quote:
+  /delivery-quotes:
     post:
       tags:
       - DeliveryOffers
@@ -43,7 +44,7 @@ paths:
         groups). Returns one QUOTED offer per (group, requested tier) that has a feasible witness path, and an OfferConstraint
         for every (group, tier) that has none. "No offer" is a normal 200 answer. A tier whose order deadline in
         the destination region has passed is reported PAST_ORDER_DEADLINE. Each offer is persisted with a TTL so
-        checkout can honour it. With an Idempotency-Key, a repeat inside the offers'' TTL returns the same offers.
+        checkout can honour it. The Idempotency-Key is required; a repeat inside the offers'' TTL returns the same offers.
         Makes no synchronous call.'
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
@@ -56,10 +57,17 @@ paths:
       responses:
         '200':
           description: Offers for the feasible tiers and constraints for the others.
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/QuoteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/Unprocessable'
   /delivery-offers/{offerId}:
@@ -92,9 +100,10 @@ paths:
         first hold, in ONE transaction (documented exception to one aggregate per transaction, G22). A retry with
         the same Idempotency-Key and body replays the first response (200). Errors: not-found (404); offer-not-quotable,
         promise-capacity-exhausted, book-closed, concurrent-update (409); group-spans-nodes, invalid-promise-terms,
-        nominal-basis-not-allowed-for-tier, idempotency-key-reused, validation-failed (422).'
+        nominal-basis-not-allowed-for-tier, validation-failed (422); idempotency-key-required (400); idempotency-key-reused
+        (409).'
       parameters:
-      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -105,6 +114,8 @@ paths:
         '201':
           description: Promise made (PROVISIONAL) and capacity held.
           headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
             Location:
               description: URL of the new promise.
               schema:
@@ -115,10 +126,15 @@ paths:
                 $ref: '#/components/schemas/Promise'
         '200':
           description: Idempotent replay; the promise made by the first request.
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Promise'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -131,6 +147,7 @@ paths:
       operationId: listPromisesByOrder
       summary: List the promises of one customer order
       description: Returns every promise confirmed for the order, one per shipment group.
+      x-pagination-exempt: view
       parameters:
       - name: orderId
         in: query
@@ -173,6 +190,7 @@ paths:
       operationId: listPromiseBooks
       summary: List the promise books of one node for one date
       description: One book per pickup cutoff of the node whose cutoff falls on the date (node local time).
+      x-pagination-exempt: view
       parameters:
       - name: nodeId
         in: query
@@ -196,7 +214,7 @@ paths:
                 $ref: '#/components/schemas/PromiseBookList'
         '422':
           $ref: '#/components/responses/Unprocessable'
-  /promises/{promiseId}:confirm:
+  /promises/{promiseId}/confirmations:
     post:
       tags:
       - Promises
@@ -208,7 +226,7 @@ paths:
         is a no-op returning 200. A hold past holdExpiresAt is refused with promise-hold-expired (409), and a RELEASED
         or otherwise closed promise with promise-closed (409): checkout then re-quotes and no order is placed.'
       parameters:
-      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      - $ref: '#/components/parameters/IdempotencyKey'
       - $ref: '#/components/parameters/PromiseId'
       requestBody:
         required: true
@@ -219,17 +237,22 @@ paths:
       responses:
         '200':
           description: The CONFIRMED promise (also the replay).
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Promise'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/Unprocessable'
-  /promises/{promiseId}:cancel:
+  /promises/{promiseId}/cancellations:
     post:
       tags:
       - Promises
@@ -243,15 +266,20 @@ paths:
         promise is refused with illegal-transition (409); a provisional hold is never cancelled, it lapses by itself
         (ReleaseExpiredHolds).'
       parameters:
-      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      - $ref: '#/components/parameters/IdempotencyKey'
       - $ref: '#/components/parameters/PromiseId'
       responses:
         '200':
           description: The CANCELLED promise (also the replay and the repeat on an already cancelled promise).
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Promise'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -265,7 +293,7 @@ paths:
       description: Stores the next policy version (strictly increasing) and publishes PromisePolicyPublished on
         the analytics topic. Offers and promises made afterwards record the new policyVersion.
       parameters:
-      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -276,6 +304,8 @@ paths:
         '201':
           description: Policy published.
           headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
             Location:
               description: URL of the current policy.
               schema:
@@ -284,6 +314,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PromisePolicy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
         '422':
@@ -308,18 +340,14 @@ components:
     IdempotencyKey:
       name: Idempotency-Key
       in: header
-      required: false
-      description: Client-chosen key; a repeat with the same key returns the first result.
-      schema:
-        type: string
-        maxLength: 128
-    IdempotencyKeyRequired:
-      name: Idempotency-Key
-      in: header
       required: true
-      description: Client-chosen key; a repeat with the same key and body returns the first result.
+      description: Client-generated key (a UUID per logical submit; a retry reuses it), 1-128 printable ASCII
+        characters. The key is global, not per route. A repeat with the same key, method, path and body replays
+        the first answer with the Idempotency-Replayed header set to "true"; a different request under the same key is a 409
+        idempotency-key-reused.
       schema:
         type: string
+        minLength: 1
         maxLength: 128
     OfferId:
       name: offerId
@@ -344,18 +372,47 @@ components:
             $ref: '#/components/schemas/Problem'
     Conflict:
       description: State, capacity, closed or concurrency conflict (illegal-transition, concurrent-update, offer-not-quotable,
-        promise-capacity-exhausted, book-closed, promise-hold-expired, promise-closed, revision-moves-earlier).
+        promise-capacity-exhausted, book-closed, promise-hold-expired, promise-closed, revision-moves-earlier), or
+        idempotency-key-reused when the Idempotency-Key was already used with a different method, path or body.
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+          examples:
+            idempotency-key-reused:
+              value:
+                type: https://retailnetwork.example/problems/idempotency-key-reused
+                title: Idempotency-Key was already used with a different request
+                status: 409
+                detail: the Idempotency-Key was already used with a different method, path or body
+    BadRequest:
+      description: The Idempotency-Key header is missing (idempotency-key-required) or malformed (idempotency-key-invalid),
+        or the request body is malformed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            idempotency-key-required:
+              value:
+                type: https://retailnetwork.example/problems/idempotency-key-required
+                title: Idempotency-Key header is required
+                status: 400
+                detail: send an Idempotency-Key header with a unique value per logical request
     Unprocessable:
-      description: Validation failure (validation-failed, group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier,
-        idempotency-key-reused).
+      description: Validation failure (validation-failed, group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier).
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+  headers:
+    IdempotencyReplayed:
+      description: Present, with the value "true", only when the response is the stored answer replayed for the same
+        Idempotency-Key, method, path and body. The first execution never carries it.
+      schema:
+        type: string
+        enum:
+        - 'true'
   schemas:
     Problem:
       type: object

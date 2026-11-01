@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -114,18 +113,19 @@ func TestCopyStoredHeaders(t *testing.T) {
 	}
 }
 
-func TestRoutePatternPrefersTheMatchedChiRoute(t *testing.T) {
-	matched := httptest.NewRequest(http.MethodPost, "/promises/prm-1:confirm", nil)
-	rctx := chi.NewRouteContext()
-	rctx.RoutePatterns = []string{"/promises/", "{promiseId}:confirm"}
-	matched = matched.WithContext(context.WithValue(matched.Context(), chi.RouteCtxKey, rctx))
-	if got := routePattern(matched); got != "/promises/{promiseId}:confirm" {
-		t.Fatalf("routePattern = %q, want the chi pattern", got)
-	}
-
-	bare := httptest.NewRequest(http.MethodGet, "/promise-books", nil)
-	if got := routePattern(bare); got != "/promise-books" {
-		t.Fatalf("routePattern outside a router = %q, want the raw path", got)
+func TestValidKeyAcceptsOneTo128PrintableASCIICharacters(t *testing.T) {
+	for key, want := range map[string]bool{
+		"":                       false,
+		"k":                      true,
+		strings.Repeat("a", 128): true,
+		strings.Repeat("a", 129): false,
+		"tab\tkey":               false,
+		"caf\u00e9":              false,
+		"9b2f6c1e-uuid-like-key": true,
+	} {
+		if got := validKey(key); got != want {
+			t.Errorf("validKey(%q) = %v, want %v", key, got, want)
+		}
 	}
 }
 
@@ -159,7 +159,7 @@ func TestStoreOutcomeWritesTheAnswerIntoTheTransaction(t *testing.T) {
 	_, _ = rec.Write([]byte(`{"promiseId":"prm-1"}`))
 
 	tx := &fakeTx{}
-	if err := storeOutcome(context.Background(), tx, "POST /promises", "key-1", rec); err != nil {
+	if err := storeOutcome(context.Background(), tx, "key-1", rec); err != nil {
 		t.Fatal(err)
 	}
 	if len(tx.execSQL) != 1 || !strings.Contains(tx.execSQL[0], "UPDATE idempotency_keys") {
@@ -167,7 +167,7 @@ func TestStoreOutcomeWritesTheAnswerIntoTheTransaction(t *testing.T) {
 	}
 	args := tx.execArgs[0]
 	if args[0] != http.StatusCreated || string(args[1].([]byte)) != `{"promiseId":"prm-1"}` ||
-		args[3] != "POST /promises" || args[4] != "key-1" {
+		args[3] != "key-1" {
 		t.Fatalf("storeOutcome bound %v", args)
 	}
 	var stored http.Header
