@@ -17,7 +17,7 @@ func Recoverer(next http.Handler) http.Handler {
 			if rec == http.ErrAbortHandler { //nolint:errorlint // sentinel compared by identity on purpose
 				panic(rec)
 			}
-			slog.ErrorContext(r.Context(), "handler panicked", "panic", rec, "method", r.Method, "path", r.URL.Path)
+			slog.ErrorContext(r.Context(), "handler panicked", "panic", rec, "method", r.Method, "path", sanitizeLog(r.URL.Path))
 			writeProblem(w, r, internalProblem, "an unexpected error occurred")
 		}()
 		next.ServeHTTP(w, r)
