@@ -8,7 +8,7 @@ description: Add or change a REST endpoint in this service in the hexagonal orde
 Follow this order: domain first, adapter last. A handler written before the
 invariant it relies on validates nothing and gets bypassed.
 
-The worked example is `POST /promises/{promiseId}:confirm`:
+The worked example is `POST /promises/{promiseId}/confirmations`:
 `internal/domain/promise/promise.go` `Confirm` + `internal/domain/book/book.go`
 -> `internal/application/usecases/lifecycle.go` `ConfirmPromise` ->
 `internal/adapters/inbound/http/handlers.go` `handleConfirm`. The read side example
