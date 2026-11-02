@@ -916,7 +916,7 @@ components:
       properties:
         orderId:
           type: string
-          description: The customer order id (1-64 characters, letters, digits and . _ : -, starting with a letter or digit).
+          description: The customer order id (1-64 characters, letters, digits and the symbols dot, underscore, colon and hyphen, starting with a letter or digit).
           minLength: 1
           maxLength: 64
         groupNo:
