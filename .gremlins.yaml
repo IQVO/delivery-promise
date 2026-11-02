@@ -25,18 +25,28 @@ unleash:
     # (internal/report/report.go in gremlins itself), so a threshold must
     # sit strictly BELOW what the repo meets today. One file serves every
     # package, so each value is below the WEAKEST package. Measured on
-    # 2026-10-23 (one run per internal/domain package, 496 mutants):
+    # 2026-11-02, measured by a full `make mutation` run (every
+    # internal/domain package) after the assertion-strengthening pass of that
+    # date. search carries one map-iteration-dependent mutant, so its efficacy
+    # oscillates between 87.88% and 88.89% run to run; the efficacy threshold
+    # sits strictly below the lower reading:
     #
     #   package   killed  lived  not-covered  efficacy  mutator-coverage
-    #   shared       55      1       0         98.21%      100.00%
-    #   calendar     62     14       0         81.58%      100.00%
+    #   shared       70      1       0         98.59%      100.00%
+    #   calendar     73      6       0         92.41%      100.00%
     #   policy       50      3       0         94.34%      100.00%
-    #   offer        26      2       0         92.86%      100.00%
-    #   book         69      7       0         90.79%      100.00%
-    #   promise      94      9       0         91.26%      100.00%
-    #   search       77     22       5         77.78%       95.19%
+    #   offer        27      2       0         93.10%      100.00%
+    #   book         73      3       0         96.05%      100.00%
+    #   promise     102      1       0         99.03%      100.00%
+    #   search     87-88   11-12     5       87.88-88.89%   95.19%
     #
-    # Weakest: search (efficacy 77.78%, mutator coverage 95.19%). Raise the
+    # Weakest: search (efficacy 88.89%, mutator coverage 95.19%). Its five
+    # not-covered mutants sit on constant-folded expressions (9*60, 21*60,
+    # -24*time.Hour) that carry no runtime instruction, so its mutator
+    # coverage cannot reach 100% by testing; the eleven lived mutants left in
+    # search (and the few in the other packages) are equivalent or
+    # message-only mutants (slice bounds that stay safe, Dijkstra equal-key
+    # order, dead conditions, truncation-neutral arithmetic). Raise the
     # numbers when tests kill more mutants; never lower them.
-    efficacy: "75"
-    mutant-coverage: "90"
+    efficacy: "87"
+    mutant-coverage: "94"
