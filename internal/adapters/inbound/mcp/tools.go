@@ -108,6 +108,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"quotedAt/expiresAt. Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
 			"fails with not-found.",
 		Annotations: readOnly,
+		Meta:        authorityMeta(authorityL1),
 	}, d.getDeliveryOffer)
 
 	addTool(server, &mcp.Tool{
@@ -118,6 +119,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"lateByMinutes). A promise is never deleted; terminal states stay readable. Read-only; an unknown promise " +
 			"fails with not-found.",
 		Annotations: readOnly,
+		Meta:        authorityMeta(authorityL1),
 	}, d.getPromise)
 
 	addTool(server, &mcp.Tool{
@@ -127,6 +129,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"belong to an order, so this is the checkout view of what was promised. Read-only; a malformed order id " +
 			"fails with validation-failed.",
 		Annotations: readOnly,
+		Meta:        authorityMeta(authorityL1),
 	}, d.listPromisesByOrder)
 
 	addTool(server, &mcp.Tool{
@@ -136,6 +139,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"nodeId:pickupDepartureId), its OPEN or CLOSED state and its capacity (share, provisional and confirmed " +
 			"holds). Read-only; a malformed node id or date fails with validation-failed.",
 		Annotations: readOnly,
+		Meta:        authorityMeta(authorityL1),
 	}, d.listPromiseBooks)
 
 	addTool(server, &mcp.Tool{
@@ -145,6 +149,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"order deadlines (localTime in the destination region's time zone). Publishing a policy is a REST " +
 			"operation. Read-only; takes no arguments.",
 		Annotations: readOnly,
+		Meta:        authorityMeta(authorityL1),
 	}, d.getCurrentPolicy)
 }
 
