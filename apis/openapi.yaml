@@ -14,7 +14,7 @@ info:
     Shared slugs: not-found (404), illegal-transition (409), concurrent-update (409), validation-failed (422). Model
     slugs (kebab-case of the Err name): offer-not-quotable, promise-capacity-exhausted, book-closed, promise-hold-expired,
     promise-closed, revision-moves-earlier (409); group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier
-    (422). Infrastructure slugs: idempotency-key-required, idempotency-key-invalid (400), idempotency-key-reused (409). Every
+    (422). Infrastructure slugs: malformed-request, idempotency-key-required, idempotency-key-invalid (400), idempotency-key-reused (409), resource-not-found (404), internal-error (500). Every
     POST requires Idempotency-Key (fleet REST API guideline); a repeat with the same key, method, path and body
     replays the first response for 24 hours with the Idempotency-Replayed header.'
   contact:
@@ -70,6 +70,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /delivery-offers/{offerId}:
     get:
       tags:
@@ -87,6 +89,8 @@ paths:
                 $ref: '#/components/schemas/DeliveryOffer'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
       description: Returns the offer in any state (QUOTED, EXPIRED or CONSUMED) with its witness path, basis and
         policy version. Offers are kept for a retention period after they expire.
   /promises:
@@ -116,10 +120,6 @@ paths:
           headers:
             Idempotency-Replayed:
               $ref: '#/components/headers/IdempotencyReplayed'
-            Location:
-              description: URL of the new promise.
-              schema:
-                type: string
           content:
             application/json:
               schema:
@@ -141,6 +141,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
     get:
       tags:
       - Promises
@@ -167,6 +169,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '422':
           $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /promises/{promiseId}:
     get:
       tags:
@@ -184,6 +188,8 @@ paths:
                 $ref: '#/components/schemas/Promise'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
       description: Returns the promise with its terms, witness path, revisions and judgement. A promise is never
         deleted; terminal states stay readable.
   /promise-books:
@@ -220,6 +226,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '422':
           $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /promises/{promiseId}/confirmations:
     post:
       tags:
@@ -258,6 +266,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /promises/{promiseId}/cancellations:
     post:
       tags:
@@ -290,6 +300,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /promise-policies:
     post:
       tags:
@@ -312,10 +324,6 @@ paths:
           headers:
             Idempotency-Replayed:
               $ref: '#/components/headers/IdempotencyReplayed'
-            Location:
-              description: URL of the current policy.
-              schema:
-                type: string
           content:
             application/json:
               schema:
@@ -326,6 +334,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /promise-policies/current:
     get:
       tags:
@@ -341,6 +351,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PromisePolicy'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   parameters:
     IdempotencyKey:
@@ -389,7 +401,7 @@ components:
         type: string
   responses:
     NotFound:
-      description: 'Not found (not-found): the offer, promise or policy does not exist.'
+      description: 'Not found (not-found): the offer or promise does not exist; an identifier carrying a NUL character is resource-not-found.'
       content:
         application/problem+json:
           schema:
@@ -409,9 +421,11 @@ components:
                 title: Idempotency-Key was already used with a different request
                 status: 409
                 detail: the Idempotency-Key was already used with a different method, path or body
+                instance: /promises
     BadRequest:
       description: The Idempotency-Key header is missing (idempotency-key-required) or malformed (idempotency-key-invalid),
-        the request body is malformed, or a collection GET sent an undeclared query parameter (unknown-query-parameter),
+        the request body is malformed (malformed-request, for bad JSON, an unknown field, trailing data, an empty body, a body over
+        64 KiB or a NUL character in the query or body), or a collection GET sent an undeclared query parameter (unknown-query-parameter),
         a bad limit (invalid-limit) or an undecodable cursor (invalid-cursor).
       content:
         application/problem+json:
@@ -424,6 +438,14 @@ components:
                 title: Idempotency-Key header is required
                 status: 400
                 detail: send an Idempotency-Key header with a unique value per logical request
+                instance: /promises
+    InternalError:
+      description: Unexpected failure (internal-error); the detail never leaks the internal message. A 5xx is never
+        stored for an Idempotency-Key, so the same key can retry.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
     Unprocessable:
       description: Validation failure (validation-failed, group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier).
       content:
@@ -446,6 +468,8 @@ components:
       - type
       - title
       - status
+      - detail
+      - instance
       properties:
         type:
           type: string
@@ -463,6 +487,7 @@ components:
           example: Book AUS3:dep-pickup-0418 has no room left (share 2500).
         instance:
           type: string
+          description: The escaped request path.
     Tier:
       type: string
       description: Service tier (promise.Tier).
@@ -495,9 +520,14 @@ components:
       properties:
         catalogItemId:
           type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]*$
+          description: Unique within the group.
         quantity:
           type: integer
           minimum: 1
+          maximum: 2147483647
     DeliveryWindow:
       type: object
       description: 'The delivery window as two instants (RFC 3339 UTC) and the local calendar they belong to. A delivery
@@ -547,11 +577,15 @@ components:
       properties:
         destinationPostalPrefix:
           type: string
+          minLength: 1
+          maxLength: 10
+          pattern: ^[A-Za-z0-9]+$
           description: Destination postal prefix (never a full address).
           example: '787'
         lines:
           type: array
           minItems: 1
+          maxItems: 100
           description: One line on a product page, the cart's lines at checkout.
           items:
             $ref: '#/components/schemas/GroupLine'
@@ -654,6 +688,7 @@ components:
         lines:
           type: array
           minItems: 1
+          maxItems: 100
           description: The shipment group's lines; all shippable from the offer's witness node. They must equal
             the offer's lines.
           items:
@@ -881,19 +916,18 @@ components:
       properties:
         orderId:
           type: string
-          description: The customer order id.
+          description: The customer order id (1-64 characters, letters, digits and . _ : -, starting with a letter or digit).
+          minLength: 1
+          maxLength: 64
         groupNo:
           type: integer
           minimum: 1
+          maximum: 100
           description: The shipment group number within the order.
     PublishPolicyRequest:
       type: object
-      required:
-      - offerTtlMinutes
-      - holdTtlMinutes
-      - packagesPerOrder
-      - capacitySharePercent
-      - orderDeadlines
+      description: Every field is optional; an omitted (or 0) numeric field takes the built-in default policy value
+        (v0). A value outside the range below is 422 validation-failed.
       properties:
         offerTtlMinutes:
           type: integer
@@ -909,15 +943,17 @@ components:
           type: integer
           minimum: 1
           maximum: 100
-          description: Declared packages per order; converts orders to departure packages (G9). Default 1.
+          description: Declared packages per order; converts orders to departure packages (G9). Default 1 when omitted or 0.
         capacitySharePercent:
           type: integer
           minimum: 1
           maximum: 100
           description: Proportional share of the node cutoff capacity the promise side may use (G9 "D4"). Default
-            100.
+            100 when omitted or 0.
         orderDeadlines:
           type: array
+          maxItems: 200
+          description: At most one deadline per (tier, regionId); a duplicate is 422 validation-failed.
           items:
             $ref: '#/components/schemas/OrderDeadline'
     OrderDeadline:
