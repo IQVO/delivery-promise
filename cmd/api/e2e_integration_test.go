@@ -382,6 +382,9 @@ func restFlow(t *testing.T, s *service, nw network) string {
 	if r := s.get("/promises?orderId=ord-1"); r.status != http.StatusOK || !strings.Contains(string(r.body), promiseID) {
 		t.Fatalf("GET promises by order = %d %s", r.status, r.body)
 	}
+	if r := s.get("/promises?orderId=ord-1&offset=1"); r.status != http.StatusBadRequest || !strings.Contains(string(r.body), "unknown-query-parameter") {
+		t.Fatalf("GET promises with a retired paging parameter = %d %s", r.status, r.body)
+	}
 	day := nw.pickup.Format("2006-01-02")
 	if r := s.get("/promise-books?nodeId=N-FC&date=" + day); r.status != http.StatusOK || !strings.Contains(string(r.body), `"confirmed":1`) {
 		t.Fatalf("GET books = %d %s", r.status, r.body)
@@ -411,13 +414,21 @@ func deliver(t *testing.T, s *service, promiseID string) {
 func assertRows(t *testing.T, s *service) {
 	t.Helper()
 	want := map[string]int{
-		"delivery_offers": 1, "promises": 1, "promise_books": 1, "idempotency_keys": 2,
+		"delivery_offers": 1, "promises": 1, "promise_books": 1,
 		"rm_nodes": 3, "rm_lanes": 2, "rm_departures": 2, "rm_waves": 1, "rm_assignments": 1, "rm_shipments": 1, "rm_outcomes": 2,
 	}
 	for table, n := range want {
 		if got := s.count(`SELECT count(*) FROM ` + table); got != n {
 			t.Errorf("%s holds %d rows, want %d", table, got, n)
 		}
+	}
+	// POST /delivery-quotes is keyed too: every quote poll (a fresh quote-<nanos>
+	// key) stores its own row, so the polls are counted apart from make + confirm.
+	if got := s.count(`SELECT count(*) FROM idempotency_keys WHERE key NOT LIKE 'quote-%'`); got != 2 {
+		t.Errorf("idempotency_keys holds %d non-quote rows, want 2 (make + confirm)", got)
+	}
+	if got := s.count(`SELECT count(*) FROM idempotency_keys WHERE key LIKE 'quote-%' AND route = 'POST /delivery-quotes'`); got < 1 {
+		t.Errorf("idempotency_keys holds %d quote rows, want at least 1", got)
 	}
 	// 3 + 3 + 3 + 1 node/region events, 2 lanes, 1 area, 3 availability, 2 departures, 1 wave, locked, shipped, 2 delivered
 	if got := s.count(`SELECT count(*) FROM processed_events`); got != 22 {

@@ -1,9 +1,15 @@
 package http
 
 import (
+	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+
+	"github.com/claudioed/delivery-promise/internal/adapters/inbound/http/page"
+	"github.com/claudioed/delivery-promise/internal/application/views"
 )
 
 func (s *Server) handleQuote(w http.ResponseWriter, r *http.Request) {
@@ -40,8 +46,21 @@ func (s *Server) handleMakePromise(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListPromises(w http.ResponseWriter, r *http.Request) {
+	limit, after, err := pageParams(r, "orderId")
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
 	res, err := s.API.ListPromisesByOrder(r.Context(), r.URL.Query().Get("orderId"))
-	respond(w, r, http.StatusOK, res, err)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	// One order has a handful of promises (one per shipment group): the use case reads them
+	// all, ordered by groupNo, and the keyset (groupNo, promiseId) slices the page.
+	writeJSON(w, http.StatusOK, paginate(res.Items, limit, after, func(p views.Promise) page.Position {
+		return page.Position{Sort: fmt.Sprintf("%010d", p.GroupNo), ID: p.PromiseID}
+	}))
 }
 
 func (s *Server) handleGetPromise(w http.ResponseWriter, r *http.Request) {
@@ -66,9 +85,21 @@ func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListBooks(w http.ResponseWriter, r *http.Request) {
+	limit, after, err := pageParams(r, "nodeId", "date")
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
 	q := r.URL.Query()
 	res, err := s.API.ListPromiseBooks(r.Context(), q.Get("nodeId"), q.Get("date"))
-	respond(w, r, http.StatusOK, res, err)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	// One node-day has a few books (one per pickup cutoff): keyset (cutoffAt, bookId).
+	writeJSON(w, http.StatusOK, paginate(res.Items, limit, after, func(b views.Book) page.Position {
+		return page.Position{Sort: b.CutoffAt.UTC().Format("2006-01-02T15:04:05.000000000Z"), ID: b.BookID}
+	}))
 }
 
 func (s *Server) handlePublishPolicy(w http.ResponseWriter, r *http.Request) {
@@ -98,4 +129,44 @@ func respond(w http.ResponseWriter, r *http.Request, status int, v any, err erro
 		return
 	}
 	writeJSON(w, status, v)
+}
+
+// pageParams validates the query of a collection GET: only the declared filters plus limit
+// and cursor are accepted, limit is 1-500 and the cursor decodes.
+func pageParams(r *http.Request, filters ...string) (int, *page.Position, error) {
+	if name := page.Unknown(r, filters...); name != "" {
+		return 0, nil, fmt.Errorf("%w: %q", errUnknownQuery, name)
+	}
+	limit, err := page.Limit(r)
+	if err != nil {
+		return 0, nil, err
+	}
+	after, err := page.After(r)
+	if err != nil {
+		return 0, nil, err
+	}
+	return limit, after, nil
+}
+
+// paginate orders rows by their keyset (sort key, id), drops everything up to and including
+// the cursor position and returns one page. The rows are already bounded by the mandatory
+// parent filter of the collection, so the keyset is applied over that bounded set.
+func paginate[T any](rows []T, limit int, after *page.Position, at func(T) page.Position) page.Page[T] {
+	sorted := append([]T(nil), rows...)
+	sort.SliceStable(sorted, func(i, j int) bool { return before(at(sorted[i]), at(sorted[j])) })
+	if after != nil {
+		i := sort.Search(len(sorted), func(i int) bool { return before(*after, at(sorted[i])) })
+		sorted = sorted[i:]
+	}
+	if len(sorted) > page.FetchSize(limit) {
+		sorted = sorted[:page.FetchSize(limit)]
+	}
+	return page.Of(sorted, limit, at)
+}
+
+func before(a, b page.Position) bool {
+	if c := strings.Compare(a.Sort, b.Sort); c != 0 {
+		return c < 0
+	}
+	return a.ID < b.ID
 }

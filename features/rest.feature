@@ -113,6 +113,19 @@ Feature: The REST adapter answers the contract of apis/openapi.yaml
     And the response field "items.0.groupNo" is 1
     And the response field "items.1.groupNo" is 2
     And the response field "items.0.orderId" is "ord-9"
+    When a GET request is sent to "/promises?orderId=ord-9&limit=1"
+    Then the response status is 200
+    And the response list "items" has 1 item
+    And the response field "items.0.groupNo" is 1
+    When a GET request is sent to "/promises?orderId=ord-9&after=x"
+    Then the response status is 400
+    And the response problem is "unknown-query-parameter"
+    When a GET request is sent to "/promises?orderId=ord-9&limit=0"
+    Then the response status is 400
+    And the response problem is "invalid-limit"
+    When a GET request is sent to "/promises?orderId=ord-9&cursor=%21%21"
+    Then the response status is 400
+    And the response problem is "invalid-cursor"
     When a GET request is sent to "/promises?orderId="
     Then the response status is 422
     And the response problem is "validation-failed"

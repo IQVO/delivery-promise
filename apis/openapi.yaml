@@ -147,8 +147,9 @@ paths:
       operationId: listPromisesByOrder
       summary: List the promises of one customer order
       description: Returns every promise confirmed for the order, one per shipment group.
-      x-pagination-exempt: view
       parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
       - name: orderId
         in: query
         required: true
@@ -157,11 +158,13 @@ paths:
           type: string
       responses:
         '200':
-          description: The order's promises, ordered by groupNo.
+          description: One page of the order's promises, ordered by groupNo.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PromiseList'
+                $ref: '#/components/schemas/PromisePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '422':
           $ref: '#/components/responses/Unprocessable'
   /promises/{promiseId}:
@@ -190,8 +193,9 @@ paths:
       operationId: listPromiseBooks
       summary: List the promise books of one node for one date
       description: One book per pickup cutoff of the node whose cutoff falls on the date (node local time).
-      x-pagination-exempt: view
       parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
       - name: nodeId
         in: query
         required: true
@@ -207,11 +211,13 @@ paths:
           format: date
       responses:
         '200':
-          description: The node's books for that date, ordered by cutoffAt.
+          description: One page of the node's books for that date, ordered by cutoffAt.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PromiseBookList'
+                $ref: '#/components/schemas/PromiseBookPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '422':
           $ref: '#/components/responses/Unprocessable'
   /promises/{promiseId}/confirmations:
@@ -349,6 +355,24 @@ components:
         type: string
         minLength: 1
         maxLength: 128
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size, 1-500 (default 100). Anything else is 400 invalid-limit.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor from the previous page's nextCursor; filters are repeated on every page request.
+        An undecodable cursor is 400 invalid-cursor, any undeclared query parameter 400 unknown-query-parameter.
+      schema:
+        type: string
     OfferId:
       name: offerId
       in: path
@@ -387,7 +411,8 @@ components:
                 detail: the Idempotency-Key was already used with a different method, path or body
     BadRequest:
       description: The Idempotency-Key header is missing (idempotency-key-required) or malformed (idempotency-key-invalid),
-        or the request body is malformed.
+        the request body is malformed, or a collection GET sent an undeclared query parameter (unknown-query-parameter),
+        a bad limit (invalid-limit) or an undecodable cursor (invalid-cursor).
       content:
         application/problem+json:
           schema:
@@ -775,7 +800,7 @@ components:
         atRiskReason:
           type: string
           description: Present while AT_RISK.
-    PromiseList:
+    PromisePage:
       type: object
       required:
       - items
@@ -784,6 +809,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Promise'
+        nextCursor:
+          type: string
+          description: Opaque cursor of the next page; absent on the last page.
     Capacity:
       type: object
       required:
@@ -833,7 +861,7 @@ components:
         version:
           type: integer
           minimum: 1
-    PromiseBookList:
+    PromiseBookPage:
       type: object
       required:
       - items
@@ -842,6 +870,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PromiseBook'
+        nextCursor:
+          type: string
+          description: Opaque cursor of the next page; absent on the last page.
     ConfirmPromiseRequest:
       type: object
       required:

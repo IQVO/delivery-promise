@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/claudioed/delivery-promise/internal/adapters/inbound/http/page"
 	"github.com/claudioed/delivery-promise/internal/application/ports"
 	"github.com/claudioed/delivery-promise/internal/domain/book"
 	"github.com/claudioed/delivery-promise/internal/domain/offer"
@@ -30,6 +31,9 @@ type problem struct {
 
 var internalProblem = problem{http.StatusInternalServerError, "internal-error", "Internal server error"}
 
+// errUnknownQuery marks a collection GET that sent a query parameter it does not declare.
+var errUnknownQuery = errors.New("unknown query parameter")
+
 // Problems the middleware writes itself, before any use case runs.
 var (
 	idempotencyKeyRequired = problem{http.StatusBadRequest, "idempotency-key-required", "Idempotency-Key header is required"}
@@ -44,6 +48,9 @@ var problemCatalogue = []struct {
 	p   problem
 }{
 	{errMalformedRequest, problem{http.StatusBadRequest, "malformed-request", "Malformed request"}},
+	{errUnknownQuery, problem{http.StatusBadRequest, "unknown-query-parameter", "Unknown query parameter"}},
+	{page.ErrInvalidLimit, problem{http.StatusBadRequest, "invalid-limit", "Invalid limit"}},
+	{page.ErrInvalidCursor, problem{http.StatusBadRequest, "invalid-cursor", "Invalid cursor"}},
 	{ports.ErrNotFound, problem{http.StatusNotFound, "not-found", "Not found"}},
 	{book.ErrPromiseCapacityExhausted, problem{http.StatusConflict, "promise-capacity-exhausted", "Promise capacity exhausted"}},
 	{book.ErrBookClosed, problem{http.StatusConflict, "book-closed", "Promise book closed"}},
