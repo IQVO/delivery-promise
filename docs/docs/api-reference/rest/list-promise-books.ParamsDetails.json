@@ -1,0 +1,1 @@
+{"parameters":[{"name":"nodeId","in":"query","required":true,"description":"The fulfillment node id.","schema":{"type":"string"}},{"name":"date","in":"query","required":true,"description":"The cutoff date, YYYY-MM-DD, in the node's time zone.","schema":{"type":"string","format":"date"}}]}

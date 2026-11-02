@@ -22,25 +22,27 @@ This project is a domain-driven design study. It is not associated with, endorse
 
 ## Documentation
 
-The context is documented on the fleet-wide warehouse-docs site, in the
-retail-network section: **<https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise>**
-(the model under `network/model/model.yaml` in IQVO/warehouse-docs is the
-single source of truth). Fleet-wide network pages:
+The service has its own documentation site: **<https://iqvo.github.io/delivery-promise/>**
+(built from `docs/`, source of the pages is the code on `develop`). The
+retail-network model it implements is also on the fleet-wide warehouse-docs
+site, under
+[`network/contexts/delivery-promise`](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise)
+(model: `network/model/model.yaml` in IQVO/warehouse-docs). Fleet-wide network
+pages:
 [strategic design](https://iqvo.github.io/warehouse-docs/network/strategic-design/subdomain-classification),
 [the CloudEvents event standard](https://iqvo.github.io/warehouse-docs/network/strategic-design/event-standard-cloudevents),
 the [promise model](https://iqvo.github.io/warehouse-docs/network/network-model/promise-model),
 and the [WMS/WES integration seam](https://iqvo.github.io/warehouse-docs/network/integration/wms-wes-integration).
-This repository's own references: [`docs/runtime.md`](docs/runtime.md)
-(configuration, probes, shutdown) and the packaging checklist
-[`docs/before-first-release.md`](docs/before-first-release.md).
-
-Page map (on the warehouse-docs site, under `network/contexts/delivery-promise/`):
 
 | Area | Pages |
-|---|---|
-| Business context | [Business context](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/business-context), [Use cases](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/use-cases) |
-| Language & model | [Ubiquitous language](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/ubiquitous-language), [Domain events](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/domain-events), [Domain message flow](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/domain-message-flow), [Class diagram](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/class-diagram), [Sequence diagrams](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/sequence-diagrams), [Entity-relationship](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/entity-relationship) |
-| DDD canvases | [Core domain chart](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/core-domain-chart), [Bounded context canvas](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/bounded-context-canvas), [Aggregate design canvas](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/aggregate-design-canvas), [EventStorming](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/eventstorming), [Context map](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise/context-map) |
+| --- | --- |
+| Overview | [Introduction](https://iqvo.github.io/delivery-promise/docs/overview/introduction), [Architecture](https://iqvo.github.io/delivery-promise/docs/overview/architecture), [Runtime](https://iqvo.github.io/delivery-promise/docs/overview/runtime), [Quickstart](https://iqvo.github.io/delivery-promise/docs/overview/quickstart) |
+| Operations | [Configuration](https://iqvo.github.io/delivery-promise/docs/operations/configuration), [Runbook](https://iqvo.github.io/delivery-promise/docs/operations/runbook), [Observability](https://iqvo.github.io/delivery-promise/docs/operations/observability), [Troubleshooting](https://iqvo.github.io/delivery-promise/docs/operations/troubleshooting), [Before the first release](https://iqvo.github.io/delivery-promise/docs/operations/before-first-release) |
+| Development | [Testing](https://iqvo.github.io/delivery-promise/docs/development/testing) |
+| Domain-driven design | [Ubiquitous language](https://iqvo.github.io/delivery-promise/docs/ddd/ubiquitous-language), [Use cases](https://iqvo.github.io/delivery-promise/docs/ddd/use-cases), [Subdomain classification](https://iqvo.github.io/delivery-promise/docs/ddd/subdomain-classification), [DDD artifacts](https://iqvo.github.io/delivery-promise/docs/ddd/ddd-artifacts): [core domain chart](https://iqvo.github.io/delivery-promise/docs/ddd/core-domain-chart), [bounded context canvas](https://iqvo.github.io/delivery-promise/docs/ddd/bounded-context-canvas), [context map](https://iqvo.github.io/delivery-promise/docs/ddd/context-map), [aggregate design canvas](https://iqvo.github.io/delivery-promise/docs/ddd/aggregate-design-canvas), [domain message flow](https://iqvo.github.io/delivery-promise/docs/ddd/domain-message-flow), [EventStorming](https://iqvo.github.io/delivery-promise/docs/ddd/eventstorming), [class diagram](https://iqvo.github.io/delivery-promise/docs/ddd/class-diagram), [entity relationship](https://iqvo.github.io/delivery-promise/docs/ddd/entity-relationship), [sequence diagrams](https://iqvo.github.io/delivery-promise/docs/ddd/sequence-diagrams), [domain events](https://iqvo.github.io/delivery-promise/docs/ddd/domain-events) |
+| API reference | [Overview](https://iqvo.github.io/delivery-promise/docs/api-reference), [Events](https://iqvo.github.io/delivery-promise/docs/api-reference/events), REST pages generated from `apis/openapi.yaml` |
+| Ecosystem | [Integration](https://iqvo.github.io/delivery-promise/docs/ecosystem/integration), [MCP tools](https://iqvo.github.io/delivery-promise/docs/mcp/tools) |
+| Decisions | [ADR index](https://iqvo.github.io/delivery-promise/docs/adr) |
 
 ## What it does
 
@@ -228,7 +230,7 @@ DATABASE_URL=postgres://... A2A_AGENT_URL=http://localhost:8093/ go run ./cmd/a2
 
 ## Helm chart
 
-The Helm chart is [`charts/delivery-promise`](charts/delivery-promise) (the `api` component only: Deployment, Service, ConfigMap, Secret or `database.existingSecret`, ServiceAccount, and an optional HPA, Ingress and Gateway API HTTPRoute, all off by default). It renders exactly the variables `cmd/api` reads and refuses to render without `database.url` or `database.existingSecret`, `kafka.brokers` and `config.consumerGroup`, with a `*_MODE` or a non-`kafka` `EVENT_PUBLISHER` in `extraEnv`, or with a `terminationGracePeriodSeconds` that does not exceed the shutdown bounds. See [`docs/runtime.md`](docs/runtime.md#deployment-helm-chart).
+The Helm chart is [`charts/delivery-promise`](charts/delivery-promise) (the `api` component only: Deployment, Service, ConfigMap, Secret or `database.existingSecret`, ServiceAccount, and an optional HPA, Ingress and Gateway API HTTPRoute, all off by default). It renders exactly the variables `cmd/api` reads and refuses to render without `database.url` or `database.existingSecret`, `kafka.brokers` and `config.consumerGroup`, with a `*_MODE` or a non-`kafka` `EVENT_PUBLISHER` in `extraEnv`, or with a `terminationGracePeriodSeconds` that does not exceed the shutdown bounds. See [`docs/docs/overview/runtime.md`](docs/docs/overview/runtime.md#deployment-helm-chart).
 
 ```
 helm template delivery-promise charts/delivery-promise \

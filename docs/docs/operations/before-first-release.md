@@ -1,3 +1,10 @@
+---
+id: before-first-release
+title: Before the first release
+sidebar_label: Before the first release
+description: "The packaging checklist of Delivery Promise (runtime, Dockerfile, Helm chart, CI jobs, secrets) with the status of each row."
+---
+
 # Before the first release: delivery-promise
 
 The first merge to `main` runs `docker-publish` and `release`. Two services built from
@@ -17,14 +24,14 @@ the fleet reference). The chart is NOT generated: it is shaped by what the servi
 |---|------|-----------|------------|
 | 1 | **Real runtime only.** `cmd/api` wires Postgres and Kafka; the in-memory adapters (`internal/adapters/outbound/memory`) are test doubles. No `*_MODE`/permissive fallback, no default that boots "healthy" without `DATABASE_URL` or `KAFKA_BROKERS`. | `cmd/**` has no import of the memory package; the binary exits at boot on missing `DATABASE_URL`, `KAFKA_BROKERS` or a consumer group id. | `TestRuntimeBinaryHasNoInMemoryAdapters` (`internal/architecture/runtime_no_memory_fitness_test.go`). The boot-error behaviour has no generic sensor: cover it in `cmd/api` tests and in the chart test (row 8). |
 | 2 | **No Go file at the repo root.** The godog runner and steps live in `features/` (`package features_test`, `Paths: "."`), binaries in `cmd/<name>/`, everything else in `internal/`. | `ls *.go` at the root prints nothing; `make bdd` still finds `TestFeatures`. | `TestNoGoFilesAtRepoRoot` (`internal/architecture/no_go_files_at_root_fitness_test.go`). |
-| 3 | **`Dockerfile` builds every `cmd/*`.** Generated; confirm `ENTRYPOINT ["./api"]` matches your main binary and `EXPOSE` matches `HTTP_ADDR`. | `docker build .` succeeds locally; `docker run --rm <image> /app/api` starts (or exits with the intended config error). | `trivy-scan` job builds the image on every PR to `main`/`develop`; `docker-publish` on push to `main`. |
+| 3 | **Dockerfile builds every `cmd/*`.** Generated; it builds `api`, `mcp` and `a2a` into one image, `ENTRYPOINT ["./api"]` and `EXPOSE 8080 8090 8093` (the chart overrides the command for the `mcp` and `a2a` Deployments). | `docker build .` succeeds locally; `docker run --rm <image> /app/api` starts (or exits with the intended config error). | `docker-publish` builds the image on push to `main`; there is no separate `trivy-scan` job in `ci.yml`. |
 | 4 | **`.dockerignore`** excludes docs, charts, harness, tests output. Generated. | Build context is small; `.git`, `.claude/`, `docs/`, `charts/` are not sent. | none: review once. |
 | 5 | ✅ **Helm chart `charts/delivery-promise/`** with `Chart.yaml` `name: delivery-promise`. The chart directory name, the `Chart.yaml` name and the `helm package` file name in the `release` job must all be `delivery-promise`. | `helm lint charts/delivery-promise` and `helm template` with the required values both pass. | `helm-lint` (PRs) and the `release` job (packages `delivery-promise-<version>.tgz`). |
 | 6 | ✅ **`DATABASE_URL` comes from a Secret** (`secretKeyRef`, chart `secret.yaml` or `database.existingSecret`), never from the ConfigMap or a literal. | `helm template` shows `secretKeyRef` for `DATABASE_URL`; the ConfigMap has no DSN. | chart test (row 8). |
 | 7 | ✅ **Pod hardening and shutdown room.** `runAsNonRoot`, `readOnlyRootFilesystem: true`, `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`; `terminationGracePeriodSeconds` greater than the sum of the binary's shutdown bounds (drain delay + HTTP + consumers + relay). | Values and Deployment carry all of it; the chart refuses a grace period below the sum. | chart test (row 8). |
 | 8 | ✅ **Chart tests in `charts/delivery-promise/tests/`** (`render_test.sh`, `test_service_selectors.py`): envFrom ConfigMap mounted, mandatory values refuse to render, every env var `cmd/api` reads is rendered, no `*_MODE`, Secret for the DSN, hardening, grace period, every Service selects exactly one Deployment. Copy and adapt the reference tests. | `bash charts/delivery-promise/tests/render_test.sh` prints `PASS`. | `chart-tests` job runs every `tests/*.sh` and `test_*.py`. **It only warns when the directory is empty**, so an absent test passes CI: the checklist is the guard. |
 | 9 | ✅ **Consumer group ids are chart values**, stable and service-prefixed, never derived from the pod name. | Each `*_CONSUMER_GROUP` is rendered from `config.*` and refuses to render empty. | chart test (row 8); `kafka-testing-and-consumers.md` rule. |
-| 10 | **Optional CI jobs match the service.** `web` (needs `web/`), `docs-api-drift` (needs `docs/` and `apis/openapi.yaml`), `api-lint` (needs `apis/*.yaml` and the spectral rulesets): delete a job and its `docker-publish` `needs:` entry if the service has no such part, or add the part. | No job in `ci.yml` is permanently red or skipped for a missing directory. | first PR's CI run. |
+| 10 | **Optional CI jobs match the service.** `web` (needs `web/`), `docs-api-drift` (needs `docs/` and `apis/openapi.yaml`), `api-lint` (needs `apis/*.yaml` and the spectral rulesets): delete a job and its `docker-publish` `needs:` entry if the service has no such part, or add the part. | No job in `ci.yml` is permanently red or skipped for a missing directory. | first PR's CI run. Today `ci.yml` has `web` and `api-lint` and no `docs-api-drift`; the documentation site builds in `.github/workflows/docs.yml`. |
 | 11 | **Repository secrets** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` exist on the repo; GHCR push is allowed for the Actions token. | A dry-run of `docker-publish` on a throwaway branch, or ask the repo admin. | none. |
 | 12 | **`govulncheck` is clean** before the PR to `main` (CI `vuln` job installs `@latest`; `make vuln` runs the same command). | `make vuln` exits 0. | `vuln` job (a `docker-publish` prerequisite). |
 
@@ -35,7 +42,7 @@ the first push to `main` because packaging was never built (rows 3-8).
 
 ## Status (2026-10-23)
 
-Rows 5-9 are done on `feature/chart`:
+Rows 5-9 are done (the work landed from `feature/chart`; the rows are re-checked against the chart on `develop` as of the docs-site refresh):
 
 | # | Evidence |
 |---|---|

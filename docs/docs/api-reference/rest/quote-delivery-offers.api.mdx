@@ -1,0 +1,70 @@
+---
+id: quote-delivery-offers
+title: "Quote delivery offers per tier for a destination and a set of lines"
+description: "Runs the PromisePolicy search over local read models. The cart is first split into shipment groups (ShipmentGrouping: one node for the whole cart when one can cover every line, otherwise the fewest groups). Returns one QUOTED offer per (group, requested tier) that has a feasible witness path, and an OfferConstraint for every (group, tier) that has none. 'No offer' is a normal 200 answer. A tier whose order deadline in the destination region has passed is reported PAST_ORDER_DEADLINE. Each offer is persisted with a TTL so checkout can honour it. With an Idempotency-Key, a repeat inside the offers' TTL returns the same offers. Makes no synchronous call."
+sidebar_label: "Quote delivery offers per tier for a destination and a set of lines"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Quote delivery offers per tier for a destination and a set of lines"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/delivery-offers:quote"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Runs the PromisePolicy search over local read models. The cart is first split into shipment groups (ShipmentGrouping: one node for the whole cart when one can cover every line, otherwise the fewest groups). Returns one QUOTED offer per (group, requested tier) that has a feasible witness path, and an OfferConstraint for every (group, tier) that has none. "No offer" is a normal 200 answer. A tier whose order deadline in the destination region has passed is reported PAST_ORDER_DEADLINE. Each offer is persisted with a TTL so checkout can honour it. With an Idempotency-Key, a repeat inside the offers' TTL returns the same offers. Makes no synchronous call.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./quote-delivery-offers.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./quote-delivery-offers.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./quote-delivery-offers.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
