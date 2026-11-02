@@ -70,3 +70,7 @@ Every input of the search is a **local read model** (`rm_*` tables) kept from ev
 | call it | [API reference](/docs/api-reference), [Events](/docs/api-reference/events), [MCP tools](/docs/mcp/tools) |
 | learn the model | [Ubiquitous language](/docs/ddd/ubiquitous-language), [Use cases](/docs/ddd/use-cases), [DDD artifacts](/docs/ddd/ddd-artifacts) |
 | see why decisions were taken | [ADR index](/docs/adr) |
+
+:::note[Disclaimer]
+This project is a domain-driven design study. It is not associated with, endorsed by or affiliated with any company, and it uses no company's code, data, logos or trademarks. All names, figures and examples are illustrative or synthetic.
+:::
