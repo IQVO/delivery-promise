@@ -123,11 +123,11 @@ func (s *Service) cancel(ctx context.Context, p *promise.Promise, reason string)
 }
 
 // CancelReasonRequested is the cancel reason recorded when a promise is
-// cancelled through POST /promises/{promiseId}:cancel, which carries no body
+// cancelled through POST /promises/{promiseId}/cancellations, which carries no body
 // (ADR 0002, A30).
 const CancelReasonRequested = "CANCELLED_ON_REQUEST"
 
-// CancelPromise cancels one promise on request (POST /promises/{promiseId}:cancel,
+// CancelPromise cancels one promise on request (POST /promises/{promiseId}/cancellations,
 // reusing the CancelPromise rule that CustomerOrderCancelled drives): a
 // CONFIRMED or AT_RISK promise becomes CANCELLED, its confirmed hold goes back
 // to the book and PromiseCancelled is raised, in one transaction. A promise

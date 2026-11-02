@@ -24,23 +24,23 @@ description: "The interfaces of Delivery Promise (REST, events, MCP, A2A), every
 
 | Tag | Endpoint | Operation id | Success |
 | --- | --- | --- | --- |
-| DeliveryOffers | `POST /delivery-offers:quote` | `quoteDeliveryOffers` | `200 {offers, unavailable}`; `Idempotency-Key` optional; "no offer" is a normal answer |
+| DeliveryOffers | `POST /delivery-quotes` | `quoteDeliveryOffers` | `200 {offers, unavailable}`; `Idempotency-Key` optional; "no offer" is a normal answer |
 | DeliveryOffers | `GET /delivery-offers/{offerId}` | `getDeliveryOffer` | `200`, the offer in any state; `404 not-found` |
 | Promises | `POST /promises` | `makePromise` | `201` with `Location`; `200` on an idempotent replay; `Idempotency-Key` required |
-| Promises | `POST /promises/{promiseId}:confirm` | `confirmPromise` | `200`, the promise; body `orderId`, `groupNo`; `Idempotency-Key` required |
-| Promises | `POST /promises/{promiseId}:cancel` | `cancelPromise` | `200`; no body; `Idempotency-Key` required; checkout compensation |
+| Promises | `POST /promises/{promiseId}/confirmations` | `confirmPromise` | `200`, the promise; body `orderId`, `groupNo`; `Idempotency-Key` required |
+| Promises | `POST /promises/{promiseId}/cancellations` | `cancelPromise` | `200`; no body; `Idempotency-Key` required; checkout compensation |
 | Promises | `GET /promises/{promiseId}` | `getPromise` | `200`; `404 not-found` |
-| Promises | `GET /promises?orderId=` | `listPromisesByOrder` | `200 {items}`, one per group |
-| PromiseBooks | `GET /promise-books?nodeId=&date=` | `listPromiseBooks` | `200 {items}`; `date` is `YYYY-MM-DD` in the node's time zone |
+| Promises | `GET /promises?orderId=` | `listPromisesByOrder` | `200 {items, nextCursor}` keyset page (`limit`, `cursor`), one per group |
+| PromiseBooks | `GET /promise-books?nodeId=&date=` | `listPromiseBooks` | `200 {items, nextCursor}` keyset page; `date` is `YYYY-MM-DD` in the node's time zone |
 | PromisePolicy | `POST /promise-policies` | `publishPromisePolicy` | `201`, the new version; `Idempotency-Key` required |
 | PromisePolicy | `GET /promise-policies/current` | `getCurrentPromisePolicy` | `200`; version 0 (`v0`) when nothing was published |
 | Health (not in the spec) | `GET /healthz`, `GET /readyz` | none | `200`; `/readyz` is `503` while draining or when postgres or kafka is down |
 
-The quote route is the **Open Host Service** for storefront contexts; `POST /promises`, `:confirm`, `:cancel`, the policy and the books are called only by customer-ordering's checkout or by operators. Storefront contexts must never call the restricted routes.
+The quote route is the **Open Host Service** for storefront contexts; `POST /promises`, `/confirmations`, `/cancellations`, the policy and the books are called only by customer-ordering's checkout or by operators. Storefront contexts must never call the restricted routes.
 
 ## Conventions in the contract
 
-- **Idempotency.** `Idempotency-Key` is required on every state-changing POST except the quote, where it is optional (the middleware runs only when the caller sends a key; a repeat inside the offers' TTL then returns the same offers). Missing: `400 idempotency-key-required`. The key is scoped to (route, key) and stored with a hash of the request: the same key with the same body replays the stored status and body (header `Idempotency-Replayed: true`); another body is `422 idempotency-key-reused`. A 2xx commits aggregates, outbox rows and the key together; a 4xx rolls the writes back but stores and replays the problem; a 5xx stores nothing. Keys are purged after 24 hours.
+- **Idempotency.** `Idempotency-Key` is required on every state-changing POST except the quote, where it is optional (the middleware runs only when the caller sends a key; a repeat inside the offers' TTL then returns the same offers). Missing: `400 idempotency-key-required`. The key is global (not per route) and stored with a hash of method, path and body: the same key with the same request replays the stored status and body (header `Idempotency-Replayed: true`); any other request is `409 idempotency-key-reused`; a key that is not 1-128 printable ASCII is `400 idempotency-key-invalid`. A 2xx commits aggregates, outbox rows and the key together; a 4xx rolls the writes back but stores and replays the problem; a 5xx stores nothing. Keys are purged after 24 hours.
 - **Errors** are RFC 9457 `application/problem+json`, `type = https://retailnetwork.example/problems/<slug>` (see below).
 - **Windows.** A delivery window is two UTC instants (`earliest`, `latest`) plus the IANA `timeZone` of the destination delivery station, the local calendar its days belong to; `timeZone` is omitted only on an offer stored before ADR 0011 carried it.
 - **Tiers** are `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`; `basis` is `SCHEDULED` or `NOMINAL` (`NOMINAL` only for `STANDARD`).

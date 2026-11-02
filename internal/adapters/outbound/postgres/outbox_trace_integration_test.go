@@ -41,7 +41,7 @@ func TestOutboxAppendStoresTheActiveTraceparent(t *testing.T) {
 	repo := postgres.NewOutbox(pool, stubEncoder{n: new(int)})
 	events := releasedEvents("prm-1")
 
-	ctx, span := sdktrace.NewTracerProvider().Tracer("test").Start(context.Background(), "POST /promises/{promiseId}:cancel")
+	ctx, span := sdktrace.NewTracerProvider().Tracer("test").Start(context.Background(), "POST /promises/{promiseId}/cancellations")
 	defer span.End()
 	if err := repo.Append(ctx, events...); err != nil {
 		t.Fatal(err)

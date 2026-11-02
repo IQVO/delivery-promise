@@ -452,7 +452,7 @@ components:
       contentType: application/cloudevents+json
       description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseConfirmed`; `dataschema` = `urn:retailnetwork:delivery-promise:analytics:PromiseConfirmed:v1`;
         subject and key = the promiseId. Topic: retailnetwork.delivery-promise.analytics. Raised by ConfirmPromise (the synchronous
-        POST /promises/{promiseId}:confirm that customer-ordering calls inside checkout, or the reconciling consumer of CustomerOrderPlaced).
+        POST /promises/{promiseId}/confirmations that customer-ordering calls inside checkout, or the reconciling consumer of CustomerOrderPlaced).
         ANALYTICS ONLY. A repeated confirm raises nothing.'
       tags:
       - name: promise

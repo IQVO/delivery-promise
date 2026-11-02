@@ -31,7 +31,7 @@ One consumer reads the eight topics under ONE stable group, `DELIVERY_PROMISE_CO
 
 ### Relationships
 
-Customer/Supplier with customer-ordering (it calls `POST /delivery-offers:quote`, `POST /promises`, `POST /promises/{promiseId}:confirm` and, to compensate a failed multi-group checkout, `POST /promises/{promiseId}:cancel`; it consumes `PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseUnkeepable`) and with order-sourcing (consumes `PromiseRevised`, `PromiseBookExhausted`); node-performance consumes `PromiseKept` and `PromiseBroken`. Open Host Service for the storefront (quote). Conformist to node-topology, offer-availability, linehaul-transportation, last-mile-delivery, node-performance and shipping-and-tracking.
+Customer/Supplier with customer-ordering (it calls `POST /delivery-quotes`, `POST /promises`, `POST /promises/{promiseId}/confirmations` and, to compensate a failed multi-group checkout, `POST /promises/{promiseId}/cancellations`; it consumes `PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseUnkeepable`) and with order-sourcing (consumes `PromiseRevised`, `PromiseBookExhausted`); node-performance consumes `PromiseKept` and `PromiseBroken`. Open Host Service for the storefront (quote). Conformist to node-topology, offer-availability, linehaul-transportation, last-mile-delivery, node-performance and shipping-and-tracking.
 
 ### Sync calls
 

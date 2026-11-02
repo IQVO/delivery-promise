@@ -124,7 +124,7 @@ job packages `delivery-promise-<version>.tgz`.
 
 ## Cancelling a promise on request
 
-`POST /promises/{promiseId}:cancel` (no body, `Idempotency-Key` required) is the compensation
+`POST /promises/{promiseId}/cancellations` (no body, `Idempotency-Key` required) is the compensation
 route of customer-ordering's checkout: when a later group fails to confirm, the promises already
 CONFIRMED are cancelled. It reuses the CancelPromise rule that `CustomerOrderCancelled` drives:
 a CONFIRMED or AT_RISK promise becomes CANCELLED with `cancelReason` `CANCELLED_ON_REQUEST`, its

@@ -76,8 +76,8 @@ flowchart LR
   kafka{{"Kafka (one broker)"}}
   producers["8 producing contexts"]
 
-  shopper -->|"POST /delivery-offers:quote"| api
-  checkout -->|"POST /promises, :confirm, :cancel"| api
+  shopper -->|"POST /delivery-quotes"| api
+  checkout -->|"POST /promises, /confirmations, /cancellations"| api
   agents --> mcp
   agents --> a2a
   agents --> web
