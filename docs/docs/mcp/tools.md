@@ -9,15 +9,15 @@ description: "The five read-only MCP tools of Delivery Promise, captured from a 
 
 `cmd/mcp` (ADR 0007) is the read-only MCP server of the context: Streamable HTTP only (no stdio, no SSE), on `MCP_ADDR` (default `:8090`) at `/mcp` and `/`, plus `GET /healthz`. In the cluster it is the Service `delivery-promise-mcp:8090`, exposed through Kong at `/api/mcp/delivery-promise` (rewritten to `/mcp`); `warehouse-ops-agent` is configured with `http://delivery-promise-mcp.warehouse-systems.svc.cluster.local:8090/mcp`. It drives the same use cases as the REST GET routes, writes nothing (no outbox, no consumer, no sweeper, never dials Kafka) and carries **no authentication**; the in-cluster ClusterIP boundary is the access control.
 
-The list below is the output of a live `tools/list` against the binary built from this branch (server `delivery-promise-mcp` 1.0.0, protocol `2025-03-26`, capabilities `tools` with `listChanged`). Every tool carries the annotations `readOnlyHint: true`, `idempotentHint: true`, `openWorldHint: false`, and `additionalProperties: false` on its input. `TestToolSurface`, `TestWriteVerbSensorFailsOnWriteNames` and `TestToolRegistryGolden` (`internal/adapters/inbound/mcp/governance_test.go`) pin the surface and refuse any write verb.
+The list below is the output of a live `tools/list` against the binary built from this branch (server `delivery-promise-mcp` 1.0.0, protocol `2025-03-26`, capabilities `tools` with `listChanged`). Every tool carries the annotations `readOnlyHint: true`, `idempotentHint: true`, `openWorldHint: false`, the `_meta` authority `com.warehouse/authority: "L1"` (Agentic Standard v2, [ADR 0013](/docs/adr/0013-agent-authority-levels-and-complete-mcp-surface): every tool of this context is a pure read, so every level is L1), and `additionalProperties: false` on its input. `TestToolSurface`, `TestWriteVerbSensorFailsOnWriteNames`, `TestEveryAgentToolDeclaresAuthority` and `TestToolRegistryGolden` (`internal/adapters/inbound/mcp`) pin the surface and refuse any write verb or missing authority.
 
-| Tool | Access | Input fields | Reads (REST equivalent) |
-| --- | --- | --- | --- |
-| `get_current_policy` | read-only | none | `GET /promise-policies/current` |
-| `get_delivery_offer` | read-only | `offerId` (string, required) | `GET /delivery-offers/{offerId}` |
-| `get_promise` | read-only | `promiseId` (string, required) | `GET /promises/{promiseId}` |
-| `list_promise_books` | read-only | `nodeId` (string, required), `date` (string `YYYY-MM-DD`, required) | `GET /promise-books?nodeId=&date=` |
-| `list_promises_by_order` | read-only | `orderId` (string, required) | `GET /promises?orderId=` |
+| Tool | Access | Authority | Input fields | Reads (REST equivalent) |
+| --- | --- | --- | --- | --- |
+| `get_current_policy` | read-only | L1 | none | `GET /promise-policies/current` |
+| `get_delivery_offer` | read-only | L1 | `offerId` (string, required) | `GET /delivery-offers/{offerId}` |
+| `get_promise` | read-only | L1 | `promiseId` (string, required) | `GET /promises/{promiseId}` |
+| `list_promise_books` | read-only | L1 | `nodeId` (string, required), `date` (string `YYYY-MM-DD`, required) | `GET /promise-books?nodeId=&date=` |
+| `list_promises_by_order` | read-only | L1 | `orderId` (string, required) | `GET /promises?orderId=` |
 
 ## Tools in detail
 
@@ -43,6 +43,14 @@ Lists the promises of one customer order, one per shipment group, ordered by `gr
 
 ## Calling them
 
-`initialize` returns an `Mcp-Session-Id` header that must accompany every later call, and requests must accept both `application/json` and `text/event-stream`. A captured `get_current_policy` call and its structured result are on the [Quickstart](/docs/overview/quickstart#mcp-streamable-http-read-only). The optional inputs of the registry carry `omitempty` so they stay optional in the schema (`TestMCPOptionalToolInputsCarryOmitempty`); today every input listed above is required.
+The handler is **stateless** (Agentic Standard v2, AS-4, [ADR 0013](/docs/adr/0013-agent-authority-levels-and-complete-mcp-surface)): it issues no `Mcp-Session-Id` and answers the 2026-07-28 revision's per-request handshake — a raw POST with `MCP-Protocol-Version: 2026-07-28` and `Mcp-Method: server/discover` returns `supportedVersions` without any `initialize`. A legacy `initialize` (2025-06-18 and older) still answers 200, so session-based clients keep working; requests must accept both `application/json` and `text/event-stream`. A captured `get_current_policy` call and its structured result are on the [Quickstart](/docs/overview/quickstart#mcp-streamable-http-read-only). The optional inputs of the registry carry `omitempty` so they stay optional in the schema (`TestMCPOptionalToolInputsCarryOmitempty`); today every input listed above is required.
+
+## Resource
+
+`promise://books/{nodeId}/{date}` (MIME `application/json`, [ADR 0013](/docs/adr/0013-agent-authority-levels-and-complete-mcp-surface)): the capacity ledger of one node's pickup cutoffs on one date — the same bounded read model as `list_promise_books` and `GET /promise-books`, as JSON text (`{nodeId, date, items}`). Listed via `resources/templates/list`; the URI segments are model-supplied and a malformed URI is rejected.
+
+## Prompt
+
+`check_order_promises` ([ADR 0013](/docs/adr/0013-agent-authority-levels-and-complete-mcp-surface)) is the operator SOP: how to judge whether an order's promises are intact — list them, read states and judgements, consult the node's books, escalate what is AT_RISK or BROKEN. It names tools but calls none, and takes no arguments.
 
 The server's `instructions` string tells a client that nothing here changes data: quoting and the promise lifecycle are REST operations driven by checkout, and the policy is published over REST too. The A2A agent offers the same reads as goal-shaped skills, see the [API overview](/docs/api-reference).
