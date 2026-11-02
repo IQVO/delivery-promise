@@ -97,7 +97,6 @@ func (d Deps) getCurrentPolicy(ctx context.Context, _ struct{}) (views.Policy, e
 // fails the build on any write-verb name (docs/adr/0007).
 func (d Deps) registerTools(server *mcp.Server) {
 	closedWorld := false
-	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld}
 
 	addTool(server, &mcp.Tool{
 		Name: "get_delivery_offer",
@@ -107,7 +106,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"departure, legs, delivery wave), basis (SCHEDULED or NOMINAL), the policyVersion it was quoted under, and " +
 			"quotedAt/expiresAt. Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
 			"fails with not-found.",
-		Annotations: readOnly,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
 	}, d.getDeliveryOffer)
 
@@ -118,7 +117,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"path, holdExpiresAt, the revisions that moved it and the final judgement (outcome KEPT or BROKEN, cause, " +
 			"lateByMinutes). A promise is never deleted; terminal states stay readable. Read-only; an unknown promise " +
 			"fails with not-found.",
-		Annotations: readOnly,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
 	}, d.getPromise)
 
@@ -128,7 +127,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"its state, terms, witness path and judgement (the same shape as get_promise). Only CONFIRMED promises " +
 			"belong to an order, so this is the checkout view of what was promised. Read-only; a malformed order id " +
 			"fails with validation-failed.",
-		Annotations: readOnly,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
 	}, d.listPromisesByOrder)
 
@@ -138,7 +137,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"(YYYY-MM-DD in the node's own time zone), ordered by cutoffAt: one book per cutoff (bookId is " +
 			"nodeId:pickupDepartureId), its OPEN or CLOSED state and its capacity (share, provisional and confirmed " +
 			"holds). Read-only; a malformed node id or date fails with validation-failed.",
-		Annotations: readOnly,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
 	}, d.listPromiseBooks)
 
@@ -148,7 +147,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"published), offerTtlMinutes and holdTtlMinutes, packagesPerOrder, capacitySharePercent and the per-tier " +
 			"order deadlines (localTime in the destination region's time zone). Publishing a policy is a REST " +
 			"operation. Read-only; takes no arguments.",
-		Annotations: readOnly,
+		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
 	}, d.getCurrentPolicy)
 }
