@@ -11,13 +11,13 @@ Route -> use case, kept in sync with `apis/openapi.yaml`. Routes are registered 
 `internal/adapters/inbound/http/server.go` `NewRouter`, handlers are in `handlers.go`,
 the wiring is `cmd/api/main.go` `run`:
 
-- `POST /delivery-offers:quote` -> `QuoteDeliveryOffers` (200; `Idempotency-Key` optional)
+- `POST /delivery-quotes` -> `QuoteDeliveryOffers` (200; `Idempotency-Key` optional)
 - `GET /delivery-offers/{offerId}` -> `GetOffer`
 - `POST /promises` -> `MakePromise` (201; a replay of the same offer answers 200)
 - `GET /promises/{promiseId}` -> `GetPromise`
 - `GET /promises?orderId=` -> `ListPromisesByOrder` (`{"items":[...]}`)
-- `POST /promises/{promiseId}:confirm` -> `ConfirmPromise` (body `{orderId, groupNo}`; repeating it is a no-op)
-- `POST /promises/{promiseId}:cancel` -> `CancelPromise` (no body; CONFIRMED/AT_RISK -> CANCELLED and the confirmed hold is released; an already CANCELLED promise is a 200 no-op; PROVISIONAL, KEPT, BROKEN or RELEASED is 409 `illegal-transition`; ADR 0002 A30)
+- `POST /promises/{promiseId}/confirmations` -> `ConfirmPromise` (body `{orderId, groupNo}`; repeating it is a no-op)
+- `POST /promises/{promiseId}/cancellations` -> `CancelPromise` (no body; CONFIRMED/AT_RISK -> CANCELLED and the confirmed hold is released; an already CANCELLED promise is a 200 no-op; PROVISIONAL, KEPT, BROKEN or RELEASED is 409 `illegal-transition`; ADR 0002 A30)
 - `GET /promise-books?nodeId=&date=` -> `ListPromiseBooks`
 - `POST /promise-policies` -> `PublishPromisePolicy` (201)
 - `GET /promise-policies/current` -> `CurrentPolicy`
@@ -35,10 +35,10 @@ the wiring is `cmd/api/main.go` `run`:
   `nominal-basis-not-allowed-for-tier`); an unmapped error is an opaque 500
   `internal-error`. A new `Err` needs a catalogue row and a row in
   `handlers_test.go` `TestEveryDomainErrorIsItsDocumentedProblem`.
-- **Idempotency-Key** is required on `POST /promises`, `POST /promises/{id}:confirm`,
-  `POST /promises/{id}:cancel` and `POST /promise-policies` (`idempotency.go`), optional on the quote. The key is
-  stored per (route, key); same key + same body replays the first response with
-  `Idempotency-Replayed: true`, same key + other body is 422
+- **Idempotency-Key** is required on `POST /promises`, `POST /promises/{id}/confirmations`,
+  `POST /promises/{id}/cancellations` and `POST /promise-policies` (`idempotency.go`), optional on the quote. The key is
+  global (looked up by key alone); same key + same body replays the first response with
+  `Idempotency-Replayed: true`, same key + other body is 409
   `idempotency-key-reused`, a missing key 400 `idempotency-key-required`; keys live
   24 h in `idempotency_keys`. The handler runs in a SAVEPOINT: a 4xx is stored but
   leaves no writes, a 5xx is never stored. A new state-changing route registers
