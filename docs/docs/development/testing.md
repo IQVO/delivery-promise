@@ -47,7 +47,7 @@ Ten files tagged `integration`: the Postgres adapter (`main_integration_test.go`
 
 ## Mutation tests
 
-`.gremlins.yaml` is read by every gremlins run: one worker, `timeout-coefficient: 30`, thresholds `efficacy: 75` and `mutant-coverage: 90`. `make mutation` loops over **every** package under `internal/domain/` (shared, calendar, policy, offer, book, promise, search) and stops on the first failure; the CI job `mutation-fast` does the same on every push and PR; `make mutation-full` (job `mutation`, weekly and manual) runs the whole `./internal/domain` tree. The measured efficacy per package is recorded in the file's header (weakest: `search`, 77.78 %).
+`.gremlins.yaml` is read by every gremlins run: one worker, `timeout-coefficient: 30`, thresholds `efficacy: 87` and `mutant-coverage: 94`. `make mutation` loops over **every** package under `internal/domain/` (shared, calendar, policy, offer, book, promise, search) and stops on the first failure; the CI job `mutation-fast` does the same on every push and PR; `make mutation-full` (job `mutation`, weekly and manual) runs the whole `./internal/domain` tree. The measured efficacy per package is recorded in the file's header (weakest: `search`, 87.88-88.89 %).
 
 ## Fitness tests
 

@@ -20,7 +20,7 @@ sequenceDiagram
   participant R as Read models and policy
   participant D as Search (domain)
   participant DB as Postgres
-  C->>H: POST /delivery-offers:quote
+  C->>H: POST /delivery-quotes
   H->>S: QuoteDeliveryOffers(command)
   S->>S: validate prefix, lines, tiers
   S->>R: current policy, nodes, listings, departures, waves, scorecards
@@ -76,7 +76,7 @@ sequenceDiagram
   participant K as Kafka consumer
   participant S as Service
   participant DB as Postgres
-  CO->>H: POST /promises/id:confirm with orderId and groupNo
+  CO->>H: POST /promises/id/confirmations with orderId and groupNo
   H->>S: ConfirmPromise
   S->>DB: UoW begin, load promise and book
   S->>S: promise.Confirm before holdExpiresAt
@@ -102,7 +102,7 @@ sequenceDiagram
   participant S as Service
   participant DB as Postgres
   alt compensation in checkout
-    CO->>H: POST /promises/id:cancel
+    CO->>H: POST /promises/id/cancellations
     H->>S: CancelPromise(id)
   else order cancelled
     K->>S: OnCustomerOrderCancelled

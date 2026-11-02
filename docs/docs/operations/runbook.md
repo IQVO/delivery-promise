@@ -50,7 +50,7 @@ Migrations are embedded in the binary (`internal/adapters/outbound/postgres/migr
 
 - **Postgres**: the only state store; no in-memory mode. `DATABASE_URL` is the pooled DSN (PgBouncer in this cluster).
 - **Kafka**: one broker platform-wide, `KAFKA_BROKERS`, comma-separated. Topics are auto-created by the first writer (`AllowAutoTopicCreation`); nothing pre-creates them.
-- **customer-ordering** calls this service synchronously over REST (`deliveryPromiseUrl` there): `POST /promises/{id}:confirm` inside checkout and `POST /promises/{id}:cancel` as checkout compensation. A latency or outage here is felt in that checkout path.
+- **customer-ordering** calls this service synchronously over REST (`deliveryPromiseUrl` there): `POST /promises/{id}/confirmations` inside checkout and `POST /promises/{id}/cancellations` as checkout compensation. A latency or outage here is felt in that checkout path.
 
 ### Kafka topics and consumer groups
 

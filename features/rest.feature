@@ -10,7 +10,7 @@ Feature: The REST adapter answers the contract of apis/openapi.yaml
     Given the worked-example network is projected
 
   Scenario: Quoting over REST answers the offers per tier
-    When a POST request with the JSON body is sent to "/delivery-offers:quote":
+    When a POST request with the JSON body is sent to "/delivery-quotes":
       """json
       {"destinationPostalPrefix":"787","lines":[{"catalogItemId":"ci-1001","quantity":2}]}
       """
@@ -24,7 +24,7 @@ Feature: The REST adapter answers the contract of apis/openapi.yaml
     And the last command published the event "DeliveryOfferQuoted" 3 times
 
   Scenario Outline: An invalid quote request answers its documented problem
-    When a POST request with the JSON body is sent to "/delivery-offers:quote":
+    When a POST request with the JSON body is sent to "/delivery-quotes":
       """json
       <body>
       """
@@ -86,7 +86,7 @@ Feature: The REST adapter answers the contract of apis/openapi.yaml
     Given I quote 2 of "ci-1001" for postal prefix "787"
     And a promise exists from the NEXT_DAY offer
     And the clock advances 15 minutes
-    When a POST request with the JSON body is sent to "/promises/{promiseId}:confirm":
+    When a POST request with the JSON body is sent to "/promises/{promiseId}/confirmations":
       """json
       {"orderId":"ord-1","groupNo":1}
       """
@@ -96,7 +96,7 @@ Feature: The REST adapter answers the contract of apis/openapi.yaml
   Scenario: Cancelling a provisional promise over REST answers illegal-transition
     Given I quote 2 of "ci-1001" for postal prefix "787"
     And a promise exists from the NEXT_DAY offer
-    When a POST request is sent to "/promises/{promiseId}:cancel"
+    When a POST request is sent to "/promises/{promiseId}/cancellations"
     Then the response status is 409
     And the response problem is "illegal-transition"
 
@@ -113,6 +113,19 @@ Feature: The REST adapter answers the contract of apis/openapi.yaml
     And the response field "items.0.groupNo" is 1
     And the response field "items.1.groupNo" is 2
     And the response field "items.0.orderId" is "ord-9"
+    When a GET request is sent to "/promises?orderId=ord-9&limit=1"
+    Then the response status is 200
+    And the response list "items" has 1 item
+    And the response field "items.0.groupNo" is 1
+    When a GET request is sent to "/promises?orderId=ord-9&after=x"
+    Then the response status is 400
+    And the response problem is "unknown-query-parameter"
+    When a GET request is sent to "/promises?orderId=ord-9&limit=0"
+    Then the response status is 400
+    And the response problem is "invalid-limit"
+    When a GET request is sent to "/promises?orderId=ord-9&cursor=%21%21"
+    Then the response status is 400
+    And the response problem is "invalid-cursor"
     When a GET request is sent to "/promises?orderId="
     Then the response status is 422
     And the response problem is "validation-failed"

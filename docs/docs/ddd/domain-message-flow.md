@@ -20,14 +20,14 @@ sequenceDiagram
   participant CO as customer-ordering
   participant DP as delivery-promise
   participant OS as order-sourcing
-  SH->>DP: qry: POST /delivery-offers:quote
+  SH->>DP: qry: POST /delivery-quotes
   DP-->>SH: qry: reply offers per tier
   SH->>CO: cmd: place order at checkout
   CO->>DP: cmd: POST /promises per group
   Note over DP: offer CONSUMED, promise PROVISIONAL, hold on the book
   DP-->>CO: cmd: reply 201 with holdExpiresAt
   DP-)DP: evt: PromiseMade
-  CO->>DP: cmd: POST /promises/id:confirm
+  CO->>DP: cmd: POST /promises/id/confirmations
   Note over DP: promise CONFIRMED, hold becomes confirmed
   DP-)DP: evt: PromiseConfirmed
   CO->>DP: evt: CustomerOrderPlaced (reconciling confirm, a no-op)
@@ -139,7 +139,7 @@ sequenceDiagram
     DP->>OS: evt: PromiseBookExhausted
   else book already full or witness path no longer feasible
     DP-->>CO: cmd: reply 409 promise-capacity-exhausted
-    CO->>DP: qry: POST /delivery-offers:quote
+    CO->>DP: qry: POST /delivery-quotes
     DP-->>CO: qry: reply new offers
   end
   Note over CO: shopper abandons checkout

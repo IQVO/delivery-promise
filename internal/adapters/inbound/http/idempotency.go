@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -32,9 +31,10 @@ const IdempotencyReplayedHeader = "Idempotency-Replayed"
 const keyRetention = "24 hours"
 
 // RequireIdempotencyKey is the fleet's transactional Idempotency-Key
-// middleware, applied route by route to the state-changing POSTs. The stored
-// key is (route, key), where the route is the method plus the chi route
-// pattern, so one caller key can be used on two operations.
+// middleware, applied route by route to every POST. The key is GLOBAL: the
+// stored row is found by key alone and compared by fingerprint, the method
+// plus the concrete path (route) and the SHA-256 of the body (requestHash).
+// The same key on another operation is therefore a reuse, not a new key.
 //
 //   - idempotency_keys.status_code starts NULL and is set by the SAME
 //     transaction that inserted the row, immediately before it commits. A
@@ -52,7 +52,10 @@ const keyRetention = "24 hours"
 //     request leaves no trace) but its problem is still stored and replayed; a
 //     5xx or a panic rolls everything back and is never stored, so the same key
 //     can retry the real work.
-//   - A different body under a stored key is 422 idempotency-key-reused.
+//   - A missing key is 400 idempotency-key-required; a key over 128
+//     characters or with non-printable ASCII is 400 idempotency-key-invalid.
+//   - A different method, path or body under a stored key is 409
+//     idempotency-key-reused.
 func RequireIdempotencyKey(pool *pgxpool.Pool, bind TxBinder) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +63,11 @@ func RequireIdempotencyKey(pool *pgxpool.Pool, bind TxBinder) func(http.Handler)
 			if key == "" {
 				writeProblem(w, r, idempotencyKeyRequired,
 					"send an Idempotency-Key header with a unique value per logical request")
+				return
+			}
+			if !validKey(key) {
+				writeProblem(w, r, idempotencyKeyInvalid,
+					"the Idempotency-Key must be 1-128 printable ASCII characters")
 				return
 			}
 			body, err := io.ReadAll(io.LimitReader(r.Body, maxBodyBytes))
@@ -71,7 +79,7 @@ func RequireIdempotencyKey(pool *pgxpool.Pool, bind TxBinder) func(http.Handler)
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			sum := sha256.Sum256(body)
 			requestHash := hex.EncodeToString(sum[:])
-			route := r.Method + " " + routePattern(r)
+			route := r.Method + " " + r.URL.Path
 
 			ctx := r.Context()
 			tx, err := pool.Begin(ctx)
@@ -90,24 +98,29 @@ func RequireIdempotencyKey(pool *pgxpool.Pool, bind TxBinder) func(http.Handler)
 				replayCachedResponse(w, r, pool, route, key, requestHash)
 				return
 			}
-			runFreshRequest(ctx, w, r, tx, bind, route, key, next)
+			runFreshRequest(ctx, w, r, tx, bind, key, next)
 		})
 	}
 }
 
-// routePattern is the chi route pattern the request matched (the raw path when
-// the middleware runs outside a router).
-func routePattern(r *http.Request) string {
-	if rc := chi.RouteContext(r.Context()); rc != nil {
-		if p := rc.RoutePattern(); p != "" {
-			return p
+// maxKeyLength is the longest Idempotency-Key the fleet accepts.
+const maxKeyLength = 128
+
+// validKey reports whether key is 1-128 printable ASCII characters.
+func validKey(key string) bool {
+	if key == "" || len(key) > maxKeyLength {
+		return false
+	}
+	for i := 0; i < len(key); i++ {
+		if key[i] < 0x20 || key[i] > 0x7e {
+			return false
 		}
 	}
-	return r.URL.Path
+	return true
 }
 
-// claimKey purges the expired keys and inserts the (route, key) row; fresh is
-// false when the key was already used.
+// claimKey purges the expired keys and inserts the key row; fresh is false
+// when the key was already used, on any operation.
 func claimKey(ctx context.Context, tx pgx.Tx, route, key, requestHash string) (bool, error) {
 	if _, err := tx.Exec(ctx, `DELETE FROM idempotency_keys WHERE created_at < now() - interval '`+keyRetention+`'`); err != nil {
 		return false, err
@@ -115,7 +128,7 @@ func claimKey(ctx context.Context, tx pgx.Tx, route, key, requestHash string) (b
 	tag, err := tx.Exec(ctx, `
 		INSERT INTO idempotency_keys (route, key, request_hash)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (route, key) DO NOTHING
+		ON CONFLICT (key) DO NOTHING
 	`, route, key, requestHash)
 	if err != nil {
 		return false, err
@@ -124,24 +137,25 @@ func claimKey(ctx context.Context, tx pgx.Tx, route, key, requestHash string) (b
 }
 
 // replayCachedResponse answers a request whose key already has a committed
-// row: the stored outcome when the body matches, 422 when it does not.
+// row: the stored outcome when the fingerprint matches, 409 when it does not.
 func replayCachedResponse(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, route, key, requestHash string) {
 	var (
-		storedHash string
-		statusCode *int
-		body       []byte
-		headersRaw []byte
+		storedRoute string
+		storedHash  string
+		statusCode  *int
+		body        []byte
+		headersRaw  []byte
 	)
 	err := pool.QueryRow(r.Context(), `
-		SELECT request_hash, status_code, response_body, response_headers
-		FROM idempotency_keys WHERE route = $1 AND key = $2
-	`, route, key).Scan(&storedHash, &statusCode, &body, &headersRaw)
+		SELECT route, request_hash, status_code, response_body, response_headers
+		FROM idempotency_keys WHERE key = $1
+	`, key).Scan(&storedRoute, &storedHash, &statusCode, &body, &headersRaw)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	if storedHash != requestHash {
-		writeProblem(w, r, idempotencyKeyReused, "the Idempotency-Key was used with a different request body")
+	if storedRoute != route || storedHash != requestHash {
+		writeProblem(w, r, idempotencyKeyReused, "the Idempotency-Key was already used with a different method, path or body")
 		return
 	}
 	if statusCode == nil {
@@ -203,7 +217,7 @@ func (c *capture) Write(b []byte) (int, error) {
 // runFreshRequest handles a genuinely new key: run the handler in a savepoint,
 // persist the outcome in the same transaction, commit, and only then write to
 // the real client.
-func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, tx pgx.Tx, bind TxBinder, route, key string, next http.Handler) {
+func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request, tx pgx.Tx, bind TxBinder, key string, next http.Handler) {
 	sp, err := tx.Begin(ctx)
 	if err != nil {
 		_ = tx.Rollback(ctx)
@@ -233,7 +247,7 @@ func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request
 		writeError(w, r, err)
 		return
 	}
-	if err := storeOutcome(ctx, tx, route, key, rec); err != nil {
+	if err := storeOutcome(ctx, tx, key, rec); err != nil {
 		_ = tx.Rollback(ctx)
 		writeError(w, r, err)
 		return
@@ -254,7 +268,7 @@ func settleSavepoint(ctx context.Context, sp pgx.Tx, code int) error {
 	return sp.Commit(ctx)
 }
 
-func storeOutcome(ctx context.Context, tx pgx.Tx, route, key string, rec *capture) error {
+func storeOutcome(ctx context.Context, tx pgx.Tx, key string, rec *capture) error {
 	headers, err := json.Marshal(rec.header)
 	if err != nil {
 		return err
@@ -262,8 +276,8 @@ func storeOutcome(ctx context.Context, tx pgx.Tx, route, key string, rec *captur
 	_, err = tx.Exec(ctx, `
 		UPDATE idempotency_keys
 		SET status_code = $1, response_body = $2, response_headers = $3, completed_at = now()
-		WHERE route = $4 AND key = $5
-	`, rec.code, rec.body.Bytes(), headers, route, key)
+		WHERE key = $4
+	`, rec.code, rec.body.Bytes(), headers, key)
 	return err
 }
 

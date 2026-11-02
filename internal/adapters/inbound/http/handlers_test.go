@@ -100,13 +100,13 @@ func TestEveryOperationCallsItsUseCaseAndAnswers(t *testing.T) {
 		status                   int
 		wantInBody               string
 	}{
-		{"quote", "POST", "/delivery-offers:quote", `{"destinationPostalPrefix":"787","lines":[{"catalogItemId":"ci-1","quantity":2}],"tiers":["NEXT_DAY"]}`, 200, `"offerId":"off-1"`},
+		{"quote", "POST", "/delivery-quotes", `{"destinationPostalPrefix":"787","lines":[{"catalogItemId":"ci-1","quantity":2}],"tiers":["NEXT_DAY"]}`, 200, `"offerId":"off-1"`},
 		{"get offer", "GET", "/delivery-offers/off-9", ``, 200, `"offerId":"off-9"`},
 		{"make promise", "POST", "/promises", `{"offerId":"off-1","lines":[{"catalogItemId":"ci-1","quantity":2}]}`, 201, `"promiseId":"prm-1"`},
 		{"list by order", "GET", "/promises?orderId=ord-1", ``, 200, `"items":[]`},
 		{"get promise", "GET", "/promises/prm-7", ``, 200, `"promiseId":"prm-7"`},
-		{"confirm", "POST", "/promises/prm-7:confirm", `{"orderId":"ord-1","groupNo":2}`, 200, `"state":"CONFIRMED"`},
-		{"cancel", "POST", "/promises/prm-8:cancel", ``, 200, `"state":"CANCELLED"`},
+		{"confirm", "POST", "/promises/prm-7/confirmations", `{"orderId":"ord-1","groupNo":2}`, 200, `"state":"CONFIRMED"`},
+		{"cancel", "POST", "/promises/prm-8/cancellations", ``, 200, `"state":"CANCELLED"`},
 		{"list books", "GET", "/promise-books?nodeId=N-AUS3&date=2026-10-22", ``, 200, `"items":[]`},
 		{"publish policy", "POST", "/promise-policies", `{"offerTtlMinutes":5,"holdTtlMinutes":20,"packagesPerOrder":2,"capacitySharePercent":50,"orderDeadlines":[{"tier":"NEXT_DAY","regionId":"R-SC","localTime":"23:59"}]}`, 201, `"policyVersion":"v1"`},
 		{"current policy", "GET", "/promise-policies/current", ``, 200, `"policyVersion":"v0"`},
@@ -205,8 +205,8 @@ func TestMalformedBodiesAre400AndNeverReachTheUseCase(t *testing.T) {
 		"unknown field": {"/promises", `{"offerId":"o","lines":[],"extra":1}`},
 		"trailing data": {"/promises", `{"offerId":"o","lines":[]} {}`},
 		"empty body":    {"/promises", ``},
-		"wrong type":    {"/delivery-offers:quote", `{"destinationPostalPrefix":787}`},
-		"confirm":       {"/promises/prm-1:confirm", `[]`},
+		"wrong type":    {"/delivery-quotes", `{"destinationPostalPrefix":787}`},
+		"confirm":       {"/promises/prm-1/confirmations", `[]`},
 	} {
 		rec := do(h, "POST", c[0], c[1])
 		if rec.Code != 400 || !strings.Contains(rec.Body.String(), "malformed-request") {
@@ -256,13 +256,13 @@ func TestOnlyTheMutatingRoutesAreWrappedByTheIdempotencyMiddleware(t *testing.T)
 		})
 	}
 	h := NewRouter(&Server{API: &fakeAPI{}, Idempotency: mw}, nil, "")
-	do(h, "POST", "/delivery-offers:quote", `{"destinationPostalPrefix":"787","lines":[]}`)
+	do(h, "POST", "/delivery-quotes", `{"destinationPostalPrefix":"787","lines":[]}`)
 	do(h, "POST", "/promises", `{"offerId":"o","lines":[]}`)
-	do(h, "POST", "/promises/prm-1:confirm", `{"orderId":"o","groupNo":1}`)
-	do(h, "POST", "/promises/prm-1:cancel", ``)
+	do(h, "POST", "/promises/prm-1/confirmations", `{"orderId":"o","groupNo":1}`)
+	do(h, "POST", "/promises/prm-1/cancellations", ``)
 	do(h, "POST", "/promise-policies", `{}`)
 	do(h, "GET", "/promises/prm-1", ``)
-	want := "POST /promises,POST /promises/prm-1:confirm,POST /promises/prm-1:cancel,POST /promise-policies"
+	want := "POST /delivery-quotes,POST /promises,POST /promises/prm-1/confirmations,POST /promises/prm-1/cancellations,POST /promise-policies"
 	if got := strings.Join(wrapped, ","); got != want {
 		t.Fatalf("wrapped = %s, want %s", got, want)
 	}
@@ -295,21 +295,15 @@ func TestUnknownRoutesAndMethodsAreNotFoundOrNotAllowed(t *testing.T) {
 	}
 }
 
-func TestTheQuoteIsKeyedOnlyWhenTheCallerSendsAKey(t *testing.T) {
-	var keyed int
-	mw := func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { keyed++; next.ServeHTTP(w, r) })
-	}
-	h := NewRouter(&Server{API: &fakeAPI{}, Idempotency: mw}, nil, "")
-	body := `{"destinationPostalPrefix":"787","lines":[{"catalogItemId":"ci-1","quantity":1}]}`
-	if rec := do(h, "POST", "/delivery-offers:quote", body); rec.Code != 200 || keyed != 0 {
-		t.Fatalf("no key: %d, middleware ran %d times", rec.Code, keyed)
-	}
-	req := httptest.NewRequest("POST", "/delivery-offers:quote", strings.NewReader(body))
-	req.Header.Set(IdempotencyKeyHeader, "k1")
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != 200 || keyed != 1 {
-		t.Fatalf("with a key: %d, middleware ran %d times", rec.Code, keyed)
+func TestRetiredRoutesAreGone(t *testing.T) {
+	h := NewRouter(&Server{API: &fakeAPI{}}, nil, "")
+	for _, c := range []struct{ method, path string }{
+		{"POST", "/delivery-offers:quote"},
+		{"POST", "/promises/prm-1:confirm"},
+		{"POST", "/promises/prm-1:cancel"},
+	} {
+		if rec := do(h, c.method, c.path, `{}`); rec.Code != http.StatusNotFound && rec.Code != http.StatusMethodNotAllowed {
+			t.Errorf("%s %s = %d, want 404 or 405", c.method, c.path, rec.Code)
+		}
 	}
 }

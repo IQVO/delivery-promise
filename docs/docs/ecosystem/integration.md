@@ -87,9 +87,9 @@ Nothing in this service calls out; others call in. All routes are unauthenticate
 
 | Caller | Routes it uses | Verified |
 | --- | --- | --- |
-| customer-ordering (checkout) | `POST /promises`, `POST /promises/{promiseId}:confirm`, `POST /promises/{promiseId}:cancel` (compensation); base URL `DELIVERY_PROMISE_URL` | `internal/adapters/outbound/deliverypromise/gateway.go`; infra `deliveryPromiseUrl`. Its default timeout bounds a call, a slow or failing DP is `503 delivery-promise-unavailable` there, and a failed compensating cancel leaves the hold at this service until it expires |
-| shopping-cart | `POST /delivery-offers:quote` only | gateway.go of shopping-cart (`internal/adapters/outbound/deliverypromise`) |
-| storefront-bff | `POST /delivery-offers:quote` only; its fitness test `bff_no_inorg_route_fitness_test.go` forbids `/promises`, `/promise-policies`, `/promise-books` | infra `deliveryPromiseUrl`; `internal/domain/composition/allowlist.go` of storefront-bff |
+| customer-ordering (checkout) | `POST /promises`, `POST /promises/{promiseId}/confirmations`, `POST /promises/{promiseId}/cancellations` (compensation); base URL `DELIVERY_PROMISE_URL` | `internal/adapters/outbound/deliverypromise/gateway.go`; infra `deliveryPromiseUrl`. Its default timeout bounds a call, a slow or failing DP is `503 delivery-promise-unavailable` there, and a failed compensating cancel leaves the hold at this service until it expires |
+| shopping-cart | `POST /delivery-quotes` only | gateway.go of shopping-cart (`internal/adapters/outbound/deliverypromise`) |
+| storefront-bff | `POST /delivery-quotes` only; its fitness test `bff_no_inorg_route_fitness_test.go` forbids `/promises`, `/promise-policies`, `/promise-books` | infra `deliveryPromiseUrl`; `internal/domain/composition/allowlist.go` of storefront-bff |
 | checkout | configured with the same base URL (`helm-values/checkout.yaml`) | infra only; the call shape was not read |
 | operators, console | `GET` routes through the `web/` remote | `web/` |
 

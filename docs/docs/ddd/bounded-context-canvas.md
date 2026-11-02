@@ -81,8 +81,8 @@ Tell a shopper, before and at purchase, the date a package will arrive, and make
 
 | Collaborator | Message | Type | Channel | Relationship |
 | --- | --- | --- | --- | --- |
-| Shopper / storefront (shopping-cart, storefront-bff) | quote | Query | REST `POST /delivery-offers:quote` | Open Host |
-| customer-ordering | quote, make, confirm, cancel | Query, commands | REST `POST /delivery-offers:quote`, `POST /promises`, `:confirm`, `:cancel` | Customer/Supplier (this context supplies) |
+| Shopper / storefront (shopping-cart, storefront-bff) | quote | Query | REST `POST /delivery-quotes` | Open Host |
+| customer-ordering | quote, make, confirm, cancel | Query, commands | REST `POST /delivery-quotes`, `POST /promises`, `/confirmations`, `/cancellations` | Customer/Supplier (this context supplies) |
 | customer-ordering | `CustomerOrderPlaced`, `CustomerOrderCancelled` | Events | `retailnetwork.customer-ordering.events` | Customer/Supplier |
 | order-sourcing | `FulfillmentLocked`, `FulfillmentShipped`, `FulfillmentUnsourceable` | Events | `retailnetwork.order-sourcing.events` | Customer/Supplier |
 | shipping-and-tracking | `PackageDelivered`, `PackageExceptionRaised`, `PackageLost`, `PackageReturned` | Events | `retailnetwork.shipping-and-tracking.events` | Conformist |

@@ -112,21 +112,32 @@ func TestADifferentBodyUnderTheSameKeyIsRefused(t *testing.T) {
 	g := newIdemRig(t)
 	g.post("/things/1", "k1", `{"a":1}`)
 	rec := g.post("/things/1", "k1", `{"a":2}`)
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "idempotency-key-reused") || g.calls.Load() != 1 {
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "idempotency-key-reused") || g.calls.Load() != 1 {
 		t.Fatalf("%d %s calls %d", rec.Code, rec.Body, g.calls.Load())
 	}
 }
 
-func TestTheKeyIsScopedToTheRoute(t *testing.T) {
+func TestTheKeyIsGlobalSoAnotherPathIsAReuse(t *testing.T) {
 	g := newIdemRig(t)
 	g.post("/things/1", "shared", `{}`)
 	other := g.post("/other", "shared", `{}`)
-	sameRoute := g.post("/things/2", "shared", `{}`) // same pattern, same key, same body: a replay
-	if other.Code != http.StatusCreated || other.Header().Get(IdempotencyReplayedHeader) != "" {
-		t.Fatalf("another route must run: %d %s", other.Code, other.Body)
+	samePattern := g.post("/things/2", "shared", `{}`) // same chi pattern, another concrete path
+	for name, rec := range map[string]*httptest.ResponseRecorder{"other route": other, "other path": samePattern} {
+		if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "idempotency-key-reused") ||
+			rec.Header().Get(IdempotencyReplayedHeader) != "" {
+			t.Fatalf("%s: %d %s, want 409 idempotency-key-reused", name, rec.Code, rec.Body)
+		}
 	}
-	if sameRoute.Header().Get(IdempotencyReplayedHeader) != "true" || g.calls.Load() != 2 || g.rows("idempotency_keys") != 2 {
-		t.Fatalf("calls %d keys %d replay %q", g.calls.Load(), g.rows("idempotency_keys"), sameRoute.Header().Get(IdempotencyReplayedHeader))
+	if g.calls.Load() != 1 || g.rows("idempotency_keys") != 1 {
+		t.Fatalf("calls %d keys %d", g.calls.Load(), g.rows("idempotency_keys"))
+	}
+}
+
+func TestAMalformedKeyIsRefusedBeforeTheHandler(t *testing.T) {
+	g := newIdemRig(t)
+	rec := g.post("/things/1", strings.Repeat("k", 129), `{}`)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "idempotency-key-invalid") || g.calls.Load() != 0 {
+		t.Fatalf("%d %s calls %d", rec.Code, rec.Body, g.calls.Load())
 	}
 }
 

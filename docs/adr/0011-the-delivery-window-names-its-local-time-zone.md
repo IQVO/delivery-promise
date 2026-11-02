@@ -31,7 +31,7 @@ optional field is non-breaking, a changed or removed one is not.
   `offer.Restore`, `promise.Make` and `promise.Restore` therefore accept a window persisted before this ADR. A zone
   that is present must have the shape of an IANA name (`shared.ValidTimeZone`: 1..64 ASCII letters, digits, `/`,
   `_`, `-`, `+`); the domain does not consult a zone database.
-- **REST (additive, optional).** `DeliveryWindow` (the `window` of `POST /delivery-offers:quote` and
+- **REST (additive, optional).** `DeliveryWindow` (the `window` of `POST /delivery-quotes` and
   `GET /delivery-offers/{offerId}`) and `PromiseTerms` (the `terms` and `previousTerms` of `GET /promises/{promiseId}`
   and `GET /promises?orderId=`) gain an optional `timeZone` string. It is omitted, never empty, when the stored
   window has none; a consumer then reads the window in UTC, which is what every consumer did before. The instants

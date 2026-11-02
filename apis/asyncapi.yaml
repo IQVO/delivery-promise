@@ -15,10 +15,12 @@ info:
     are catalogued in ADR 0004.
 
 
-    **Consumed.** Events of nine producers, kept as event-fed local read models or driving RepromiseOnRisk, JudgeOnDelivery
+    **Consumed.** Events of eight producers, kept as event-fed local read models or driving RepromiseOnRisk, JudgeOnDelivery
     and CancelPromise (ADR 0003). The consumed messages below are a tolerant local copy of the fields this service relies
     on; the producer''s own AsyncAPI is authoritative. Every consumer is idempotent on the CloudEvents `id` (inbox table)
-    and dispatches on the full `type`.
+    and dispatches on the full `type`. A transient failure is retried with capped backoff (5 attempts), then the message goes to `<topic>.dlq`
+    (headers `x-dlq-*`); a payload that can never be applied goes there at once; an unknown type or a message that is not a valid CloudEvent
+    is logged and skipped. Offsets are committed only after handling.
 
 
     **Envelope (mandatory).** CloudEvents 1.0, structured content mode, Kafka header `content-type: application/cloudevents+json;
@@ -452,7 +454,7 @@ components:
       contentType: application/cloudevents+json
       description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseConfirmed`; `dataschema` = `urn:retailnetwork:delivery-promise:analytics:PromiseConfirmed:v1`;
         subject and key = the promiseId. Topic: retailnetwork.delivery-promise.analytics. Raised by ConfirmPromise (the synchronous
-        POST /promises/{promiseId}:confirm that customer-ordering calls inside checkout, or the reconciling consumer of CustomerOrderPlaced).
+        POST /promises/{promiseId}/confirmations that customer-ordering calls inside checkout, or the reconciling consumer of CustomerOrderPlaced).
         ANALYTICS ONLY. A repeated confirm raises nothing.'
       tags:
       - name: promise
@@ -2203,7 +2205,6 @@ components:
             type: object
             required:
             - orderId
-            - groups
             properties:
               orderId: *id001
               groups:
@@ -2241,8 +2242,6 @@ components:
             type: object
             required:
             - assignmentId
-            - orderId
-            - groupNo
             - promiseId
             properties:
               assignmentId: *id001
@@ -2259,11 +2258,8 @@ components:
             type: object
             required:
             - assignmentId
-            - trackingNumbers
             properties:
               assignmentId: *id001
-              orderId: *id001
-              groupNo: *id003
               trackingNumbers: &id004
                 type: array
                 items: *id001
@@ -2276,8 +2272,6 @@ components:
             type: object
             required:
             - assignmentId
-            - orderId
-            - groupNo
             - promiseId
             properties:
               assignmentId: *id001
@@ -2294,11 +2288,6 @@ components:
                   properties:
                     nodeId: *id001
                     reason: *id001
-              reason:
-                type: string
-                enum:
-                - NO_CANDIDATE
-                - NODE_REFUSED
     PackageDeliveredConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2308,11 +2297,9 @@ components:
             type: object
             required:
             - trackingNumber
-            - deliveredAt
             properties:
               trackingNumber: *id001
               assignmentId: *id001
-              orderId: *id001
               deliveredAt: *id002
     PackageExceptionRaisedConsumed:
       allOf:
@@ -2322,14 +2309,10 @@ components:
           data:
             type: object
             required:
-            - trackingNumber
             - assignmentId
             properties:
               trackingNumber: *id001
               assignmentId: *id001
-              orderId: *id001
-              reason: *id001
-              at: *id002
     PackageLostConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2339,10 +2322,8 @@ components:
             type: object
             required:
             - trackingNumber
-            - declaredAt
             properties:
               trackingNumber: *id001
-              orderId: *id001
               declaredAt: *id002
     PackageReturnedConsumed:
       allOf:
@@ -2353,10 +2334,8 @@ components:
             type: object
             required:
             - trackingNumber
-            - returnedAt
             properties:
               trackingNumber: *id001
-              orderId: *id001
               returnedAt: *id002
     DepartureScheduledConsumed:
       allOf:
@@ -2367,12 +2346,6 @@ components:
             type: object
             required:
             - departureId
-            - kind
-            - originNodeId
-            - destinationNodeId
-            - cutoffAt
-            - arrivesAt
-            - capacityPackages
             properties:
               departureId: *id001
               laneId: *id001
@@ -2397,11 +2370,8 @@ components:
             type: object
             required:
             - departureId
-            - remainingPackages
             properties:
               departureId: *id001
-              capacityPackages: *id003
-              bookedPackages: *id003
               remainingPackages: *id003
     DepartureCancelledConsumed:
       allOf:
@@ -2414,8 +2384,6 @@ components:
             - departureId
             properties:
               departureId: *id001
-              reason: *id001
-              cancelledAt: *id002
     BookingMovedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2425,8 +2393,6 @@ components:
             type: object
             required:
             - assignmentId
-            - fromDepartureId
-            - toDepartureId
             properties:
               assignmentId: *id001
               fromDepartureId: *id001
@@ -2440,11 +2406,9 @@ components:
             type: object
             required:
             - assignmentId
-            - departureId
             properties:
               assignmentId: *id001
               departureId: *id001
-              reason: *id001
     DeliveryWaveScheduledConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2455,16 +2419,9 @@ components:
             required:
             - waveId
             - stationNodeId
-            - inductCutoffAt
-            - windowStart
-            - windowEnd
-            - stopCapacity
             properties:
               waveId: *id001
               stationNodeId: *id001
-              serviceDate:
-                type: string
-                format: date
               inductCutoffAt: *id002
               windowStart: *id002
               windowEnd: *id002
@@ -2478,11 +2435,8 @@ components:
             type: object
             required:
             - waveId
-            - remainingStops
             properties:
               waveId: *id001
-              stopCapacity: *id003
-              assignedStops: *id003
               remainingStops: *id003
     DeliveryWaveCancelledConsumed:
       allOf:
@@ -2495,7 +2449,6 @@ components:
             - waveId
             properties:
               waveId: *id001
-              reason: *id001
     PackageInductionDeferredConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2519,8 +2472,6 @@ components:
             type: object
             required:
             - nodeId
-            - window
-            - grade
             properties:
               nodeId: *id001
               window:
@@ -2548,9 +2499,6 @@ components:
             type: object
             required:
             - nodeId
-            - nodeType
-            - regionId
-            - timezone
             properties:
               nodeId: *id001
               nodeType: *id001
@@ -2570,13 +2518,6 @@ components:
             type: object
             required:
             - nodeId
-            - profileRevision
-            - timezone
-            - operatingHoursByDay
-            - holidays
-            - handlingTimeMinutes
-            - cutoffs
-            - throughputCap
             properties:
               nodeId: *id001
               profileRevision: *id003
@@ -2634,7 +2575,6 @@ components:
             - nodeId
             properties:
               nodeId: *id001
-              activatedAt: *id002
     NodeSuspendedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2646,8 +2586,6 @@ components:
             - nodeId
             properties:
               nodeId: *id001
-              reason: *id001
-              suspendedAt: *id002
     NodeRetiredConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2659,7 +2597,6 @@ components:
             - nodeId
             properties:
               nodeId: *id001
-              retiredAt: *id002
     LaneOpenedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2669,19 +2606,10 @@ components:
             type: object
             required:
             - laneId
-            - originNodeId
-            - destinationNodeId
-            - mode
-            - nominalTransitMinutes
             properties:
               laneId: *id001
               originNodeId: *id001
               destinationNodeId: *id001
-              mode:
-                type: string
-                enum:
-                - GROUND
-                - AIR
               nominalTransitMinutes: *id003
     LaneClosedConsumed:
       allOf:
@@ -2694,7 +2622,6 @@ components:
             - laneId
             properties:
               laneId: *id001
-              closedAt: *id002
     ServiceAreaAssignedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2704,9 +2631,6 @@ components:
             type: object
             required:
             - postalPrefix
-            - deliveryStationNodeId
-            - regionId
-            - assignmentVersion
             properties:
               postalPrefix: *id001
               deliveryStationNodeId: *id001
@@ -2721,7 +2645,6 @@ components:
             type: object
             required:
             - regionId
-            - code
             properties:
               regionId: *id001
               code: *id001
@@ -2774,15 +2697,12 @@ components:
             - listingId
             - catalogItemId
             - nodeId
-            - availableQty
             properties:
               listingId: *id001
               catalogItemId: *id001
               nodeId: *id001
               availableQty: *id003
-              basis: *id001
               asOf: *id002
-              feedId: *id001
     ListingSuppressedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2792,11 +2712,9 @@ components:
             type: object
             required:
             - listingId
-            - nodeId
             properties:
               listingId: *id001
               nodeId: *id001
-              reason: *id001
     ListingRestoredConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2806,7 +2724,6 @@ components:
             type: object
             required:
             - listingId
-            - nodeId
             properties:
               listingId: *id001
               nodeId: *id001

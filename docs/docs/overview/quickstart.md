@@ -100,7 +100,7 @@ HTTP/1.1 201 Created
 Quote a delivery offer for a catalogue item known to the read models (the `catalogItemId` came from the `rm_listings` table the consumer filled):
 
 ```text
-$ curl -s -X POST localhost:18080/delivery-offers:quote -H 'Content-Type: application/json' \
+$ curl -s -X POST localhost:18080/delivery-quotes -H 'Content-Type: application/json' \
     -d '{"destinationPostalPrefix":"787","lines":[{"catalogItemId":"item-4749b893-2ad9-450c-bd4e-b992c15b4e8a","quantity":1}],"tiers":["STANDARD"]}'
 {"offers":[{"offerId":"off-6ed676d4-f7ff-4518-80a5-ba623b55afa5","state":"QUOTED","groupNo":1,"destinationPostalPrefix":"787","tier":"STANDARD","lines":[{"catalogItemId":"item-4749b893-2ad9-450c-bd4e-b992c15b4e8a","quantity":1}],"window":{"earliest":"2026-11-01T15:00:00Z","latest":"2026-11-02T03:00:00Z","timeZone":"America/Chicago"},"witnessPath":{"nodeId":"node-98ff00c3-e4e0-454c-946d-cd58721d7107","pickupDepartureId":"dep-0219ff091eaf4cf9c7f93f27b2a17c5b","legs":[],"deliveryWaveId":"wave-d74aea0d-6d91-48ea-ae05-10d939ebad59"},"basis":"SCHEDULED","policyVersion":"v1","quotedAt":"2026-10-31T16:44:30.812774Z","expiresAt":"2026-10-31T16:54:30.812774Z"}],"unavailable":[]}
 ```
