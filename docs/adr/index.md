@@ -24,3 +24,4 @@ The decisions of `delivery-promise`, in the order they were taken. The ADR bodie
 | [0010](./0010-a2a-inbound-adapter.md) | A2A inbound adapter | Accepted (2026-10-29) |
 | [0011](./0011-the-delivery-window-names-its-local-time-zone.md) | the delivery window names its local time zone | Accepted (2026-10-30) |
 | [0012](./0012-adopt-the-fleet-rest-api-guideline.md) | adopt the fleet REST API guideline | Accepted (2026-11-01) |
+| [0013](./0013-agent-authority-levels-and-complete-mcp-surface.md) | agent authority levels and complete MCP surface | Accepted (2026-11-02) |

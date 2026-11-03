@@ -207,6 +207,8 @@ the first response (`POST /promises/{promiseId}/cancellations` requires it).
 | `list_promise_books` | `GET /promise-books?nodeId=&date=` |
 | `get_current_policy` | `GET /promise-policies/current` |
 
+Every tool is **authority `L1`** (Agentic Standard v2, [ADR 0013](docs/adr/0013-agent-authority-levels-and-complete-mcp-surface.md)): a pure read that changes nothing, declared in `tools/list` `_meta` under `com.warehouse/authority`. The server is stateless (no `Mcp-Session-Id`; legacy `initialize` and 2026-07-28 `server/discover` both answer) and also serves the `promise://books/{nodeId}/{date}` resource and the `check_order_promises` operator prompt.
+
 It drives the same use cases as the REST adapter, writes nothing (no outbox, no consumer, no sweeper, never dials Kafka) and carries **no auth** — the fleet-wide decision; the in-cluster ClusterIP boundary is the access control. Run it locally:
 
 ```
@@ -221,6 +223,8 @@ DATABASE_URL=postgres://... go run ./cmd/mcp    # MCP_ADDR :8090, LOG_LEVEL, SER
 | --- | --- | --- |
 | `promise_status` | exactly one of `orderId`, `promiseId` | the promises of an order, or one promise: state, terms, witness path, revisions, judgement |
 | `book_capacity` | `nodeId`, `date` (YYYY-MM-DD) | the node's promise books on that day: share, provisional and confirmed holds |
+
+Both skills carry the `authority:L1` tag — the level of the tool each fronts ([ADR 0013](docs/adr/0013-agent-authority-levels-and-complete-mcp-surface.md)).
 
 A request is a message whose first part is `{"skill":"promise_status","arguments":{"orderId":"ord-1001"}}` (Data part, or Text part holding that JSON); unknown fields are refused. The answer is one message: a Data part `{skill, data | problem}` and a one-line Text summary. Rejections are RFC 7807-style `problem`s inside the message with the REST status classification (400 request shape, 404 `not-found`, 422 `validation-failed`, 500 `internal-error`), never JSON-RPC errors. Like MCP it writes nothing and carries **no auth**. `A2A_AGENT_URL` (absolute http(s) URL advertised on the card) is mandatory; the binary refuses to boot without it.
 
