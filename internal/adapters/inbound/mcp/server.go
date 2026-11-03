@@ -34,10 +34,12 @@ const instructions = "Delivery promises of the retail network (read-only): read 
 	"get_delivery_offer (its tier, window, witness path and state QUOTED, EXPIRED or CONSUMED); read the confirmed " +
 	"promises of one customer order with list_promises_by_order (one per shipment group) or one promise in any state " +
 	"with get_promise (its terms, witness path, revisions and judgement); see the capacity ledger of a node's pickup " +
-	"cutoffs on one date with list_promise_books (share, provisional and confirmed holds per book); and read the " +
-	"current promise policy with get_current_policy (offer TTL, hold TTL, packages per order, capacity share and " +
-	"per-tier order deadlines). Nothing here changes data: quoting and the promise lifecycle are REST operations of " +
-	"delivery-promise, driven by checkout, and the policy is published on REST too."
+	"cutoffs on one date with list_promise_books (share, provisional and confirmed holds per book) or the " +
+	"promise://books/{nodeId}/{date} resource; and read the current promise policy with get_current_policy (offer " +
+	"TTL, hold TTL, packages per order, capacity share and per-tier order deadlines). Every tool is authority L1 " +
+	"(a pure read). Nothing here changes data: quoting and the promise lifecycle are REST operations of " +
+	"delivery-promise, driven by checkout, and the policy is published on REST too. Start with the " +
+	"check_order_promises prompt."
 
 // NewServer builds the MCP server for this bounded context with every tool
 // registered.
@@ -47,10 +49,19 @@ func NewServer(deps Deps) *mcp.Server {
 		&mcp.ServerOptions{Instructions: instructions},
 	)
 	deps.registerTools(server)
+	deps.registerResources(server)
+	deps.registerPrompts(server)
 	return server
 }
 
 // Handler returns the Streamable HTTP handler for the MCP server.
 func Handler(server *mcp.Server) http.Handler {
-	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+	// Stateless (Agentic Standard v2, AS-4): no Mcp-Session-Id is issued, so
+	// the server also answers the 2026-07-28 revision's per-request
+	// handshake (server/discover) while legacy initialize clients keep
+	// working. Nothing here relies on cross-call session state.
+	return mcp.NewStreamableHTTPHandler(
+		func(*http.Request) *mcp.Server { return server },
+		&mcp.StreamableHTTPOptions{Stateless: true},
+	)
 }

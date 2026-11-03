@@ -115,6 +115,11 @@ func checkToolMetadata(t *testing.T, tool *sdk.Tool) {
 	if tool.Description == "" {
 		t.Errorf("tool %q has no description", tool.Name)
 	}
+	// Agentic Standard v2 (AS-1, docs/adr/0013): every tool declares its
+	// authority level; this charter is read-only, so every tool is L1.
+	if level, ok := tool.Meta[authorityKey].(string); !ok || level != "L1" {
+		t.Errorf("tool %q must declare Meta[%q] = \"L1\" (read-only surface), got %v", tool.Name, authorityKey, tool.Meta[authorityKey])
+	}
 	if tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
 		t.Errorf("tool %q is not annotated read-only: %+v", tool.Name, tool.Annotations)
 		return

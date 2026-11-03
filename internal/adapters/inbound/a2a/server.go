@@ -83,7 +83,7 @@ func Card(cfg Config) *a2a.AgentCard {
 				ID:          skillPromiseStatus,
 				Name:        "Status of the delivery promises of an order",
 				Description: "Read the delivery promise(s) behind one customer order: pass orderId for every promise of the order (one per shipment group) or promiseId for one promise. Each promise carries its state (PROVISIONAL, CONFIRMED, AT_RISK, KEPT, BROKEN, RELEASED or CANCELLED), terms (tier, shipBy, deliverByEarliest, deliverByLatest, timeZone of the local calendar, basis, policyVersion), witness path, holdExpiresAt, revisions and, once judged, the judgement (outcome, cause, lateByMinutes). Pass exactly one of orderId and promiseId. Read-only; an unknown promise is answered as a 404 problem, an order with no promise as an empty list.",
-				Tags:        []string{"delivery-promise", "promise", "read"},
+				Tags:        []string{"delivery-promise", "promise", "read", "authority:L1"},
 				InputModes:  []string{"application/json"},
 				Examples: []string{
 					`{"skill":"promise_status","arguments":{"orderId":"ord-1001"}}`,
@@ -94,7 +94,7 @@ func Card(cfg Config) *a2a.AgentCard {
 				ID:          skillBookCapacity,
 				Name:        "Promise book capacity of a node on a date",
 				Description: "Read the promise books of one fulfillment node whose pickup cutoff falls on a date (YYYY-MM-DD, the node's own time zone): per book its state and capacity ledger (share, provisional and confirmed holds), its pickup departure and cutoffAt. Read-only; a node or date without books is answered as an empty list.",
-				Tags:        []string{"delivery-promise", "capacity", "read"},
+				Tags:        []string{"delivery-promise", "capacity", "read", "authority:L1"},
 				InputModes:  []string{"application/json"},
 				Examples: []string{
 					`{"skill":"book_capacity","arguments":{"nodeId":"N-AUS3","date":"2026-10-22"}}`,
