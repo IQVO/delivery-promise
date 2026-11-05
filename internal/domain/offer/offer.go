@@ -5,7 +5,9 @@
 // States: QUOTED, EXPIRED, CONSUMED; transitions QUOTED -> CONSUMED (Consume,
 // from MakePromise) and QUOTED -> EXPIRED (Expire, ExpireOffers). Invariants:
 // expiresAt <= min(quotedAt + offerTtl, the latest instant the witness pickup
-// cutoff can still be met) (ErrOfferExpiryTooLate); an expired or consumed
+// cutoff can still be met) (ErrOfferExpiryTooLate); orderByAt is that cutoff
+// bound uncapped by the TTL (the customer-facing "order by" instant); an
+// expired or consumed
 // offer cannot back a promise (ErrOfferNotQuotable); a fast tier is never
 // NOMINAL (ErrNominalBasisNotAllowedForTier). The offer raises the analytics
 // event DeliveryOfferQuoted.
@@ -61,6 +63,7 @@ type Offer struct {
 	policy       string
 	quotedAt     time.Time
 	expiresAt    time.Time
+	orderByAt    time.Time
 	state        State
 	closedAt     time.Time
 	version      int64
@@ -80,10 +83,16 @@ type Snapshot struct {
 	PolicyVersion     string
 	QuotedAt          time.Time
 	ExpiresAt         time.Time
-	State             State
-	ClosedAt          time.Time
-	PickupCutoffAt    time.Time
-	Version           int64
+	// OrderByAt is the cutoff-bound half of expiresAt: the latest instant the
+	// order can be placed and still make the witness pickup cutoff. Unlike
+	// expiresAt it is NOT capped by the offer TTL. Snapshots persisted before
+	// the field existed restore it as the zero time (the same tolerance as
+	// PickupCutoffAt).
+	OrderByAt      time.Time
+	State          State
+	ClosedAt       time.Time
+	PickupCutoffAt time.Time
+	Version        int64
 }
 
 // Quote is the input of QuoteDeliveryOffers for one (group, tier).
@@ -125,7 +134,8 @@ func New(q Quote, now time.Time) (*Offer, []shared.Event, error) {
 	o := &Offer{
 		id: q.ID, groupNo: q.GroupNo, destination: q.DestinationPrefix, tier: q.Tier, lines: slices.Clone(q.Lines),
 		window: q.Window, witness: q.Witness.Clone(), basis: q.Basis, policy: q.PolicyVersion, quotedAt: now,
-		expiresAt: shared.UTC(q.ExpiresAt), state: StateQuoted, version: 1, pickupCutoff: shared.UTC(q.PickupCutoffAt),
+		expiresAt: shared.UTC(q.ExpiresAt), orderByAt: shared.UTC(q.LatestMeetableAt), state: StateQuoted,
+		version: 1, pickupCutoff: shared.UTC(q.PickupCutoffAt),
 	}
 	ev := DeliveryOfferQuoted{
 		Header: shared.Header{Version: o.version, At: now}, OfferID: o.id, Tier: o.tier, DestinationPrefix: o.destination,
@@ -179,8 +189,8 @@ func Restore(s Snapshot) (*Offer, error) {
 	return &Offer{
 		id: s.ID, groupNo: s.GroupNo, destination: s.DestinationPrefix, tier: s.Tier, lines: slices.Clone(s.Lines),
 		window: s.Window, witness: s.Witness.Clone(), basis: s.Basis, policy: s.PolicyVersion, quotedAt: shared.UTC(s.QuotedAt),
-		expiresAt: shared.UTC(s.ExpiresAt), state: s.State, closedAt: shared.UTC(s.ClosedAt), version: s.Version,
-		pickupCutoff: shared.UTC(s.PickupCutoffAt),
+		expiresAt: shared.UTC(s.ExpiresAt), orderByAt: shared.UTC(s.OrderByAt), state: s.State,
+		closedAt: shared.UTC(s.ClosedAt), version: s.Version, pickupCutoff: shared.UTC(s.PickupCutoffAt),
 	}, nil
 }
 
@@ -273,6 +283,12 @@ func (o *Offer) QuotedAt() time.Time { return o.quotedAt }
 
 // ExpiresAt returns when the offer stops being quotable.
 func (o *Offer) ExpiresAt() time.Time { return o.expiresAt }
+
+// OrderByAt returns the latest instant the order can be placed and still make
+// the quoted window's witness pickup cutoff (cutoff minus the effective
+// handling, in business time). Unlike ExpiresAt it is not capped by the offer
+// TTL: ordering before it keeps the quoted window even after a re-quote.
+func (o *Offer) OrderByAt() time.Time { return o.orderByAt }
 
 // PickupCutoffAt returns the witness pickup cutoff (shipBy).
 func (o *Offer) PickupCutoffAt() time.Time { return o.pickupCutoff }

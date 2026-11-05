@@ -34,6 +34,7 @@ The first table is this context's own language, with the identifier each term ha
 | **Constraint** | Why a tier has no offer: `DESTINATION_NOT_SERVED`, `ITEM_QUANTITY_NOT_AVAILABLE`, `DELIVERY_SLA_UNAVAILABLE`, `NODE_CAPACITY_EXHAUSTED`, `PAST_ORDER_DEADLINE`. | `search` constraints, API `OfferConstraint` | An error: "no offer" is a normal 200 answer |
 | **Revision** | One re-promise: `{no, previousTerms, reason, revisedAt}`. | `promise.Revision` | |
 | **Hold expiry** | `holdExpiresAt`: the instant a provisional promise is released if no order confirmed it. | `promise.Promise.HoldExpiresAt` | The offer's `expiresAt` |
+| **Order-by instant** | `orderByAt`: the latest instant the order can be placed and still make the quoted window's witness pickup cutoff — `expiresAt`'s cutoff bound uncapped by the offer TTL. | `offer.Offer.OrderByAt` | A node **Cutoff** minus effective handling |
 | **Read model** | A local copy of another context's facts, fed only by events. | `rm_*` tables, `internal/application/readmodel` | An aggregate: no invariant is enforced on it |
 | **Outbox / Inbox** | Events written with the aggregates and published later; consumed event ids claimed with their effect. | `outbox_events`, `processed_events` | |
 

@@ -52,6 +52,7 @@ type Offer struct {
 	PolicyVersion           string    `json:"policyVersion"`
 	QuotedAt                time.Time `json:"quotedAt"`
 	ExpiresAt               time.Time `json:"expiresAt"`
+	OrderByAt               time.Time `json:"orderByAt"`
 }
 
 // Unavailable says why a (group, tier) has no offer.
@@ -191,6 +192,7 @@ func FromOffer(o *offer.Offer) Offer {
 		OfferID: string(o.ID()), State: string(o.State()), GroupNo: o.GroupNo(), DestinationPostalPrefix: o.DestinationPrefix(),
 		Tier: string(o.Tier()), Lines: lines(o.Lines()), Window: Window{Earliest: o.Window().Earliest.UTC(), Latest: o.Window().Latest.UTC(), TimeZone: o.Window().TimeZone},
 		WitnessPath: witness(o.Witness()), Basis: string(o.Basis()), PolicyVersion: o.PolicyVersion(), QuotedAt: o.QuotedAt().UTC(), ExpiresAt: o.ExpiresAt().UTC(),
+		OrderByAt: o.OrderByAt().UTC(),
 	}
 }
 
