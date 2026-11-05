@@ -307,6 +307,6 @@ func (o *Offer) Snapshot() Snapshot {
 	return Snapshot{
 		ID: o.id, GroupNo: o.groupNo, DestinationPrefix: o.destination, Tier: o.tier, Lines: slices.Clone(o.lines), Window: o.window,
 		Witness: o.witness.Clone(), Basis: o.basis, PolicyVersion: o.policy, QuotedAt: o.quotedAt, ExpiresAt: o.expiresAt,
-		State: o.state, ClosedAt: o.closedAt, PickupCutoffAt: o.pickupCutoff, Version: o.version,
+		OrderByAt: o.orderByAt, State: o.state, ClosedAt: o.closedAt, PickupCutoffAt: o.pickupCutoff, Version: o.version,
 	}
 }
