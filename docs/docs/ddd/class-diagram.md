@@ -25,6 +25,7 @@ classDiagram
     +string policyVersion
     +time quotedAt
     +time expiresAt
+    +time orderByAt
     +State state
     +Consume(now)
     +Expire(now)

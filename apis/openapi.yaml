@@ -639,6 +639,7 @@ components:
       - policyVersion
       - quotedAt
       - expiresAt
+      - orderByAt
       properties:
         offerId:
           type: string
@@ -667,6 +668,10 @@ components:
           type: string
           format: date-time
           description: min(quotedAt + offerTtl, the latest instant the witness pickup cutoff can still be met).
+        orderByAt:
+          type: string
+          format: date-time
+          description: The latest instant the order can be placed and still make the quoted window's witness pickup cutoff (cutoff minus the effective handling, in business time). Unlike expiresAt it is not capped by the offer TTL; ordering before it keeps the quoted window even after a re-quote. Snapshots quoted before the field existed expose the zero time.
         groupNo:
           type: integer
           minimum: 1

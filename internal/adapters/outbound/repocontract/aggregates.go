@@ -31,6 +31,7 @@ func offerRoundTrip(t *testing.T, f Fixture) {
 	eq(t, "lines", got.Lines()[0].Quantity, 2)
 	eq(t, "policy", got.PolicyVersion(), "v0")
 	eqTime(t, "expiresAt", got.ExpiresAt(), o.ExpiresAt())
+	eqTime(t, "order by", got.OrderByAt(), o.OrderByAt())
 	eqTime(t, "pickup cutoff", got.PickupCutoffAt(), o.PickupCutoffAt())
 	eqTime(t, "window latest", got.Window().Latest, o.Window().Latest)
 	eq(t, "window time zone", got.Window().TimeZone, "America/Chicago")

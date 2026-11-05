@@ -28,7 +28,7 @@ Source: `internal/domain/offer/offer.go` (`Consume`, `Expire`).
 
 | Canvas item | Content |
 | --- | --- |
-| Invariants | `expiresAt` is at most the earlier of `quotedAt + offerTtl` and the latest instant the witness pickup cutoff can still be met (`ErrOfferExpiryTooLate`, never returned over HTTP); an expired or consumed offer cannot back a promise (`ErrOfferNotQuotable`); a fast tier is never `NOMINAL` (`ErrNominalBasisNotAllowedForTier`) |
+| Invariants | `expiresAt` is at most the earlier of `quotedAt + offerTtl` and the latest instant the witness pickup cutoff can still be met (`ErrOfferExpiryTooLate`, never returned over HTTP); `orderByAt` is that cutoff bound uncapped by the TTL (the customer-facing "order by" instant); an expired or consumed offer cannot back a promise (`ErrOfferNotQuotable`); a fast tier is never `NOMINAL` (`ErrNominalBasisNotAllowedForTier`) |
 | Corrective policies | `ExpireOffers` sweep; `Quotable(now)` also treats an offer past `expiresAt` as not quotable before the sweep reaches it; checkout re-quotes when `offer-not-quotable` |
 | Commands | `QuoteDeliveryOffers` (creates), `MakePromise` (consumes), `ExpireOffers` |
 | Events | `DeliveryOfferQuoted` (analytics only), one per persisted offer |

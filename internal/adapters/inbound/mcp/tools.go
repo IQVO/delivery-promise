@@ -102,9 +102,10 @@ func (d Deps) registerTools(server *mcp.Server) {
 		Name: "get_delivery_offer",
 		Description: "Read one delivery offer in any state (QUOTED, EXPIRED or CONSUMED): its tier, groupNo, " +
 			"destination postal prefix, lines, delivery window (earliest, latest and the delivery station's IANA timeZone, " +
-			"the local calendar of its days), the witness path that proves feasibility (node, pickup " +
-			"departure, legs, delivery wave), basis (SCHEDULED or NOMINAL), the policyVersion it was quoted under, and " +
-			"quotedAt/expiresAt. Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
+			"the local calendar of its days), the witness path that proves feasibility (node, pickup departure, legs, " +
+			"delivery wave), basis (SCHEDULED or NOMINAL), the policyVersion it was quoted under, quotedAt/expiresAt, " +
+			"and orderByAt (the latest instant the order can be placed and still make the quoted window, uncapped by " +
+			"the offer TTL). Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
 			"fails with not-found.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
