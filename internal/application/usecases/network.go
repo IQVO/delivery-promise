@@ -153,6 +153,11 @@ func (s *Service) fill(ctx context.Context, in *search.Input, stationID string, 
 	if err != nil {
 		return err
 	}
+	confirmed, err := s.Promises.ConfirmedHolds(ctx, nodeIDs)
+	if err != nil {
+		return err
+	}
+	addUnaccounted(holds, confirmed, latestAsOf(net.Listings))
 	in.Available = availability(net, holds)
 	for _, sc := range net.Scorecards {
 		in.Grades[sc.NodeID] = search.Grade(sc.Grade)
@@ -166,6 +171,39 @@ func (s *Service) fill(ctx context.Context, in *search.Input, stationID string, 
 		in.Books[string(b.ID())] = search.BookView{Open: b.State() == book.StateOpen, Room: b.Room(), HoldDeadlineAt: b.HoldDeadlineAt()}
 	}
 	return nil
+}
+
+// ReservationLag is how long after a promise is confirmed the warehouse is
+// taken to have reserved its units, so that a listing figure computed from
+// then on already excludes them (ADR 0015). It comes from the docs' worked
+// example (order-assignment-model.md): order placed 14:10, held order raised
+// 15:56, released to the floor 16:02, i.e. 1h52 later; 2h covers it.
+const ReservationLag = 2 * time.Hour
+
+// latestAsOf is the newest asOf among the listings of each (node, item): the
+// instant the figure the promise side sells against was computed.
+func latestAsOf(listings []readmodel.Listing) map[repository.HoldKey]time.Time {
+	out := map[repository.HoldKey]time.Time{}
+	for _, l := range listings {
+		k := repository.HoldKey{NodeID: l.NodeID, ItemID: l.ItemID}
+		if l.AsOf.After(out[k]) {
+			out[k] = l.AsOf
+		}
+	}
+	return out
+}
+
+// addUnaccounted adds to holds the units of confirmed promises that the
+// listing figure cannot include yet: the figure was computed before the
+// warehouse reserved the order (confirmedAt + ReservationLag). A figure that
+// lands late or out of order carries an older asOf and so releases nothing.
+func addUnaccounted(holds map[repository.HoldKey]int, confirmed []repository.ConfirmedHold, asOf map[repository.HoldKey]time.Time) {
+	for _, c := range confirmed {
+		if figure, ok := asOf[c.Key]; ok && !figure.Before(c.ConfirmedAt.Add(ReservationLag)) {
+			continue
+		}
+		holds[c.Key] += c.Qty
+	}
 }
 
 // availability is the units of an item shippable from a node: the listing's
@@ -203,6 +241,11 @@ func (s *Service) nodeAvailability(ctx context.Context, nodeID string, lines []s
 	if err != nil {
 		return nil, err
 	}
+	confirmed, err := s.Promises.ConfirmedHolds(ctx, []string{nodeID})
+	if err != nil {
+		return nil, err
+	}
+	addUnaccounted(holds, confirmed, latestAsOf(listings))
 	out := map[string]int{}
 	for _, l := range listings {
 		if l.Suppressed {

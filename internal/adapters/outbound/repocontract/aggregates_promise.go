@@ -18,6 +18,24 @@ var promiseCases = []named{
 	{"ListHoldsExpired and ListAtRisk", promiseSweeps},
 	{"ListActiveByPath matches the pickup, a leg or the wave of active promises", promiseByPath},
 	{"HeldQuantities sums PROVISIONAL promises per node and item", promiseHeld},
+	{"ConfirmedHolds lists the lines of CONFIRMED and AT_RISK promises with their confirmation instant", promiseConfirmedHolds},
+}
+
+func promiseConfirmedHolds(t *testing.T, f Fixture) {
+	noErr(t, f.Promises.Save(ctx, NewPromise(t, "prm-1", "off-1", "N-AUS3", "dep-1800"))) // provisional: not listed
+	confirmedPromise(t, f, "prm-4", "off-4", "ord-1", 1)
+	got, err := f.Promises.ConfirmedHolds(ctx, []string{"N-AUS3"})
+	noErr(t, err)
+	eq(t, "one confirmed line", len(got), 1)
+	eq(t, "key", got[0].Key, repository.HoldKey{NodeID: "N-AUS3", ItemID: "ci-1001"})
+	eq(t, "quantity", got[0].Qty, 2)
+	eq(t, "confirmedAt", got[0].ConfirmedAt.UTC().Equal(T0.Add(time.Minute)), true)
+	got, err = f.Promises.ConfirmedHolds(ctx, []string{"N-DFW7"})
+	noErr(t, err)
+	eq(t, "other nodes are not listed", len(got), 0)
+	got, err = f.Promises.ConfirmedHolds(ctx, nil)
+	noErr(t, err)
+	eq(t, "no nodes", len(got), 0)
 }
 
 // confirmedPromise stores a promise and confirms it in a second save, as the

@@ -18,6 +18,7 @@ func Restore(s Snapshot) (*Promise, error) {
 		lines: slices.Clone(s.Lines), terms: normTerms(s.Terms), witness: s.Witness.Clone(), bookID: s.BookID,
 		holdExpiresAt: shared.UTC(s.HoldExpiresAt), revisions: cloneRevisions(s.Revisions), atRiskReason: s.AtRiskReason,
 		cancelReason: s.CancelReason, releaseReason: s.ReleaseReason, unkeepable: s.Unkeepable, madeAt: shared.UTC(s.MadeAt), version: s.Version,
+		confirmedAt: shared.UTC(s.ConfirmedAt),
 	}
 	if s.Judgement != nil {
 		j := *s.Judgement
@@ -133,6 +134,6 @@ func (p *Promise) Snapshot() Snapshot {
 		ID: p.id, OfferID: p.offerID, OrderID: p.orderID, GroupNo: p.groupNo, State: p.state, DestinationPrefix: p.destination,
 		Lines: slices.Clone(p.lines), Terms: p.terms, Witness: p.witness.Clone(), BookID: p.bookID, HoldExpiresAt: p.holdExpiresAt,
 		Revisions: cloneRevisions(p.revisions), Judgement: p.Judgement(), AtRiskReason: p.atRiskReason, CancelReason: p.cancelReason,
-		ReleaseReason: p.releaseReason, Unkeepable: p.unkeepable, MadeAt: p.madeAt, Version: p.version,
+		ReleaseReason: p.releaseReason, Unkeepable: p.unkeepable, MadeAt: p.madeAt, ConfirmedAt: p.confirmedAt, Version: p.version,
 	}
 }

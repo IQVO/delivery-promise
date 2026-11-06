@@ -59,6 +59,10 @@ type PromiseRepository interface {
 	// HeldQuantities returns the units held by PROVISIONAL promises, per
 	// (node, item), for the nodes.
 	HeldQuantities(ctx context.Context, nodeIDs []string) (map[repository.HoldKey]int, error)
+	// ConfirmedHolds returns the lines of the active (CONFIRMED and AT_RISK)
+	// promises, per (node, item) of their witness, with the instant each was
+	// confirmed: units the warehouse has not reserved yet (ADR 0015).
+	ConfirmedHolds(ctx context.Context, nodeIDs []string) ([]repository.ConfirmedHold, error)
 	// Save persists the promise under the concurrency rule of the package
 	// comment. A second promise for the same offer is ErrConcurrentUpdate.
 	Save(ctx context.Context, p *promise.Promise) error

@@ -188,6 +188,26 @@ func (r *PromiseRepository) HeldQuantities(ctx context.Context, nodeIDs []string
 	return out, nil
 }
 
+// ConfirmedHolds lists the lines of the CONFIRMED and AT_RISK promises per
+// (node, item), oldest confirmation first.
+func (r *PromiseRepository) ConfirmedHolds(ctx context.Context, nodeIDs []string) ([]repository.ConfirmedHold, error) {
+	defer r.s.enter(ctx)()
+	var out []repository.ConfirmedHold
+	for _, p := range r.s.st.promises {
+		if !p.State.Active() || !slices.Contains(nodeIDs, p.Witness.NodeID) {
+			continue
+		}
+		at := p.ConfirmedAt
+		if at.IsZero() {
+			at = p.HoldExpiresAt // confirmed before the instant was recorded: the latest it can have been
+		}
+		for _, l := range p.Lines {
+			out = append(out, repository.ConfirmedHold{Key: repository.HoldKey{NodeID: p.Witness.NodeID, ItemID: l.CatalogItemID}, Qty: l.Quantity, ConfirmedAt: at})
+		}
+	}
+	return out, nil
+}
+
 // Save stores the promise under the version rule and the unique offer index.
 func (r *PromiseRepository) Save(ctx context.Context, p *promise.Promise) error {
 	defer r.s.enter(ctx)()

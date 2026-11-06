@@ -42,7 +42,7 @@ func (p *Promise) Confirm(orderID string, groupNo int, now time.Time) ([]shared.
 	if !now.Before(p.holdExpiresAt) {
 		return nil, fmt.Errorf("%w: promise %s held until %s", ErrPromiseHoldExpired, p.id, p.holdExpiresAt.Format(time.RFC3339))
 	}
-	p.state, p.orderID, p.groupNo = StateConfirmed, orderID, groupNo
+	p.state, p.orderID, p.groupNo, p.confirmedAt = StateConfirmed, orderID, groupNo, shared.UTC(now)
 	p.version++
 	return []shared.Event{PromiseConfirmed{Header: p.header(now), PromiseID: p.id, OrderID: orderID, GroupNo: groupNo}}, nil
 }
