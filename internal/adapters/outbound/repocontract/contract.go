@@ -129,11 +129,14 @@ func NewPromise(t *testing.T, id, offerID, node, pickup string) *promise.Promise
 	return p
 }
 
-// NewPolicy publishes version current+1 with a NEXT_DAY deadline.
+// NewPolicy publishes version current+1 with a NEXT_DAY deadline and
+// non-default measured-transit parameters (ADR 0014), so the contract suite
+// pins every persisted field.
 func NewPolicy(t *testing.T, current int) *policy.Policy {
 	t.Helper()
 	p, _, err := policy.Publish(current, policy.Input{
 		OfferTTLMinutes: 10, HoldTTLMinutes: 15, PackagesPerOrder: 2, SharePercent: 80,
+		TransitWindowDays: 14, TransitServiceLevelPercent: 95, MinTransitObservations: 40,
 		Deadlines: []policy.Deadline{{Tier: shared.TierNextDay, RegionID: "R-SC", Minute: 23*60 + 59}},
 	}, T0)
 	noErr(t, err)

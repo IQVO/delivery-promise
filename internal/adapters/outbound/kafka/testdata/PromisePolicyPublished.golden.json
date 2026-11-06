@@ -10,6 +10,7 @@
   "data": {
     "capacitySharePercent": 80,
     "holdTtlMinutes": 15,
+    "minTransitObservations": 30,
     "offerTtlMinutes": 10,
     "orderDeadlines": [
       {
@@ -25,6 +26,8 @@
     "packagesPerOrder": 2,
     "policyVersion": "v2",
     "publishedAt": "2026-10-22T19:05:00Z",
+    "transitServiceLevelPercent": 95,
+    "transitWindowDays": 21,
     "version": 2
   }
 }

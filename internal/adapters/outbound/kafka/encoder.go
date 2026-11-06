@@ -192,6 +192,8 @@ func policyData(ev policy.PromisePolicyPublished) map[string]any {
 	}
 	return map[string]any{
 		"policyVersion": ev.PolicyVersion, "version": ev.Number, "offerTtlMinutes": ev.OfferTTLMinutes, "holdTtlMinutes": ev.HoldTTLMinutes,
-		"packagesPerOrder": ev.PackagesPerOrder, "capacitySharePercent": ev.SharePercent, "orderDeadlines": ds, "publishedAt": utc(ev.PublishedAt),
+		"packagesPerOrder": ev.PackagesPerOrder, "capacitySharePercent": ev.SharePercent, "transitWindowDays": ev.TransitWindowDays,
+		"transitServiceLevelPercent": ev.TransitServiceLevelPercent, "minTransitObservations": ev.MinTransitObservations,
+		"orderDeadlines": ds, "publishedAt": utc(ev.PublishedAt),
 	}
 }

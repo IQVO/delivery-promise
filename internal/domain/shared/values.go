@@ -59,14 +59,17 @@ func (t Tier) SlowerOrEqual() []Tier {
 // Basis says what a window was computed from.
 type Basis string
 
-// The two bases of the model.
+// The three bases of the model.
 const (
 	BasisScheduled Basis = "SCHEDULED"
 	BasisNominal   Basis = "NOMINAL"
+	BasisMeasured  Basis = "MEASURED"
 )
 
-// Valid reports whether b is SCHEDULED or NOMINAL.
-func (b Basis) Valid() bool { return b == BasisScheduled || b == BasisNominal }
+// Valid reports whether b is SCHEDULED, NOMINAL or MEASURED.
+func (b Basis) Valid() bool {
+	return b == BasisScheduled || b == BasisNominal || b == BasisMeasured
+}
 
 // Domain bounds. They are plain literals on purpose (ADR 0002, A29).
 const (
@@ -194,7 +197,9 @@ type Witness struct {
 	DeliveryWaveID    string
 }
 
-// Validate checks the witness against its basis.
+// Validate checks the witness against its basis. A MEASURED witness carries
+// the same path as a SCHEDULED one (ADR 0014); only NOMINAL is empty
+// (contracts-delta E8).
 func (w Witness) Validate(b Basis) error {
 	if !ValidID(w.NodeID) {
 		return Invalid("witness nodeId %q is not a valid id", w.NodeID)
@@ -206,7 +211,7 @@ func (w Witness) Validate(b Basis) error {
 		return nil
 	}
 	if !ValidID(w.PickupDepartureID) || !ValidID(w.DeliveryWaveID) {
-		return Invalid("a SCHEDULED witness needs a pickup departure and a delivery wave")
+		return Invalid("a %s witness needs a pickup departure and a delivery wave", b)
 	}
 	for _, l := range w.Legs {
 		if !ValidID(l) {

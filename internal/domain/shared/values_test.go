@@ -35,8 +35,8 @@ func TestTierRules(t *testing.T) {
 }
 
 func TestBasisValid(t *testing.T) {
-	if !BasisScheduled.Valid() || !BasisNominal.Valid() || Basis("GUESS").Valid() || Basis("").Valid() {
-		t.Fatal("only SCHEDULED and NOMINAL are bases")
+	if !BasisScheduled.Valid() || !BasisNominal.Valid() || !BasisMeasured.Valid() || Basis("GUESS").Valid() || Basis("").Valid() {
+		t.Fatal("only SCHEDULED, NOMINAL and MEASURED are bases")
 	}
 }
 
@@ -148,6 +148,9 @@ func TestWitnessValidate(t *testing.T) {
 	if err := sched.Validate(BasisScheduled); err != nil {
 		t.Fatalf("scheduled witness refused: %v", err)
 	}
+	if err := sched.Validate(BasisMeasured); err != nil {
+		t.Fatalf("a measured witness carries the same path as a scheduled one: %v", err)
+	}
 	if err := (Witness{NodeID: "n1"}).Validate(BasisNominal); err != nil {
 		t.Fatalf("nominal witness refused: %v", err)
 	}
@@ -160,9 +163,12 @@ func TestWitnessValidate(t *testing.T) {
 		{"nominal with pickup", Witness{NodeID: "n1", PickupDepartureID: "d1"}, BasisNominal},
 		{"nominal with wave", Witness{NodeID: "n1", DeliveryWaveID: "w1"}, BasisNominal},
 		{"nominal with legs", Witness{NodeID: "n1", Legs: []string{"d"}}, BasisNominal},
+		{"nominal cannot carry a path", sched, BasisNominal},
 		{"scheduled without pickup", Witness{NodeID: "n1", DeliveryWaveID: "w1"}, BasisScheduled},
 		{"scheduled without wave", Witness{NodeID: "n1", PickupDepartureID: "d1"}, BasisScheduled},
 		{"scheduled bad leg", Witness{NodeID: "n1", PickupDepartureID: "d1", DeliveryWaveID: "w1", Legs: []string{"!"}}, BasisScheduled},
+		{"measured without pickup", Witness{NodeID: "n1", DeliveryWaveID: "w1"}, BasisMeasured},
+		{"measured without wave", Witness{NodeID: "n1", PickupDepartureID: "d1"}, BasisMeasured},
 	}
 	for _, c := range bad {
 		if err := c.w.Validate(c.basis); !errors.Is(err, ErrValidation) {
