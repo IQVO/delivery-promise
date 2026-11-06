@@ -96,7 +96,7 @@ func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Po
 		Now: now, Policy: pol, Lines: lines, Tiers: tiers, SingleGroup: opt.singleGroup, OnlyNode: opt.onlyNode,
 		ExcludeNodes: opt.excludeNodes, ExcludeDepartures: opt.excludeDepartures, ExcludeWaves: opt.excludeWaves,
 		Nodes: map[string]search.Node{}, Grades: map[string]search.Grade{}, Books: map[string]search.BookView{},
-		Available: func(string, string) int { return 0 },
+		Available: func(string, string) int { return 0 }, MeasuredTransit: s.measuredTransitOf(ctx, pol, now),
 	}
 	area, err := s.Network.GetArea(ctx, prefix)
 	if errors.Is(err, ports.ErrNotFound) {
@@ -119,6 +119,19 @@ func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Po
 		return in, nil
 	}
 	return in, s.fill(ctx, &in, area.StationID, lines)
+}
+
+// measuredTransitOf adapts the measured-transit read model to the search's
+// closure: the current policy's service-level percentile, minimum observations
+// and window (ADR 0014). A service without the port never measures.
+func (s *Service) measuredTransitOf(ctx context.Context, pol *policy.Policy, now time.Time) func(origin, dest string) (bool, int) {
+	if s.TransitActuals == nil {
+		return nil
+	}
+	percentile, minObs, window := pol.TransitServiceLevelPercent(), pol.MinTransitObservations(), pol.TransitWindowDays()
+	return func(origin, dest string) (bool, int) {
+		return s.TransitActuals.MeasuredTransit(ctx, origin, dest, percentile, minObs, window, now)
+	}
 }
 
 func (s *Service) fill(ctx context.Context, in *search.Input, stationID string, lines []shared.Line) error {
