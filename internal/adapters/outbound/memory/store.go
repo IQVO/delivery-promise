@@ -31,26 +31,37 @@ import (
 // state is everything a unit of work can change. Stored values are replaced,
 // never edited in place, so copying the maps is enough.
 type state struct {
-	offers      map[offer.ID]offer.Snapshot
-	promises    map[promise.ID]promise.Snapshot
-	books       map[book.ID]book.Snapshot
-	policies    map[int]policy.Snapshot
-	nodes       map[string]readmodel.Node
-	regions     map[string]readmodel.Region
-	areas       map[string]readmodel.Area
-	lanes       map[string]search.Lane
-	items       map[string]readmodel.Item
-	listings    map[string]readmodel.Listing
-	departures  map[string]search.Departure
-	waves       map[string]search.Wave
-	scorecards  map[string]readmodel.Scorecard
-	assignments map[string]readmodel.Assignment
-	shipments   map[string][]string
-	trackingOf  map[string]string
-	outcomes    map[string]readmodel.PackageOutcome
-	inbox       map[string]string
-	outbox      []shared.Event
+	offers       map[offer.ID]offer.Snapshot
+	promises     map[promise.ID]promise.Snapshot
+	books        map[book.ID]book.Snapshot
+	policies     map[int]policy.Snapshot
+	nodes        map[string]readmodel.Node
+	regions      map[string]readmodel.Region
+	areas        map[string]readmodel.Area
+	lanes        map[string]search.Lane
+	items        map[string]readmodel.Item
+	listings     map[string]readmodel.Listing
+	departures   map[string]search.Departure
+	waves        map[string]search.Wave
+	scorecards   map[string]readmodel.Scorecard
+	assignments  map[string]readmodel.Assignment
+	shipments    map[string][]string
+	trackingOf   map[string]string
+	outcomes     map[string]readmodel.PackageOutcome
+	transitOpen  map[string]transitOpenRow
+	transitRings map[transitPair][]readmodel.TransitObservation
+	inbox        map[string]string
+	outbox       []shared.Event
 }
+
+// transitOpenRow is the open pairing row of a departed load (ADR 0014).
+type transitOpenRow struct {
+	Origin     string
+	DepartedAt time.Time
+}
+
+// transitPair keys one (origin, dest) observations ring.
+type transitPair struct{ origin, dest string }
 
 func newState() state {
 	return state{
@@ -59,7 +70,8 @@ func newState() state {
 		areas: map[string]readmodel.Area{}, lanes: map[string]search.Lane{}, items: map[string]readmodel.Item{},
 		listings: map[string]readmodel.Listing{}, departures: map[string]search.Departure{}, waves: map[string]search.Wave{},
 		scorecards: map[string]readmodel.Scorecard{}, assignments: map[string]readmodel.Assignment{}, shipments: map[string][]string{},
-		trackingOf: map[string]string{}, outcomes: map[string]readmodel.PackageOutcome{}, inbox: map[string]string{},
+		trackingOf: map[string]string{}, outcomes: map[string]readmodel.PackageOutcome{}, transitOpen: map[string]transitOpenRow{},
+		transitRings: map[transitPair][]readmodel.TransitObservation{}, inbox: map[string]string{},
 	}
 }
 
@@ -77,9 +89,18 @@ func (st state) clone() state {
 		nodes: cloneMap(st.nodes), regions: cloneMap(st.regions), areas: cloneMap(st.areas), lanes: cloneMap(st.lanes),
 		items: cloneMap(st.items), listings: cloneMap(st.listings), departures: cloneMap(st.departures), waves: cloneMap(st.waves),
 		scorecards: cloneMap(st.scorecards), assignments: cloneMap(st.assignments), shipments: cloneMap(st.shipments),
-		trackingOf: cloneMap(st.trackingOf), outcomes: cloneMap(st.outcomes), inbox: cloneMap(st.inbox),
+		trackingOf: cloneMap(st.trackingOf), outcomes: cloneMap(st.outcomes), transitOpen: cloneMap(st.transitOpen),
+		transitRings: cloneTransitRings(st.transitRings), inbox: cloneMap(st.inbox),
 		outbox: append([]shared.Event(nil), st.outbox...),
 	}
+}
+
+func cloneTransitRings(m map[transitPair][]readmodel.TransitObservation) map[transitPair][]readmodel.TransitObservation {
+	out := make(map[transitPair][]readmodel.TransitObservation, len(m))
+	for k, v := range m {
+		out[k] = append([]readmodel.TransitObservation(nil), v...)
+	}
+	return out
 }
 
 // Store is the shared state of the in-memory doubles.
@@ -121,6 +142,9 @@ func (s *Store) Network() *NetworkViews { return &NetworkViews{s} }
 
 // Shipments returns the ShipmentViews double.
 func (s *Store) Shipments() *ShipmentViews { return &ShipmentViews{s} }
+
+// TransitActuals returns the TransitActuals double (ADR 0014).
+func (s *Store) TransitActuals() *TransitActuals { return &TransitActuals{s} }
 
 // Outbox returns the EventOutbox double.
 func (s *Store) Outbox() *Outbox { return &Outbox{s} }
