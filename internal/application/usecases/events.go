@@ -155,6 +155,20 @@ type BookingFailed struct {
 	DepartureID  string `json:"departureId"`
 }
 
+// LoadDeparted is linehaul-transportation LoadDeparted (ADR 0014).
+type LoadDeparted struct {
+	LoadID       string    `json:"loadId"`
+	OriginNodeID string    `json:"originNodeId"`
+	DepartedAt   time.Time `json:"departedAt"`
+}
+
+// LoadArrived is linehaul-transportation LoadArrived (ADR 0014).
+type LoadArrived struct {
+	LoadID            string    `json:"loadId"`
+	DestinationNodeID string    `json:"destinationNodeId"`
+	ArrivedAt         time.Time `json:"arrivedAt"`
+}
+
 // WaveScheduled is last-mile-delivery DeliveryWaveScheduled.
 type WaveScheduled struct {
 	WaveID         string    `json:"waveId"`

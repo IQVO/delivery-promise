@@ -74,6 +74,22 @@ func (s *Service) OnBookingFailed(ctx context.Context, m Meta, e BookingFailed) 
 	return s.assignmentRisk(ctx, m, e.AssignmentID, ReasonBookingFailed, nil, []string{e.DepartureID})
 }
 
+// OnLoadDeparted opens the load's pairing row of the measured-transit read
+// model (ADR 0014).
+func (s *Service) OnLoadDeparted(ctx context.Context, m Meta, e LoadDeparted) error {
+	return s.project(ctx, m, func(ctx context.Context) error {
+		return s.TransitActuals.RecordLoadDeparted(ctx, e.LoadID, e.OriginNodeID, e.DepartedAt.UTC())
+	})
+}
+
+// OnLoadArrived pairs the load's open row into one measured transit
+// observation and deletes it (ADR 0014).
+func (s *Service) OnLoadArrived(ctx context.Context, m Meta, e LoadArrived) error {
+	return s.project(ctx, m, func(ctx context.Context) error {
+		return s.TransitActuals.RecordLoadArrived(ctx, e.LoadID, e.DestinationNodeID, e.ArrivedAt.UTC())
+	})
+}
+
 // ---- last-mile-delivery ------------------------------------------------------------------------------------
 
 // OnWaveScheduled projects DeliveryWaveScheduled.

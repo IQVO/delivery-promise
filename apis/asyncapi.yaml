@@ -169,6 +169,10 @@ channels:
         $ref: '#/components/messages/BookingMoved'
       BookingFailed:
         $ref: '#/components/messages/BookingFailed'
+      LoadDeparted:
+        $ref: '#/components/messages/LoadDeparted'
+      LoadArrived:
+        $ref: '#/components/messages/LoadArrived'
   lastMileEvents:
     address: retailnetwork.last-mile-delivery.events
     title: last-mile-delivery integration topic (consumed)
@@ -322,9 +326,11 @@ operations:
     channel:
       $ref: '#/channels/linehaulEvents'
     title: Consume linehaul-transportation events
-    summary: Consume DepartureScheduled, DepartureCapacityChanged, DepartureCancelled, BookingMoved, BookingFailed from linehaul-transportation.
-    description: The service consumes DepartureScheduled, DepartureCapacityChanged, DepartureCancelled, BookingMoved, BookingFailed
-      from `retailnetwork.linehaul-transportation.events` to keep its local read models and to drive RepromiseOnRisk, JudgeOnDelivery
+    summary: Consume DepartureScheduled, DepartureCapacityChanged, DepartureCancelled, BookingMoved, BookingFailed, LoadDeparted,
+      LoadArrived from linehaul-transportation.
+    description: The service consumes DepartureScheduled, DepartureCapacityChanged, DepartureCancelled, BookingMoved, BookingFailed,
+      LoadDeparted and LoadArrived from `retailnetwork.linehaul-transportation.events` to keep its local read models (the
+      load events pair by loadId into the measured-transit read model, ADR 0014) and to drive RepromiseOnRisk, JudgeOnDelivery
       and CancelPromise. It never calls linehaul-transportation synchronously.
     tags:
     - name: consumed-linehaul-transportation
@@ -334,6 +340,8 @@ operations:
     - $ref: '#/channels/linehaulEvents/messages/DepartureCancelled'
     - $ref: '#/channels/linehaulEvents/messages/BookingMoved'
     - $ref: '#/channels/linehaulEvents/messages/BookingFailed'
+    - $ref: '#/channels/linehaulEvents/messages/LoadDeparted'
+    - $ref: '#/channels/linehaulEvents/messages/LoadArrived'
   receiveLastMileEvents:
     action: receive
     channel:
@@ -1216,6 +1224,62 @@ components:
             assignmentId: asg-31b7
             departureId: dep-AUS3-1800
             reason: DEPARTURE_FULL
+    LoadDeparted:
+      name: LoadDeparted
+      title: A load left its origin node
+      summary: A load left its origin node.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.linehaul-transportation.events`; `type` = `com.retailnetwork.logistics.linehaul-transportation.load.LoadDeparted`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: opens the load''s pairing row of the measured-transit read model (ADR 0014).'
+      tags:
+      - name: consumed-linehaul-transportation
+      payload:
+        $ref: '#/components/schemas/LoadDepartedConsumed'
+      examples:
+      - name: loadDeparted
+        summary: A load left its origin node.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0101
+          source: /retailnetwork/linehaul-transportation
+          type: com.retailnetwork.logistics.linehaul-transportation.load.LoadDeparted
+          subject: ld-91f2
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:linehaul-transportation:events:LoadDeparted:v1
+          data:
+            loadId: ld-91f2
+            originNodeId: N-AUS3
+            departedAt: '2026-10-22T23:15:00Z'
+    LoadArrived:
+      name: LoadArrived
+      title: A load arrived at its destination node
+      summary: A load arrived at its destination node.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.linehaul-transportation.events`; `type` = `com.retailnetwork.logistics.linehaul-transportation.load.LoadArrived`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: pairs the load''s open row into one measured transit observation (ADR 0014).'
+      tags:
+      - name: consumed-linehaul-transportation
+      payload:
+        $ref: '#/components/schemas/LoadArrivedConsumed'
+      examples:
+      - name: loadArrived
+        summary: A load arrived at its destination node.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0102
+          source: /retailnetwork/linehaul-transportation
+          type: com.retailnetwork.logistics.linehaul-transportation.load.LoadArrived
+          subject: ld-91f2
+          time: '2026-10-22T19:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:linehaul-transportation:events:LoadArrived:v1
+          data:
+            loadId: ld-91f2
+            destinationNodeId: N-SAU1
+            arrivedAt: '2026-10-23T00:45:00Z'
     DeliveryWaveScheduled:
       name: DeliveryWaveScheduled
       title: A delivery wave was scheduled
@@ -2409,6 +2473,36 @@ components:
             properties:
               assignmentId: *id001
               departureId: *id001
+    LoadDepartedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - loadId
+            - originNodeId
+            - departedAt
+            properties:
+              loadId: *id001
+              originNodeId: *id001
+              departedAt: *id002
+    LoadArrivedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - loadId
+            - destinationNodeId
+            - arrivedAt
+            properties:
+              loadId: *id001
+              destinationNodeId: *id001
+              arrivedAt: *id002
     DeliveryWaveScheduledConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
