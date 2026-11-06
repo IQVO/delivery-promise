@@ -899,6 +899,7 @@ components:
             groupNo: 1
             promiseId: prm-7f3a21
             nodeId: N-VWS-AUS3
+            pickupDepartureId: dep-AUS3-1800
     FulfillmentShipped:
       name: FulfillmentShipped
       title: The vendor shipped the group
@@ -2337,6 +2338,7 @@ components:
               groupNo: *id003
               promiseId: *id001
               nodeId: *id001
+              pickupDepartureId: *id001
     FulfillmentShippedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
