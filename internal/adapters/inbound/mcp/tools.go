@@ -103,7 +103,8 @@ func (d Deps) registerTools(server *mcp.Server) {
 		Description: "Read one delivery offer in any state (QUOTED, EXPIRED or CONSUMED): its tier, groupNo, " +
 			"destination postal prefix, lines, delivery window (earliest, latest and the delivery station's IANA timeZone, " +
 			"the local calendar of its days), the witness path that proves feasibility (node, pickup departure, legs, " +
-			"delivery wave), basis (SCHEDULED or NOMINAL), the policyVersion it was quoted under, quotedAt/expiresAt, " +
+			"delivery wave), basis (SCHEDULED from the timetable, MEASURED when a leg's measured transit pushed the " +
+			"arrival later, or NOMINAL lane times), the policyVersion it was quoted under, quotedAt/expiresAt, " +
 			"and orderByAt (the latest instant the order can be placed and still make the quoted window, uncapped by " +
 			"the offer TTL). Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
 			"fails with not-found.",
@@ -145,7 +146,9 @@ func (d Deps) registerTools(server *mcp.Server) {
 	addTool(server, &mcp.Tool{
 		Name: "get_current_policy",
 		Description: "Read the current promise policy: policyVersion (v0 is the built-in default when nothing was " +
-			"published), offerTtlMinutes and holdTtlMinutes, packagesPerOrder, capacitySharePercent and the per-tier " +
+			"published), offerTtlMinutes and holdTtlMinutes, packagesPerOrder, capacitySharePercent, the measured-transit " +
+			"parameters (transitWindowDays of observations kept, transitServiceLevelPercent quoted against a lane's " +
+			"measured transit, minTransitObservations before a lane beats the timetable) and the per-tier " +
 			"order deadlines (localTime in the destination region's time zone). Publishing a policy is a REST " +
 			"operation. Read-only; takes no arguments.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},

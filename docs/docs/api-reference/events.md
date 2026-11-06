@@ -53,14 +53,14 @@ The Kafka key is the `subject`, so all events of one promise share a partition a
 
 ## Consumed
 
-Dispatch is on the full `type`; payloads are decoded tolerantly (unknown fields ignored). 34 types from eight producer topics, each handled idempotently on the CloudEvents `id`. The full type is `com.retailnetwork.<tier>.<producer>.<entity>.<Event>`; `Handlers` in `internal/adapters/inbound/kafka/dispatch.go` is the registry.
+Dispatch is on the full `type`; payloads are decoded tolerantly (unknown fields ignored). 36 types from eight producer topics, each handled idempotently on the CloudEvents `id`. The full type is `com.retailnetwork.<tier>.<producer>.<entity>.<Event>`; `Handlers` in `internal/adapters/inbound/kafka/dispatch.go` is the registry.
 
 | Topic | Tier and entity | Events | Effect |
 | --- | --- | --- | --- |
 | `retailnetwork.customer-ordering.events` | `commerce.customer-ordering.customerorder` | `CustomerOrderPlaced`, `CustomerOrderCancelled` | reconciling confirm; cancel |
 | `retailnetwork.order-sourcing.events` | `commerce.order-sourcing.assignment` | `FulfillmentLocked`, `FulfillmentShipped`, `FulfillmentUnsourceable` | assignment facts; at risk |
 | `retailnetwork.shipping-and-tracking.events` | `logistics.shipping-and-tracking.journey` | `PackageDelivered`, `PackageExceptionRaised`, `PackageLost`, `PackageReturned` | judge; at risk |
-| `retailnetwork.linehaul-transportation.events` | `logistics.linehaul-transportation.departure` | `DepartureScheduled`, `DepartureCapacityChanged`, `DepartureCancelled`, `BookingMoved`, `BookingFailed` | `rm_departures`; at risk |
+| `retailnetwork.linehaul-transportation.events` | `logistics.linehaul-transportation.departure`, `.load` | `DepartureScheduled`, `DepartureCapacityChanged`, `DepartureCancelled`, `BookingMoved`, `BookingFailed`, `LoadDeparted`, `LoadArrived` | `rm_departures`; at risk; `rm_transit_actuals` (ADR 0014) |
 | `retailnetwork.last-mile-delivery.events` | `logistics.last-mile-delivery.wave` (and `packageattempthistory` for `PackageInductionDeferred`) | `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged`, `DeliveryWaveCancelled`, `PackageInductionDeferred` | `rm_waves`; at risk |
 | `retailnetwork.node-performance.events` | `partner.node-performance.scorecard` | `NodeScorecardUpdated` | `rm_scorecards` |
 | `retailnetwork.node-topology.events` | `logistics.node-topology.node`, `.lane`, `.servicearea`, `.region` | `NodeRegistered`, `NodeOperationalProfileDeclared`, `NodeActivated`, `NodeSuspended`, `NodeRetired`, `LaneOpened`, `LaneClosed`, `ServiceAreaAssigned`, `RegionDefined` | `rm_nodes`, `rm_lanes`, `rm_areas`, `rm_regions` |

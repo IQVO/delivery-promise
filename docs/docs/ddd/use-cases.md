@@ -27,7 +27,7 @@ All three binaries drive the **same** `Service`: REST (`cmd/api`) exposes the co
 | `ExpireOffers` | clock | sweeper | none |
 | `CloseBooks` | clock | sweeper | none |
 | `RepriceAtRisk` | clock | sweeper | as `ReviseAtRisk` |
-| Read-model projections | 34 consumed event types | consumer | none |
+| Read-model projections | 36 consumed event types | consumer | none |
 | Reads | any | REST GET routes, MCP tools, A2A skills | none |
 
 ## QuoteDeliveryOffers
@@ -36,7 +36,7 @@ Source: `quote.go`, `internal/domain/search`.
 
 - **Input:** `destinationPostalPrefix` (valid prefix, never a full address), `lines[]` (`catalogItemId`, `quantity` of at least 1; at most 100 lines), optional `tiers[]` (default all four of `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`), optional `Idempotency-Key`.
 - **What it does:** reads the current policy (version 0 default when nothing was published), runs the PromisePolicy search over the **local read models only** (no synchronous call) and splits the cart into the fewest shipment groups (one node for the whole cart when one can cover every line). For each (group, tier) with a feasible witness path (node cutoff, pickup departure with room and an OPEN book with share left, linehaul legs, a delivery wave with stops left) it persists a `QUOTED` offer; every other requested (group, tier) is reported with the constraint that blocked it: `DESTINATION_NOT_SERVED`, `ITEM_QUANTITY_NOT_AVAILABLE`, `DELIVERY_SLA_UNAVAILABLE`, `NODE_CAPACITY_EXHAUSTED` or `PAST_ORDER_DEADLINE`.
-- **Invariants:** `expiresAt` is the earlier of `quotedAt + offerTtl` and the latest instant the witness pickup cutoff can still be met (`ErrOfferExpiryTooLate` is never returned, such an offer is not built); only `STANDARD` may fall back to a `NOMINAL` basis (`ErrNominalBasisNotAllowedForTier`); a tier whose order deadline in the destination region has passed is `PAST_ORDER_DEADLINE`.
+- **Invariants:** `expiresAt` is the earlier of `quotedAt + offerTtl` and the latest instant the witness pickup cutoff can still be met (`ErrOfferExpiryTooLate` is never returned, such an offer is not built); only `STANDARD` may fall back to a `NOMINAL` basis (`ErrNominalBasisNotAllowedForTier`); a lane whose measured transit at the policy's service level exceeds a leg's scheduled transit pushes the arrival later and quotes `MEASURED` (ADR 0014); a tier whose order deadline in the destination region has passed is `PAST_ORDER_DEADLINE`.
 - **Errors:** 422 `validation-failed` for a bad prefix, line or tier. "No offer" is a normal 200 with `unavailable` entries.
 - **Idempotency:** safe to repeat; with an `Idempotency-Key`, a repeat inside the offers' TTL returns the same offers.
 - **Events:** `DeliveryOfferQuoted` per offer, written to the outbox in the same transaction as the offers.
@@ -47,7 +47,7 @@ Source: `make_promise.go`, `internal/domain/promise`, `internal/domain/book`.
 
 - **Input:** `offerId` and the group's `lines` (they must equal the offer's lines), `Idempotency-Key` required.
 - **What it does, in one transaction** (the documented exception to one aggregate per transaction, gap G22): consumes the offer, revalidates the witness path against the current read models (node ACTIVE, pickup departure and every leg scheduled, not cancelled, with room for `packagesPerOrder`; wave scheduled with a stop left), checks the lines are shippable from the witness node, holds one order of capacity on the witness `PromiseBook` (`nodeId:pickupDepartureId`, opened lazily by the first hold from the node's operational profile) and creates the `PROVISIONAL` promise with `holdExpiresAt = now + holdTtl`.
-- **Invariants:** the offer must be `QUOTED` and unexpired (`ErrOfferNotQuotable`); `shipBy < deliverByEarliest <= deliverByLatest` (`ErrInvalidPromiseTerms`); a fast tier is `SCHEDULED` (`ErrNominalBasisNotAllowedForTier`); lines shippable from the witness node (`ErrGroupSpansNodes`); `provisional + confirmed <= share` (`ErrPromiseCapacityExhausted`); no hold once the book is CLOSED or after `cutoffAt` minus handling time (`ErrBookClosed`). A witness path that is no longer feasible is refused like a full book (409 `promise-capacity-exhausted`) so checkout re-quotes (ADR 0002 A27).
+- **Invariants:** the offer must be `QUOTED` and unexpired (`ErrOfferNotQuotable`); `shipBy < deliverByEarliest <= deliverByLatest` (`ErrInvalidPromiseTerms`); a fast tier is `SCHEDULED` or `MEASURED`, never `NOMINAL` (`ErrNominalBasisNotAllowedForTier`); lines shippable from the witness node (`ErrGroupSpansNodes`); `provisional + confirmed <= share` (`ErrPromiseCapacityExhausted`); no hold once the book is CLOSED or after `cutoffAt` minus handling time (`ErrBookClosed`). A witness path that is no longer feasible is refused like a full book (409 `promise-capacity-exhausted`) so checkout re-quotes (ADR 0002 A27).
 - **Replay:** a retry for an offer already `CONSUMED` with the same lines returns the existing promise (200 instead of 201).
 - **Events:** `PromiseMade`; `PromiseBookExhausted` when the hold makes the book full. The business counter `promising.promises.made` is incremented with `outcome=made` or `refused` and the problem slug as `reason`.
 
@@ -71,7 +71,7 @@ Source: `lifecycle.go`.
 
 Source: `lifecycle.go`, `internal/domain/policy`.
 
-- **Input:** `offerTtlMinutes` and `holdTtlMinutes` (1 to 1440), `packagesPerOrder` (1 to 100), `capacitySharePercent` (1 to 100) and at most 200 `orderDeadlines` (`tier`, optional `regionId`, `localTime` as `HH:mm` in the destination station's time zone, no duplicate tier and region); `Idempotency-Key` required.
+- **Input:** `offerTtlMinutes` and `holdTtlMinutes` (1 to 1440), `packagesPerOrder` (1 to 100), `capacitySharePercent` (1 to 100), the measured-transit parameters `transitWindowDays` (1 to 365), `transitServiceLevelPercent` (50 to 99) and `minTransitObservations` (5 to 1000, ADR 0014) and at most 200 `orderDeadlines` (`tier`, optional `regionId`, `localTime` as `HH:mm` in the destination station's time zone, no duplicate tier and region); `Idempotency-Key` required.
 - **Invariants:** a published version is immutable and strictly increasing; the current policy is the highest version, and version 0 is the built-in default (10 minutes offer TTL, 15 minutes hold TTL, 1 package, 100 % share, no deadlines). A concurrent publish answers 409 `concurrent-update`.
 - **Events:** `PromisePolicyPublished` on the analytics topic.
 

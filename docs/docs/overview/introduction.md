@@ -25,7 +25,7 @@ A retailer that shows an early date sells more; one that shows an early date and
 
 | Aggregate | Role | Where |
 | --- | --- | --- |
-| `DeliveryOffer` | A short-lived quote per shipment group and tier, with its witness path, basis (`SCHEDULED` or `NOMINAL`) and `policyVersion`. States `QUOTED`, `EXPIRED`, `CONSUMED`. | `internal/domain/offer` |
+| `DeliveryOffer` | A short-lived quote per shipment group and tier, with its witness path, basis (`SCHEDULED`, `MEASURED` or `NOMINAL`) and `policyVersion`. States `QUOTED`, `EXPIRED`, `CONSUMED`. | `internal/domain/offer` |
 | `Promise` | The commitment for one shipment group of an order. `PROVISIONAL` holds capacity until the hold expires, `CONFIRMED` once the order is placed, then `AT_RISK`, `KEPT`, `BROKEN`, `RELEASED` or `CANCELLED`. Carries terms, witness path, revisions and the judgement. | `internal/domain/promise` |
 | `PromiseBook` | The promise-side capacity ledger of one (node, pickup departure) cutoff: `provisional + confirmed <= share`. Opened lazily by the first hold, closed at the cutoff. | `internal/domain/book` |
 | `PromisePolicy` | Versioned tier deadlines, offer and hold TTLs, packages per order, capacity share. Version 0 is the built-in default. | `internal/domain/policy` |
@@ -53,7 +53,7 @@ Every input of the search is a **local read model** (`rm_*` tables) kept from ev
 - **Quote** delivery offers per tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`) for a cart and a destination prefix; "no offer" comes with the constraint that blocked it.
 - **Promise** a chosen offer: consume it, create the `PROVISIONAL` promise and hold capacity on the witness book in one transaction; confirm it when the order is placed; cancel it on request (checkout compensation) or when the order is cancelled.
 - **Keep** the promise: flag it at risk when a departure, wave or package fails, re-promise it from the current network state (never earlier than before) and judge it `KEPT` or `BROKEN` (cause `LATE`, `LOST` or `RETURNED`) on delivery.
-- **Publish** twelve event types (six integration, six analytics) through a transactional outbox, and consume 34 event types from eight producers.
+- **Publish** twelve event types (six integration, six analytics) through a transactional outbox, and consume 36 event types from eight producers.
 - **Expose** a REST API, a read-only MCP server (five tools), a read-only A2A agent (two skills) and a console remote (`web/`, four read-only screens).
 - **Operate** as a stateful consumer, sweeper and relay in one pod, on real Postgres and Kafka only.
 

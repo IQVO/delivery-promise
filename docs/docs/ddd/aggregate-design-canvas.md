@@ -28,7 +28,7 @@ Source: `internal/domain/offer/offer.go` (`Consume`, `Expire`).
 
 | Canvas item | Content |
 | --- | --- |
-| Invariants | `expiresAt` is at most the earlier of `quotedAt + offerTtl` and the latest instant the witness pickup cutoff can still be met (`ErrOfferExpiryTooLate`, never returned over HTTP); `orderByAt` is that cutoff bound uncapped by the TTL (the customer-facing "order by" instant); an expired or consumed offer cannot back a promise (`ErrOfferNotQuotable`); a fast tier is never `NOMINAL` (`ErrNominalBasisNotAllowedForTier`) |
+| Invariants | `expiresAt` is at most the earlier of `quotedAt + offerTtl` and the latest instant the witness pickup cutoff can still be met (`ErrOfferExpiryTooLate`, never returned over HTTP); `orderByAt` is that cutoff bound uncapped by the TTL (the customer-facing "order by" instant); an expired or consumed offer cannot back a promise (`ErrOfferNotQuotable`); a fast tier is never `NOMINAL` (`ErrNominalBasisNotAllowedForTier`, which `MEASURED` never trips, ADR 0014) |
 | Corrective policies | `ExpireOffers` sweep; `Quotable(now)` also treats an offer past `expiresAt` as not quotable before the sweep reaches it; checkout re-quotes when `offer-not-quotable` |
 | Commands | `QuoteDeliveryOffers` (creates), `MakePromise` (consumes), `ExpireOffers` |
 | Events | `DeliveryOfferQuoted` (analytics only), one per persisted offer |
@@ -64,7 +64,7 @@ Source: `internal/domain/promise/promise.go` (header comment and `Confirm`, `Fla
 
 | Canvas item | Content |
 | --- | --- |
-| Invariants | `deliverByEarliest <= deliverByLatest` and `shipBy < deliverByEarliest` (`ErrInvalidPromiseTerms`); fast tiers are `SCHEDULED` (`ErrNominalBasisNotAllowedForTier`); confirm only before `holdExpiresAt` (`ErrPromiseHoldExpired`); a revision never moves `deliverByLatest` earlier (`ErrRevisionMovesEarlier`); `KEPT`, `BROKEN`, `RELEASED`, `CANCELLED` are terminal (`ErrPromiseClosed`); every line shippable from the witness node (`ErrGroupSpansNodes`); a `PROVISIONAL` promise has no order, judgement or revision; `atRiskReason` is set exactly while `AT_RISK`; a `KEPT` judgement has a delivery and no cause; at most one live promise per order group (partial unique index) |
+| Invariants | `deliverByEarliest <= deliverByLatest` and `shipBy < deliverByEarliest` (`ErrInvalidPromiseTerms`); fast tiers are `SCHEDULED` or `MEASURED`, never `NOMINAL` (`ErrNominalBasisNotAllowedForTier`); confirm only before `holdExpiresAt` (`ErrPromiseHoldExpired`); a revision never moves `deliverByLatest` earlier (`ErrRevisionMovesEarlier`); `KEPT`, `BROKEN`, `RELEASED`, `CANCELLED` are terminal (`ErrPromiseClosed`); every line shippable from the witness node (`ErrGroupSpansNodes`); a `PROVISIONAL` promise has no order, judgement or revision; `atRiskReason` is set exactly while `AT_RISK`; a `KEPT` judgement has a delivery and no cause; at most one live promise per order group (partial unique index) |
 | Corrective policies | `ReleaseExpiredHolds` sweep; `RepromiseOnRisk` (flag at risk then `ReviseAtRisk`, retried by `RepriceAtRisk`); `JudgeOnDelivery`; cancellation on `CustomerOrderCancelled` or `POST /promises/{promiseId}/cancellations` |
 | Commands | `MakePromise`, `ConfirmPromise` (idempotent), `FlagAtRisk`, `Revise`, `MarkUnkeepable`, `Judge`, `Cancel`, `ReleaseExpiredHold` |
 | Events | `PromiseMade`, `PromiseConfirmed`, `PromiseAtRisk`, `PromiseRevised`, `PromiseUnkeepable`, `PromiseKept`, `PromiseBroken`, `PromiseReleased`, `PromiseCancelled`; every transition raises exactly one event, a repeat confirm raises none |

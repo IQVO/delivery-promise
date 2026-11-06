@@ -801,6 +801,9 @@ components:
             holdTtlMinutes: 15
             packagesPerOrder: 1
             capacitySharePercent: 100
+            transitWindowDays: 28
+            transitServiceLevelPercent: 90
+            minTransitObservations: 20
             orderDeadlines:
             - tier: NEXT_DAY
               regionId: R-SC
@@ -1928,8 +1931,11 @@ components:
       - STANDARD
     Basis:
       type: string
+      description: 'Promise basis: SCHEDULED from the timetable, MEASURED when a leg''s measured transit pushed the
+        arrival later (ADR 0014), NOMINAL from lane times (STANDARD only).'
       enum:
       - SCHEDULED
+      - MEASURED
       - NOMINAL
     GroupLine:
       type: object
@@ -2243,6 +2249,9 @@ components:
             - holdTtlMinutes
             - packagesPerOrder
             - capacitySharePercent
+            - transitWindowDays
+            - transitServiceLevelPercent
+            - minTransitObservations
             - orderDeadlines
             - publishedAt
             properties:
@@ -2255,6 +2264,21 @@ components:
               holdTtlMinutes: *id003
               packagesPerOrder: *id003
               capacitySharePercent: *id003
+              transitWindowDays:
+                type: integer
+                minimum: 1
+                maximum: 365
+                description: Days of observed transits the measured-transit read model keeps (ADR 0014).
+              transitServiceLevelPercent:
+                type: integer
+                minimum: 50
+                maximum: 99
+                description: Service-level percentile quoted against measured transit (ADR 0014).
+              minTransitObservations:
+                type: integer
+                minimum: 5
+                maximum: 1000
+                description: Observations a lane needs before its measured transit beats the timetable (ADR 0014).
               orderDeadlines:
                 type: array
                 items:

@@ -23,11 +23,11 @@ The list below is the output of a live `tools/list` against the binary built fro
 
 ### `get_current_policy`
 
-Reads the current promise policy: `policyVersion` (`v0` is the built-in default when nothing was published), `offerTtlMinutes`, `holdTtlMinutes`, `packagesPerOrder`, `capacitySharePercent` and the per-tier `orderDeadlines` (`tier`, optional `regionId`, `localTime` in the destination region's time zone). Output keys: `policyVersion`, `version`, `offerTtlMinutes`, `holdTtlMinutes`, `packagesPerOrder`, `capacitySharePercent`, `orderDeadlines`, `publishedAt`. Publishing a policy is a REST operation.
+Reads the current promise policy: `policyVersion` (`v0` is the built-in default when nothing was published), `offerTtlMinutes`, `holdTtlMinutes`, `packagesPerOrder`, `capacitySharePercent`, the measured-transit parameters `transitWindowDays`, `transitServiceLevelPercent` and `minTransitObservations` (ADR 0014) and the per-tier `orderDeadlines` (`tier`, optional `regionId`, `localTime` in the destination region's time zone). Output keys: `policyVersion`, `version`, `offerTtlMinutes`, `holdTtlMinutes`, `packagesPerOrder`, `capacitySharePercent`, `transitWindowDays`, `transitServiceLevelPercent`, `minTransitObservations`, `orderDeadlines`, `publishedAt`. Publishing a policy is a REST operation.
 
 ### `get_delivery_offer`
 
-Reads one offer in any state (`QUOTED`, `EXPIRED`, `CONSUMED`): tier, `groupNo`, destination postal prefix, lines, the delivery `window` (`earliest`, `latest` and the station's IANA `timeZone`), the `witnessPath` (node, pickup departure, legs, delivery wave), `basis` (`SCHEDULED` or `NOMINAL`), `policyVersion`, `quotedAt` and `expiresAt`. Offers are kept for a retention period after they expire. An unknown offer fails with `not-found`. Input: `offerId`, the id returned by the quote, for example `off-1`.
+Reads one offer in any state (`QUOTED`, `EXPIRED`, `CONSUMED`): tier, `groupNo`, destination postal prefix, lines, the delivery `window` (`earliest`, `latest` and the station's IANA `timeZone`), the `witnessPath` (node, pickup departure, legs, delivery wave), `basis` (`SCHEDULED`, `MEASURED` when a lane's measured transit pushed the arrival later, or `NOMINAL`), `policyVersion`, `quotedAt` and `expiresAt`. Offers are kept for a retention period after they expire. An unknown offer fails with `not-found`. Input: `offerId`, the id returned by the quote, for example `off-1`.
 
 ### `get_promise`
 

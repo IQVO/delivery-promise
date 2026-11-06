@@ -158,6 +158,16 @@ erDiagram
     text tracking_number PK
     jsonb data
   }
+  rm_load_transit_open {
+    text load_id PK
+    text origin_node_id
+    timestamptz departed_at
+  }
+  rm_transit_actuals {
+    text origin_node_id PK
+    text dest_node_id PK
+    jsonb observations
+  }
   rm_nodes ||--o{ rm_listings : "node_id"
   rm_items ||--o{ rm_listings : "item_id"
   rm_nodes ||--o{ rm_scorecards : "node_id"
@@ -168,7 +178,7 @@ erDiagram
   rm_trackings ||--o| rm_outcomes : "tracking_number"
 ```
 
-Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `internal/application/readmodel`.
+Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_actuals.up.sql`, `internal/application/readmodel`.
 
 | Table | Fed by | Used by |
 | --- | --- | --- |
@@ -177,3 +187,4 @@ Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `internal/applic
 | `rm_departures`, `rm_waves` | linehaul and last-mile events | path search, `MakePromise` revalidation, cancellation risk |
 | `rm_scorecards` | node-performance events | the `ScorecardHandicap` |
 | `rm_assignments`, `rm_shipments`, `rm_trackings`, `rm_outcomes` | order-sourcing and shipping-and-tracking events | finding a promise's assignment and judging it |
+| `rm_load_transit_open`, `rm_transit_actuals` | linehaul `LoadDeparted` and `LoadArrived` | the measured transit behind a `MEASURED` basis (ADR 0014) |
