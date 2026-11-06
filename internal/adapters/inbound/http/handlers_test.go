@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/claudioed/delivery-promise/internal/application/ports"
 	"github.com/claudioed/delivery-promise/internal/application/usecases"
@@ -77,6 +78,9 @@ func (f *fakeAPI) CancelPromise(_ context.Context, id string) (views.Promise, er
 
 func (f *fakeAPI) PublishPromisePolicy(_ context.Context, in policy.Input) (views.Policy, error) {
 	f.policy = in
+	if p, _, err := policy.Publish(0, in, time.Now().UTC()); err == nil {
+		return views.FromPolicy(p), f.err
+	}
 	return views.Policy{PolicyVersion: "v1"}, f.err
 }
 
@@ -142,6 +146,7 @@ func assertRecordedCalls(t *testing.T, api *fakeAPI) {
 		t.Errorf("confirm %v books %v", api.confirm, api.books)
 	}
 	want := policy.Input{OfferTTLMinutes: 5, HoldTTLMinutes: 20, PackagesPerOrder: 2, SharePercent: 50,
+		TransitWindowDays: 28, TransitServiceLevelPercent: 90, MinTransitObservations: 20,
 		Deadlines: []policy.Deadline{{Tier: shared.TierNextDay, RegionID: "R-SC", Minute: 23*60 + 59}}}
 	if fmt.Sprint(api.policy) != fmt.Sprint(want) {
 		t.Errorf("policy input = %+v", api.policy)
@@ -231,6 +236,32 @@ func TestOmittedPolicyValuesTakeTheDefaults(t *testing.T) {
 	if api.policy.OfferTTLMinutes != int(d.OfferTTL().Minutes()) || api.policy.HoldTTLMinutes != int(d.HoldTTL().Minutes()) ||
 		api.policy.PackagesPerOrder != d.PackagesPerOrder() || api.policy.SharePercent != d.SharePercent() {
 		t.Fatalf("input = %+v", api.policy)
+	}
+	if api.policy.TransitWindowDays != d.TransitWindowDays() || api.policy.TransitServiceLevelPercent != d.TransitServiceLevelPercent() ||
+		api.policy.MinTransitObservations != d.MinTransitObservations() {
+		t.Fatalf("transit input = %+v", api.policy)
+	}
+}
+
+// TestTheMeasuredTransitPolicyFieldsRoundTrip posts the three ADR 0014 fields
+// and reads them back from GET /promise-policies/current.
+func TestTheMeasuredTransitPolicyFieldsRoundTrip(t *testing.T) {
+	api := &fakeAPI{}
+	body := `{"transitWindowDays":14,"transitServiceLevelPercent":95,"minTransitObservations":40}`
+	rec := do(NewRouter(&Server{API: api}, nil, ""), "POST", "/promise-policies", body)
+	if rec.Code != 201 {
+		t.Fatalf("status %d %s", rec.Code, rec.Body)
+	}
+	if api.policy.TransitWindowDays != 14 || api.policy.TransitServiceLevelPercent != 95 || api.policy.MinTransitObservations != 40 {
+		t.Fatalf("transit input = %+v", api.policy)
+	}
+	if got := rec.Body.String(); !strings.Contains(got, `"transitWindowDays":14`) || !strings.Contains(got, `"transitServiceLevelPercent":95`) ||
+		!strings.Contains(got, `"minTransitObservations":40`) {
+		t.Fatalf("published view = %s", got)
+	}
+	rec = do(NewRouter(&Server{API: api}, nil, ""), "GET", "/promise-policies/current", "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"policyVersion":"v0"`) {
+		t.Fatalf("current: %d %s", rec.Code, rec.Body)
 	}
 }
 

@@ -21,18 +21,19 @@ const MaxAttempts = 3
 
 // Deps are the out ports a Service needs.
 type Deps struct {
-	UoW       ports.UnitOfWork
-	Offers    ports.OfferRepository
-	Promises  ports.PromiseRepository
-	Books     ports.BookRepository
-	Policies  ports.PolicyRepository
-	Network   ports.NetworkViews
-	Shipments ports.ShipmentViews
-	Outbox    ports.EventOutbox
-	Inbox     ports.Inbox
-	Clock     ports.Clock
-	IDs       ports.IDGenerator
-	Logger    *slog.Logger
+	UoW            ports.UnitOfWork
+	Offers         ports.OfferRepository
+	Promises       ports.PromiseRepository
+	Books          ports.BookRepository
+	Policies       ports.PolicyRepository
+	Network        ports.NetworkViews
+	Shipments      ports.ShipmentViews
+	TransitActuals ports.TransitActuals
+	Outbox         ports.EventOutbox
+	Inbox          ports.Inbox
+	Clock          ports.Clock
+	IDs            ports.IDGenerator
+	Logger         *slog.Logger
 	// Metrics records the business outcome of each MakePromise; nil records
 	// nothing, so unit tests need no wiring.
 	Metrics ports.PromiseMetrics

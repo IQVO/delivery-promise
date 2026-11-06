@@ -158,7 +158,7 @@ func validateQuote(q Quote) error {
 		return shared.Invalid("tier %q is not a tier", q.Tier)
 	}
 	if !q.Basis.Valid() {
-		return shared.Invalid("basis %q is not SCHEDULED or NOMINAL", q.Basis)
+		return shared.Invalid("basis %q is not SCHEDULED, NOMINAL or MEASURED", q.Basis)
 	}
 	if q.PolicyVersion == "" || len(q.PolicyVersion) > shared.MaxID {
 		return shared.Invalid("policyVersion is required")

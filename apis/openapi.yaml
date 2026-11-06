@@ -498,9 +498,11 @@ components:
       - STANDARD
     Basis:
       type: string
-      description: Promise basis; NOMINAL only for STANDARD.
+      description: 'Promise basis: SCHEDULED from the timetable, MEASURED when a leg''s measured transit pushed the
+        arrival later (ADR 0014), NOMINAL from lane times (STANDARD only).'
       enum:
       - SCHEDULED
+      - MEASURED
       - NOMINAL
     OfferConstraint:
       type: string
@@ -955,6 +957,24 @@ components:
           maximum: 100
           description: Proportional share of the node cutoff capacity the promise side may use (G9 "D4"). Default
             100 when omitted or 0.
+        transitWindowDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: Days of observed load transits the measured-transit read model keeps (ADR 0014). Default 28
+            when omitted or 0.
+        transitServiceLevelPercent:
+          type: integer
+          minimum: 50
+          maximum: 99
+          description: Service-level percentile quoted against a lane's measured transit (ADR 0014). Default 90 when
+            omitted or 0.
+        minTransitObservations:
+          type: integer
+          minimum: 5
+          maximum: 1000
+          description: Observations a lane needs inside the window before its measured transit can push a promise
+            later than the timetable (ADR 0014). Default 20 when omitted or 0.
         orderDeadlines:
           type: array
           maxItems: 200
@@ -985,6 +1005,9 @@ components:
       - holdTtlMinutes
       - packagesPerOrder
       - capacitySharePercent
+      - transitWindowDays
+      - transitServiceLevelPercent
+      - minTransitObservations
       - orderDeadlines
       - publishedAt
       properties:
@@ -1003,6 +1026,22 @@ components:
           type: integer
         capacitySharePercent:
           type: integer
+        transitWindowDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: Days of observed load transits the measured-transit read model keeps (ADR 0014).
+        transitServiceLevelPercent:
+          type: integer
+          minimum: 50
+          maximum: 99
+          description: Service-level percentile quoted against a lane's measured transit (ADR 0014).
+        minTransitObservations:
+          type: integer
+          minimum: 5
+          maximum: 1000
+          description: Observations a lane needs inside the window before its measured transit can push a promise
+            later than the timetable (ADR 0014).
         orderDeadlines:
           type: array
           items:

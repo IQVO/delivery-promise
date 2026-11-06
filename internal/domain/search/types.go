@@ -151,6 +151,11 @@ type Input struct {
 	Departures []Departure
 	Waves      []Wave
 	Grades     map[string]Grade
+	// MeasuredTransit answers the measured transit in minutes of an (origin,
+	// dest) pair at the policy's service level; ok is false while the pair has
+	// too few observations. A nil closure never measures: the timetable stands
+	// (ADR 0014).
+	MeasuredTransit func(origin, dest string) (ok bool, minutes int)
 	// Books holds the existing books by bookId; a missing book is opened lazily
 	// with the computed share.
 	Books             map[string]BookView

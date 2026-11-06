@@ -22,6 +22,10 @@ func TestDefault(t *testing.T) {
 		p.PackagesPerOrder() != 1 || p.SharePercent() != 100 || len(p.Deadlines()) != 0 || !p.PublishedAt().IsZero() {
 		t.Fatalf("default policy wrong: %+v", p.Snapshot())
 	}
+	if p.TransitWindowDays() != DefaultTransitWindowDays || p.TransitServiceLevelPercent() != DefaultTransitServiceLevel ||
+		p.MinTransitObservations() != DefaultTransitObservations {
+		t.Fatalf("default transit policy wrong: %d/%d/%d", p.TransitWindowDays(), p.TransitServiceLevelPercent(), p.MinTransitObservations())
+	}
 	if p.PastDeadline(shared.TierNextDay, "R", 24*60-1) {
 		t.Fatal("no deadline: never past")
 	}
@@ -37,6 +41,18 @@ func TestPublishValidation(t *testing.T) {
 		"packages high":      func(i *Input) { i.PackagesPerOrder = MaxPackagesPerOrder + 1 },
 		"share low":          func(i *Input) { i.SharePercent = 0 },
 		"share high":         func(i *Input) { i.SharePercent = MaxSharePercent + 1 },
+		"transit window low": func(i *Input) { i.TransitWindowDays = -1 }, // 0 means omitted
+		"transit window high": func(i *Input) {
+			i.TransitWindowDays = MaxTransitWindowDays + 1
+		},
+		"transit service level low": func(i *Input) { i.TransitServiceLevelPercent = MinTransitServiceLevel - 1 },
+		"transit service level high": func(i *Input) {
+			i.TransitServiceLevelPercent = MaxTransitServiceLevel + 1
+		},
+		"min transit observations low": func(i *Input) { i.MinTransitObservations = MinTransitObservations - 1 },
+		"min transit observations high": func(i *Input) {
+			i.MinTransitObservations = MaxTransitObservations + 1
+		},
 		"bad tier":           func(i *Input) { i.Deadlines = []Deadline{{Tier: "X"}} },
 		"bad region":         func(i *Input) { i.Deadlines = []Deadline{{Tier: shared.TierNextDay, RegionID: "-"}} },
 		"minute negative":    func(i *Input) { i.Deadlines = []Deadline{{Tier: shared.TierNextDay, Minute: -1}} },
@@ -52,13 +68,25 @@ func TestPublishValidation(t *testing.T) {
 		}
 	}
 	// the bounds themselves are legal
-	in := Input{OfferTTLMinutes: MaxTTLMinutes, HoldTTLMinutes: 1, PackagesPerOrder: MaxPackagesPerOrder, SharePercent: MaxSharePercent}
+	in := Input{OfferTTLMinutes: MaxTTLMinutes, HoldTTLMinutes: 1, PackagesPerOrder: MaxPackagesPerOrder, SharePercent: MaxSharePercent,
+		TransitWindowDays: MaxTransitWindowDays, TransitServiceLevelPercent: MaxTransitServiceLevel, MinTransitObservations: MaxTransitObservations}
 	if _, _, err := Publish(0, in, t0); err != nil {
 		t.Fatalf("bounds refused: %v", err)
 	}
-	in = Input{OfferTTLMinutes: 1, HoldTTLMinutes: MaxTTLMinutes, PackagesPerOrder: 1, SharePercent: 1}
+	in = Input{OfferTTLMinutes: 1, HoldTTLMinutes: MaxTTLMinutes, PackagesPerOrder: 1, SharePercent: 1,
+		TransitWindowDays: MinTransitWindowDays, TransitServiceLevelPercent: MinTransitServiceLevel, MinTransitObservations: MinTransitObservations}
 	if _, _, err := Publish(0, in, t0); err != nil {
 		t.Fatalf("lower bounds refused: %v", err)
+	}
+	// omitted transit fields take the defaults
+	in = Input{OfferTTLMinutes: 10, HoldTTLMinutes: 15, PackagesPerOrder: 1, SharePercent: 1}
+	p, _, err := Publish(0, in, t0)
+	if err != nil {
+		t.Fatalf("omitted transit refused: %v", err)
+	}
+	if p.TransitWindowDays() != DefaultTransitWindowDays || p.TransitServiceLevelPercent() != DefaultTransitServiceLevel ||
+		p.MinTransitObservations() != DefaultTransitObservations {
+		t.Fatalf("omitted transit: %d/%d/%d", p.TransitWindowDays(), p.TransitServiceLevelPercent(), p.MinTransitObservations())
 	}
 	for _, cur := range []int{-1, shared.MaxInt32} {
 		if _, _, err := Publish(cur, valid(), t0); !errors.Is(err, ErrVersionNotNext) {

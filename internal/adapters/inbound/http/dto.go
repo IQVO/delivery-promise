@@ -57,11 +57,14 @@ type orderDeadlineDTO struct {
 }
 
 type publishPolicyRequest struct {
-	OfferTTLMinutes      int                `json:"offerTtlMinutes"`
-	HoldTTLMinutes       int                `json:"holdTtlMinutes"`
-	PackagesPerOrder     int                `json:"packagesPerOrder"`
-	CapacitySharePercent int                `json:"capacitySharePercent"`
-	OrderDeadlines       []orderDeadlineDTO `json:"orderDeadlines"`
+	OfferTTLMinutes            int                `json:"offerTtlMinutes"`
+	HoldTTLMinutes             int                `json:"holdTtlMinutes"`
+	PackagesPerOrder           int                `json:"packagesPerOrder"`
+	CapacitySharePercent       int                `json:"capacitySharePercent"`
+	TransitWindowDays          int                `json:"transitWindowDays"`
+	TransitServiceLevelPercent int                `json:"transitServiceLevelPercent"`
+	MinTransitObservations     int                `json:"minTransitObservations"`
+	OrderDeadlines             []orderDeadlineDTO `json:"orderDeadlines"`
 }
 
 // input maps the request to the domain input; an omitted value takes the policy default.
@@ -70,6 +73,8 @@ func (p publishPolicyRequest) input() (policy.Input, error) {
 	in := policy.Input{
 		OfferTTLMinutes: orDefault(p.OfferTTLMinutes, int(def.OfferTTL().Minutes())), HoldTTLMinutes: orDefault(p.HoldTTLMinutes, int(def.HoldTTL().Minutes())),
 		PackagesPerOrder: orDefault(p.PackagesPerOrder, def.PackagesPerOrder()), SharePercent: orDefault(p.CapacitySharePercent, def.SharePercent()),
+		TransitWindowDays: orDefault(p.TransitWindowDays, def.TransitWindowDays()), TransitServiceLevelPercent: orDefault(p.TransitServiceLevelPercent, def.TransitServiceLevelPercent()),
+		MinTransitObservations: orDefault(p.MinTransitObservations, def.MinTransitObservations()),
 	}
 	for _, d := range p.OrderDeadlines {
 		minute, err := parseLocalTime(d.LocalTime)

@@ -108,7 +108,7 @@ entity `promise`, `promisebook`, `deliveryoffer` or `promisepolicy`
 | `retailnetwork.delivery-promise.events` (integration) | `PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseUnkeepable`, `PromiseBookExhausted` |
 | `retailnetwork.delivery-promise.analytics` (analytics only) | `PromiseMade`, `PromiseConfirmed`, `PromiseReleased`, `PromiseCancelled`, `DeliveryOfferQuoted`, `PromisePolicyPublished` |
 
-**Consumed** — 34 event types from eight producer topics (ADR 0003), kept as
+**Consumed** — 36 event types from eight producer topics (ADR 0003), kept as
 event-fed local read models or driving RepromiseOnRisk, JudgeOnDelivery and
 CancelPromise; every consumer is idempotent on the CloudEvents `id` (inbox
 table) and dispatches on the full `type`:

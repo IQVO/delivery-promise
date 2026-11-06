@@ -153,14 +153,17 @@ type OrderDeadline struct {
 
 // Policy is a promise policy version.
 type Policy struct {
-	PolicyVersion        string          `json:"policyVersion"`
-	Version              int             `json:"version"`
-	OfferTTLMinutes      int             `json:"offerTtlMinutes"`
-	HoldTTLMinutes       int             `json:"holdTtlMinutes"`
-	PackagesPerOrder     int             `json:"packagesPerOrder"`
-	CapacitySharePercent int             `json:"capacitySharePercent"`
-	OrderDeadlines       []OrderDeadline `json:"orderDeadlines"`
-	PublishedAt          time.Time       `json:"publishedAt"`
+	PolicyVersion              string          `json:"policyVersion"`
+	Version                    int             `json:"version"`
+	OfferTTLMinutes            int             `json:"offerTtlMinutes"`
+	HoldTTLMinutes             int             `json:"holdTtlMinutes"`
+	PackagesPerOrder           int             `json:"packagesPerOrder"`
+	CapacitySharePercent       int             `json:"capacitySharePercent"`
+	TransitWindowDays          int             `json:"transitWindowDays"`
+	TransitServiceLevelPercent int             `json:"transitServiceLevelPercent"`
+	MinTransitObservations     int             `json:"minTransitObservations"`
+	OrderDeadlines             []OrderDeadline `json:"orderDeadlines"`
+	PublishedAt                time.Time       `json:"publishedAt"`
 }
 
 func lines(in []shared.Line) []Line {
@@ -243,6 +246,8 @@ func FromPolicy(p *policy.Policy) Policy {
 	}
 	return Policy{
 		PolicyVersion: p.VersionName(), Version: p.Version(), OfferTTLMinutes: int(p.OfferTTL() / time.Minute), HoldTTLMinutes: int(p.HoldTTL() / time.Minute),
-		PackagesPerOrder: p.PackagesPerOrder(), CapacitySharePercent: p.SharePercent(), OrderDeadlines: ds, PublishedAt: p.PublishedAt().UTC(),
+		PackagesPerOrder: p.PackagesPerOrder(), CapacitySharePercent: p.SharePercent(), TransitWindowDays: p.TransitWindowDays(),
+		TransitServiceLevelPercent: p.TransitServiceLevelPercent(), MinTransitObservations: p.MinTransitObservations(),
+		OrderDeadlines: ds, PublishedAt: p.PublishedAt().UTC(),
 	}
 }

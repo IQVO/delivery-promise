@@ -142,19 +142,20 @@ func openPostgres(ctx context.Context, rt runtimeEnv, logger *slog.Logger) (*pgx
 func buildService(pool *pgxpool.Pool, outbox *postgres.Outbox, logger *slog.Logger, metrics ports.PromiseMetrics) *usecases.Service {
 	network := postgres.NewNetworkViews(pool)
 	return usecases.New(usecases.Deps{
-		UoW:       postgres.NewUnitOfWork(pool),
-		Offers:    postgres.NewOfferRepository(pool),
-		Promises:  postgres.NewPromiseRepository(pool),
-		Books:     postgres.NewBookRepository(pool),
-		Policies:  postgres.NewPolicyRepository(pool),
-		Network:   network,
-		Shipments: postgres.NewShipmentViews(pool),
-		Outbox:    outbox,
-		Inbox:     postgres.NewInbox(pool),
-		Clock:     clock.System{},
-		IDs:       ids.UUID{},
-		Logger:    logger,
-		Metrics:   metrics,
+		UoW:            postgres.NewUnitOfWork(pool),
+		Offers:         postgres.NewOfferRepository(pool),
+		Promises:       postgres.NewPromiseRepository(pool),
+		Books:          postgres.NewBookRepository(pool),
+		Policies:       postgres.NewPolicyRepository(pool),
+		Network:        network,
+		Shipments:      postgres.NewShipmentViews(pool),
+		TransitActuals: postgres.NewTransitActuals(pool),
+		Outbox:         outbox,
+		Inbox:          postgres.NewInbox(pool),
+		Clock:          clock.System{},
+		IDs:            ids.UUID{},
+		Logger:         logger,
+		Metrics:        metrics,
 	})
 }
 

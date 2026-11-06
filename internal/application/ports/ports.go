@@ -148,6 +148,23 @@ type Inbox interface {
 	Begin(ctx context.Context, eventID, eventType string, at time.Time) (bool, error)
 }
 
+// TransitActuals stores the measured-transit read model (ADR 0014): one open
+// row per departed load, paired by LoadArrived into a ring of observed
+// transits per (origin, dest) pair. Every call joins the unit of work carried
+// by ctx when there is one.
+type TransitActuals interface {
+	// RecordLoadDeparted opens the pairing row of a load.
+	RecordLoadDeparted(ctx context.Context, loadID, originNodeID string, departedAt time.Time) error
+	// RecordLoadArrived pairs the load's open row into one observation of its
+	// (origin, dest) pair, appends it to the ring (latest 200) and deletes the
+	// open row. A load with no open row changes nothing.
+	RecordLoadArrived(ctx context.Context, loadID, destNodeID string, arrivedAt time.Time) error
+	// MeasuredTransit answers the nearest-rank `percentile` transit in minutes
+	// of the pair's observations inside the last windowDays days; ok is false
+	// while there are fewer than minObservations of them.
+	MeasuredTransit(ctx context.Context, origin, dest string, percentile, minObservations, windowDays int, now time.Time) (bool, int)
+}
+
 // EventOutbox is the write side of the transactional outbox. Called with the
 // ctx handed to UnitOfWork.Do it joins the SAME transaction as the aggregate
 // Save calls, so the aggregates and their raised events commit or roll back
