@@ -198,32 +198,6 @@ func (r *PromiseRepository) ListActiveByPath(ctx context.Context, f repository.P
 		ORDER BY id`, f.DepartureID, f.WaveID)
 }
 
-// HeldQuantities sums the lines of PROVISIONAL promises per (node, item).
-func (r *PromiseRepository) HeldQuantities(ctx context.Context, nodeIDs []string) (map[repository.HoldKey]int, error) {
-	out := map[repository.HoldKey]int{}
-	if len(nodeIDs) == 0 {
-		return out, nil
-	}
-	rows, err := r.q(ctx).Query(ctx, `
-		SELECT p.node_id, l->>'CatalogItemID', SUM((l->>'Quantity')::int)
-		FROM promises p, jsonb_array_elements(p.snapshot->'Lines') AS l
-		WHERE p.state = 'PROVISIONAL' AND p.node_id = ANY ($1)
-		GROUP BY p.node_id, l->>'CatalogItemID'`, nodeIDs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var node, item string
-		var qty int
-		if err := rows.Scan(&node, &item, &qty); err != nil {
-			return nil, err
-		}
-		out[repository.HoldKey{NodeID: node, ItemID: item}] = qty
-	}
-	return out, rows.Err()
-}
-
 // Save stores the promise under the version rule; a second promise for the
 // same offer or order group is ports.ErrConcurrentUpdate.
 func (r *PromiseRepository) Save(ctx context.Context, p *promise.Promise) error {

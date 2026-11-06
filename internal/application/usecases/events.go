@@ -212,6 +212,9 @@ type FulfillmentLocked struct {
 	GroupNo      int    `json:"groupNo"`
 	PromiseID    string `json:"promiseId"`
 	NodeID       string `json:"nodeId"`
+	// PickupDepartureID is the departure order-sourcing locked the group on:
+	// with NodeID the book that must carry the charge. Absent on older producers.
+	PickupDepartureID string `json:"pickupDepartureId,omitempty"`
 }
 
 // FulfillmentShipped is order-sourcing FulfillmentShipped.

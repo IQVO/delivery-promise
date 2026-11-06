@@ -11,6 +11,14 @@ type HoldKey struct {
 	ItemID string
 }
 
+// ConfirmedHold is the units one active (CONFIRMED or AT_RISK) promise has
+// ordered of one item at the node of its witness, and when it was confirmed.
+type ConfirmedHold struct {
+	Key         HoldKey
+	Qty         int
+	ConfirmedAt time.Time
+}
+
 // BookFilter selects books for the REST list and the clock jobs.
 type BookFilter struct {
 	// NodeIDs restricts the books to these nodes; empty means every node.

@@ -142,6 +142,7 @@ type Promise struct {
 	releaseReason string
 	unkeepable    bool
 	madeAt        time.Time
+	confirmedAt   time.Time
 	version       int64
 }
 
@@ -165,7 +166,10 @@ type Snapshot struct {
 	ReleaseReason     string
 	Unkeepable        bool
 	MadeAt            time.Time
-	Version           int64
+	// ConfirmedAt is when the hold became a confirmed order; zero for a promise
+	// that is not confirmed yet or was confirmed before the field existed.
+	ConfirmedAt time.Time
+	Version     int64
 }
 
 // Making is the input of Make.
@@ -315,6 +319,10 @@ func (p *Promise) ReleaseReason() string { return p.releaseReason }
 
 // Unkeepable reports whether PromiseUnkeepable was raised.
 func (p *Promise) Unkeepable() bool { return p.unkeepable }
+
+// ConfirmedAt returns when the promise was confirmed (zero before, or for a
+// promise confirmed before the instant was recorded).
+func (p *Promise) ConfirmedAt() time.Time { return p.confirmedAt }
 
 // MadeAt returns when the promise was made.
 func (p *Promise) MadeAt() time.Time { return p.madeAt }
