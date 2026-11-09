@@ -1228,7 +1228,9 @@ components:
           description: Present when RELEASED.
         atRiskReason:
           type: string
-          description: Present while AT_RISK.
+          description: 'Present while AT_RISK. One of NODE_UNSOURCEABLE, PACKAGE_EXCEPTION, INDUCTION_DEFERRED, DEPARTURE_CANCELLED,
+            WAVE_CANCELLED, BOOKING_FAILED, BOOKING_MOVED or PREDICTED_LATE (a departure of the witness path is past its expected
+            arrival with no arrival seen). A PREDICTED_LATE promise stays AT_RISK until it is judged, even if the load arrives later.'
     PromisePage:
       type: object
       required:

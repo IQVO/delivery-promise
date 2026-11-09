@@ -28,6 +28,8 @@ Source: `internal/adapters/outbound/telemetry/promise_metrics.go`, `internal/ada
 | Instrument | Type | Unit | Attributes | Emitted by |
 | --- | --- | --- | --- | --- |
 | `promising.promises.made` | Int64 counter | `{promise}` | `outcome` = `made` or `refused`; `reason` (only on `refused`) = the problem slug, for example `offer-not-quotable`, `promise-capacity-exhausted`, `internal-error` | `cmd/api`, every `MakePromise` attempt. Prometheus name `promising_promises_made_total` |
+| `deliverypromise.predicted_late.flagged` | Int64 counter | `{promise}` | none | `cmd/api`, the `FlagPredictedLate` sweep pass, one per promise flagged AT_RISK with `PREDICTED_LATE` (ADR 0021). Prometheus name `deliverypromise_predicted_late_flagged_total` |
+| `deliverypromise.departure_arrival.ignored` | Int64 counter | `{event}` | none | `cmd/api`, the `LoadArrived` handler, one per event without a `departureId` (ADR 0021). Prometheus name `deliverypromise_departure_arrival_ignored_total` |
 | `http.server.request.duration` | Float64 histogram | `s` | `http.method`, `http.scheme`, `http.route` (chi route pattern, when matched) | all three binaries, `otelchimetric.NewServerRequestDuration`. Prometheus name `http_server_request_duration_seconds` |
 | Go runtime metrics | various | various | none | all three binaries (`runtime.Start`), goroutines, GC and heap; the dashboard reads `go_goroutine_count` and `go_memory_used_bytes` |
 | `deliverypromise.tier.candidates.excluded` | Int64 counter | `{candidate}` | `tier` = `SAME_DAY` or `NEXT_DAY` | `cmd/api` and `cmd/mcp` searches: a candidate node removed because node-performance revoked its eligibility (ADR 0022), once per node and tier per request. Prometheus name `deliverypromise_tier_candidates_excluded_total` |

@@ -39,7 +39,7 @@ func newEnv(t *testing.T) *env {
 	e := &env{t: t, store: store, clock: clock, ids: &memory.SeqIDs{}}
 	e.svc = usecases.New(usecases.Deps{
 		UoW: store.UnitOfWork(), Offers: store.Offers(), Promises: store.Promises(), Books: store.Books(), Policies: store.Policies(),
-		Network: store.Network(), Shipments: store.Shipments(), TransitActuals: store.TransitActuals(), TierEligibility: store.TierEligibility(),
+		Network: store.Network(), Shipments: store.Shipments(), TransitActuals: store.TransitActuals(), TierEligibility: store.TierEligibility(), DepartureArrivals: store.DepartureArrivals(),
 		Outbox: store.Outbox(), Inbox: store.Inbox(), Clock: clock, IDs: e.ids,
 	})
 	e.seedWorkedExample()

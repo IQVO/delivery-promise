@@ -80,8 +80,9 @@ refuses to render otherwise.
 Every `SWEEP_INTERVAL` it runs, in order, batches of 100 of: `ExpireOffers` (QUOTED offers
 past `expiresAt`), `ReleaseExpiredHolds` (PROVISIONAL promises past `holdExpiresAt`, which
 release their book capacity and raise `PromiseReleased`), `CloseBooks` (OPEN books at their
-cutoff, ADR 0002 A13) and `RepriceAtRisk` (AT_RISK promises that could not be revised
-when they were flagged, ADR 0002 A17/A19). A failing pass is logged and never stops the
+cutoff, ADR 0002 A13), `FlagPredictedLate` (CONFIRMED promises whose locked path is running
+late are flagged AT_RISK with `PREDICTED_LATE`, ADR 0021) and `RepriceAtRisk` (AT_RISK promises that could not be revised
+when they were flagged, ADR 0002 A17/A19; a `PREDICTED_LATE` promise whose window is still reachable is left alone). A failing pass is logged and never stops the
 others; the sweeper is the only place the clock drives the domain.
 
 ## The outbox in operation

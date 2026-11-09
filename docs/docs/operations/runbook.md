@@ -31,7 +31,7 @@ The `api` pod runs four things side by side:
 - **REST API** (chi, `application/problem+json`, no authentication): offers, promises, promise books, policy. Contracts in [API reference](/docs/api-reference).
 - **Transactional-outbox relay** (`cmd/api/workers.go`, `internal/adapters/outbound/outbox/relay.go`): drains `outbox_events` to Kafka every `OUTBOX_RELAY_INTERVAL` (default 1 s), batches of 100, one message at a time in `id` order, `FOR UPDATE SKIP LOCKED` (safe with more than one replica).
 - **One Kafka consumer** (`internal/adapters/inbound/kafka/`) over the eight integration topics under the stable group `DELIVERY_PROMISE_CONSUMER_GROUP` (`delivery-promise-consumer` in this cluster); handlers keep local read models (`rm_*` tables) and claim each CloudEvents id in `processed_events`.
-- **Sweeper** (`cmd/api/workers.go`): every `SWEEP_INTERVAL` (default 15 s) runs `ExpireOffers`, `ReleaseExpiredHolds`, `CloseBooks`, `RepriceAtRisk` in batches of 100; a failing pass is logged (`sweep pass failed`) and never stops the others.
+- **Sweeper** (`cmd/api/workers.go`): every `SWEEP_INTERVAL` (default 15 s) runs `ExpireOffers`, `ReleaseExpiredHolds`, `CloseBooks`, `FlagPredictedLate`, `RepriceAtRisk` in batches of 100 (`FlagPredictedLate`: ADR 0021, counted by `deliverypromise_predicted_late_flagged_total`; `deliverypromise_departure_arrival_ignored_total` counts `LoadArrived` events without a `departureId`); a failing pass is logged (`sweep pass failed`) and never stops the others.
 
 Shutdown is sequential (`/readyz` 503, drain delay, HTTP, consumer, sweeper, relay last, pool); any worker that returns on its own exits the process non-zero so Kubernetes restarts it (`cmd/api/main.go`).
 

@@ -12,11 +12,11 @@ import (
 )
 
 // latestMigration is the ceiling of the embedded set: bump it with every new
-// migration so the step count below stays honest.
-const latestMigration = 7
+// migration so the version assertion below stays honest.
+const latestMigration = 8
 
-// listingOwnerMigration is the migration this file proves; the steps below go
-// to the version just under it, whatever the ceiling is.
+// listingOwnerMigration is the migration this file proves (ADR 0017); the
+// steps below go to the version just under it, whatever the ceiling is.
 const listingOwnerMigration = 5
 
 // TestListingOwnerMigrationBackfillsOperatorOwned proves migration 0005 (ADR
@@ -41,12 +41,12 @@ func TestListingOwnerMigrationBackfillsOperatorOwned(t *testing.T) {
 		t.Fatalf("schema version %d, want %d", version, latestMigration)
 	}
 
-	mustDo(t, "one step down to 0004", postgres.MigrateTo(url, listingOwnerMigration-1))
+	mustDo(t, "down to 0004", postgres.MigrateTo(url, listingOwnerMigration-1))
 	if _, err := pool.Exec(ctx, `INSERT INTO rm_listings (id, item_id, node_id, data)
 		VALUES ('lst-legacy', 'ci-1001', 'N-AUS3', '{"ID":"lst-legacy","ItemID":"ci-1001","NodeID":"N-AUS3","AvailableQty":7}')`); err != nil {
 		t.Fatalf("seed a 0004 row: %v", err)
 	}
-	mustDo(t, "up to 0005", postgres.RunMigrations(url))
+	mustDo(t, "up again", postgres.RunMigrations(url))
 
 	var owner, dataOwner string
 	scalar(`SELECT owner_ref FROM rm_listings WHERE id = 'lst-legacy'`, &owner)
