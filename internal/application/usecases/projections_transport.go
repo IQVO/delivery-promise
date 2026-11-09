@@ -83,10 +83,21 @@ func (s *Service) OnLoadDeparted(ctx context.Context, m Meta, e LoadDeparted) er
 }
 
 // OnLoadArrived pairs the load's open row into one measured transit
-// observation and deletes it (ADR 0014).
+// observation and deletes it (ADR 0014), and records the arrival of the
+// departure the load belongs to for the late-risk sweep (ADR 0021).
 func (s *Service) OnLoadArrived(ctx context.Context, m Meta, e LoadArrived) error {
 	return s.project(ctx, m, func(ctx context.Context) error {
-		return s.TransitActuals.RecordLoadArrived(ctx, e.LoadID, e.DestinationNodeID, e.ArrivedAt.UTC())
+		if err := s.TransitActuals.RecordLoadArrived(ctx, e.LoadID, e.DestinationNodeID, e.ArrivedAt.UTC()); err != nil {
+			return err
+		}
+		switch {
+		case s.DepartureArrivals == nil:
+			return nil
+		case e.DepartureID == "":
+			s.LateRisk.DepartureArrivalIgnored(ctx) // an older producer: no model row, counted
+			return nil
+		}
+		return s.DepartureArrivals.RecordDepartureArrived(ctx, e.DepartureID, e.ArrivedAt.UTC())
 	})
 }
 

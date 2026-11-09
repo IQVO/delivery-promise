@@ -6,7 +6,7 @@ Accepted (2026-10-23).
 
 ## Context
 
-Every Kafka message in the retail network is a CloudEvents 1.0 event in structured mode (retail-network-docs `model/model.yaml` `conventions.cloudevents`; the repo rule `.claude/rules/fleet/cloudevents.md`). This ADR is the catalogue of every type delivery-promise publishes. `TestEventCatalogueMatchesContract` checks it against `apis/asyncapi.yaml`. The types delivery-promise only consumes are listed in ADR 0003, not here.
+Every Kafka message in the retail network is a CloudEvents 1.0 event in structured mode (retail-network-docs `model/model.yaml` `conventions.cloudevents`; the repo rule `.claude/rules/fleet/cloudevents.md`). This ADR is the catalogue of every type delivery-promise publishes. `TestEventCatalogueMatchesContract` checks it against `apis/asyncapi.yaml`. The types delivery-promise only consumes are listed in ADR 0003; the ones added after the first release are also named at the end of this ADR.
 
 ## Decision
 
@@ -58,6 +58,18 @@ Payload rules:
 - `PromiseBroken.cause` is `LATE`, `LOST` or `RETURNED`.
 - A breaking change is a new `.v2` type; a consumer ignores unknown fields.
 - The analytics-only events carry no PII (there is none in this context) and are not read by any integration consumer.
+
+### Consumed types added after the first release
+
+These are NOT published by this service; they are listed so the full type string is in the catalogue (the dispatch table and `apis/asyncapi.yaml` receive operations must match it).
+
+```text
+type: com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged stream: events
+```
+
+| Event | Stream | Subject / key | Raised when (by the producer) | Effect here |
+|---|---|---|---|---|
+| `NodeTierEligibilityChanged` | events | `<nodeId>:7d` | node-performance flips a node's fast-tier eligibility (one event per tier, SAME_DAY and NEXT_DAY) | NodeTierEligibility read model; ineligible nodes are dropped from SAME_DAY and NEXT_DAY candidates (ADR 0022) |
 
 ## Consequences
 

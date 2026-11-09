@@ -68,6 +68,9 @@ One method on `Service` per command and query; commands run in ONE `ports.UnitOf
 - `QuoteDeliveryOffers` (`quote.go`), `MakePromise` (`make_promise.go`),
   `ConfirmPromise`, `CancelPromises`, `ReleaseExpiredHolds`, `ExpireOffers`,
   `CloseBooks`, `PublishPromisePolicy` and the queries (`lifecycle.go`).
+- `FlagPredictedLate` (`late_risk.go`, ADR 0021): the sweeper flags CONFIRMED promises whose
+  locked path runs past its expected arrival (reason `PREDICTED_LATE`); `RepriceAtRisk`
+  leaves such a promise alone while its window is reachable.
 - `RepriceAtRisk`, `ReviseAtRisk`, `ReviseAll` (`risk.go`): re-promise when the
   witness path breaks; `PromiseUnkeepable` once when no path is left.
 - Judgement from shipping facts (`judge.go`): KEPT on the LAST package delivered,

@@ -28,8 +28,12 @@ Source: `internal/adapters/outbound/telemetry/promise_metrics.go`, `internal/ada
 | Instrument | Type | Unit | Attributes | Emitted by |
 | --- | --- | --- | --- | --- |
 | `promising.promises.made` | Int64 counter | `{promise}` | `outcome` = `made` or `refused`; `reason` (only on `refused`) = the problem slug, for example `offer-not-quotable`, `promise-capacity-exhausted`, `internal-error` | `cmd/api`, every `MakePromise` attempt. Prometheus name `promising_promises_made_total` |
+| `deliverypromise.predicted_late.flagged` | Int64 counter | `{promise}` | none | `cmd/api`, the `FlagPredictedLate` sweep pass, one per promise flagged AT_RISK with `PREDICTED_LATE` (ADR 0021). Prometheus name `deliverypromise_predicted_late_flagged_total` |
+| `deliverypromise.departure_arrival.ignored` | Int64 counter | `{event}` | none | `cmd/api`, the `LoadArrived` handler, one per event without a `departureId` (ADR 0021). Prometheus name `deliverypromise_departure_arrival_ignored_total` |
 | `http.server.request.duration` | Float64 histogram | `s` | `http.method`, `http.scheme`, `http.route` (chi route pattern, when matched) | all three binaries, `otelchimetric.NewServerRequestDuration`. Prometheus name `http_server_request_duration_seconds` |
 | Go runtime metrics | various | various | none | all three binaries (`runtime.Start`), goroutines, GC and heap; the dashboard reads `go_goroutine_count` and `go_memory_used_bytes` |
+| `deliverypromise.tier.candidates.excluded` | Int64 counter | `{candidate}` | `tier` = `SAME_DAY` or `NEXT_DAY` | `cmd/api` and `cmd/mcp` searches: a candidate node removed because node-performance revoked its eligibility (ADR 0022), once per node and tier per request. Prometheus name `deliverypromise_tier_candidates_excluded_total` |
+| `deliverypromise.tier.eligibility.events.ignored` | Int64 counter | `{event}` | `reason` = `unknown-tier` or `missing-field` | `cmd/api` consumer: a `NodeTierEligibilityChanged` that cannot be applied. Prometheus name `deliverypromise_tier_eligibility_events_ignored_total` |
 
 Reading `promising.promises.made`: a falling `made` share with a rising `offer-not-quotable` or `promise-capacity-exhausted` means shoppers are offered dates the network can no longer keep (expired offers, full nodes); a rising `internal-error` means the service itself is failing. There is **no** instrument for outbox depth, consumer lag, sweep counts or DLQ volume; use the SQL and logs in the [Runbook](/docs/operations/runbook).
 

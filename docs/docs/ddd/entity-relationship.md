@@ -170,6 +170,10 @@ erDiagram
     text dest_node_id PK
     jsonb observations
   }
+  rm_departure_arrival {
+    text departure_id PK
+    timestamptz arrived_at
+  }
   rm_nodes ||--o{ rm_listings : "node_id"
   rm_items ||--o{ rm_listings : "item_id"
   rm_nodes ||--o{ rm_scorecards : "node_id"
@@ -180,7 +184,7 @@ erDiagram
   rm_trackings ||--o| rm_outcomes : "tracking_number"
 ```
 
-Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_actuals.up.sql`, `0005_listing_owner.up.sql`, `internal/application/readmodel`.
+Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_actuals.up.sql`, `0005_listing_owner.up.sql`, `0007_node_tier_eligibility.up.sql`, `0008_departure_arrival.up.sql`, `internal/application/readmodel`.
 
 | Table | Fed by | Used by |
 | --- | --- | --- |
@@ -188,8 +192,10 @@ Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_ac
 | `rm_items`, `rm_listings` | offer-availability events | shipment grouping and availability per (node, item, owner): `rm_listings` is keyed by `(item_id, node_id, owner_ref)` (index `rm_listings_node_item_owner`, migration 0005) and a line is covered by ONE owner, never a sum (ADR 0017) |
 | `rm_departures`, `rm_waves` | linehaul and last-mile events | path search, `MakePromise` revalidation, cancellation risk |
 | `rm_scorecards` | node-performance events | the `ScorecardHandicap` |
+| `rm_node_tier_eligibility` (`node_id`, `tier`, `eligible`, `changed_at`; PK `(node_id, tier)`; migration 0007) | node-performance `NodeTierEligibilityChanged` | removing ineligible nodes from `SAME_DAY` and `NEXT_DAY` candidates (ADR 0022); a missing row means eligible |
 | `rm_assignments`, `rm_shipments`, `rm_trackings`, `rm_outcomes` | order-sourcing and shipping-and-tracking events | finding a promise's assignment and judging it |
 | `rm_load_transit_open`, `rm_transit_actuals` | linehaul `LoadDeparted` and `LoadArrived` | the measured transit behind a `MEASURED` basis (ADR 0014) |
+| `rm_departure_arrival` | linehaul `LoadArrived` that carries a `departureId` | the late-risk sweep: a witness departure past its expected arrival with no row is flagged (ADR 0021); pruned past the transit window |
 
 ## Analytical database
 
