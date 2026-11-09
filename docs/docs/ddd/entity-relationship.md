@@ -170,6 +170,12 @@ erDiagram
     text dest_node_id PK
     jsonb observations
   }
+  rm_promise_calibration {
+    text tier PK
+    text basis PK
+    text node_grade PK
+    jsonb observations
+  }
   rm_nodes ||--o{ rm_listings : "node_id"
   rm_items ||--o{ rm_listings : "item_id"
   rm_nodes ||--o{ rm_scorecards : "node_id"
@@ -180,7 +186,7 @@ erDiagram
   rm_trackings ||--o| rm_outcomes : "tracking_number"
 ```
 
-Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_actuals.up.sql`, `0005_listing_owner.up.sql`, `internal/application/readmodel`.
+Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_actuals.up.sql`, `0005_listing_owner.up.sql`, `0006_promise_calibration.up.sql`, `internal/application/readmodel`.
 
 | Table | Fed by | Used by |
 | --- | --- | --- |
@@ -190,3 +196,4 @@ Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_ac
 | `rm_scorecards` | node-performance events | the `ScorecardHandicap` |
 | `rm_assignments`, `rm_shipments`, `rm_trackings`, `rm_outcomes` | order-sourcing and shipping-and-tracking events | finding a promise's assignment and judging it |
 | `rm_load_transit_open`, `rm_transit_actuals` | linehaul `LoadDeparted` and `LoadArrived` | the measured transit behind a `MEASURED` basis (ADR 0014) |
+| `rm_promise_calibration` | this service's own `PromiseKept` and late `PromiseBroken` judgements | the calibration buffer and the `confidence` of a quote (ADR 0020) |

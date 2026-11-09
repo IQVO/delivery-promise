@@ -36,16 +36,16 @@ Topics: integration events on `retailnetwork.delivery-promise.events`, analytics
 | `PromiseBroken` | `promise` | events | `JudgePromise` | as kept, plus `lateByMinutes` and `cause` (`LATE`, `LOST`, `RETURNED`); `deliveredAt` omitted for `LOST` and `RETURNED` |
 | `PromiseUnkeepable` | `promise` | events | `ReviseAtRisk` finds no path at any tier | `promiseId`, `orderId`, `groupNo`, `reason`; at most once per promise |
 | `PromiseBookExhausted` | `promisebook` | events | the hold that fills the book | `bookId`, `nodeId`, `pickupDepartureId`, `share` |
-| `PromiseMade` | `promise` | analytics | `MakePromise` | `promiseId`, `offerId`, `tier`, `nodeId`, `pickupDepartureId`, `shipBy`, `deliverByEarliest`, `deliverByLatest`, `timeZone`, `basis`, `policyVersion`, `holdExpiresAt`, `lines[]` |
+| `PromiseMade` | `promise` | analytics | `MakePromise` | `promiseId`, `offerId`, `tier`, `nodeId`, `pickupDepartureId`, `shipBy`, `deliverByEarliest`, `deliverByLatest`, `timeZone`, `basis`, `confidence?`, `policyVersion`, `holdExpiresAt`, `lines[]` |
 | `PromiseConfirmed` | `promise` | analytics | `ConfirmPromise` | `promiseId`, `orderId`, `groupNo` |
 | `PromiseReleased` | `promise` | analytics | `ReleaseExpiredHolds` | `promiseId`, `reason` (`HOLD_EXPIRED`) |
 | `PromiseCancelled` | `promise` | analytics | `CancelPromise` | `promiseId`, `orderId`, `reason` (the order's reason, or `CANCELLED_ON_REQUEST` through REST) |
-| `DeliveryOfferQuoted` | `deliveryoffer` | analytics | `QuoteDeliveryOffers`, one per offer | `offerId`, `tier`, `destinationPostalPrefix`, `nodeId`, `deliverByEarliest`, `deliverByLatest`, `timeZone`, `basis`, `policyVersion`, `expiresAt` |
-| `PromisePolicyPublished` | `promisepolicy` | analytics | `PublishPromisePolicy` | `policyVersion`, `version`, `offerTtlMinutes`, `holdTtlMinutes`, `packagesPerOrder`, `capacitySharePercent`, `orderDeadlines[]`, `publishedAt` |
+| `DeliveryOfferQuoted` | `deliveryoffer` | analytics | `QuoteDeliveryOffers`, one per offer | `offerId`, `tier`, `destinationPostalPrefix`, `nodeId`, `deliverByEarliest`, `deliverByLatest`, `timeZone`, `basis`, `confidence?`, `policyVersion`, `expiresAt` |
+| `PromisePolicyPublished` | `promisepolicy` | analytics | `PublishPromisePolicy` | `policyVersion`, `version`, `offerTtlMinutes`, `holdTtlMinutes`, `packagesPerOrder`, `capacitySharePercent`, `transitWindowDays`, `transitServiceLevelPercent`, `minTransitObservations`, `targetOnTimeProbabilityPercent`, `minCalibrationObservations`, `calibrationWindowDays`, `maxCalibrationBufferMinutes`, `orderDeadlines[]`, `publishedAt` |
 
 That is twelve types: six integration, six analytics-only. Consumers of the events topic that exist in the sibling repositories (read 2026-10-31): customer-ordering (`PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseUnkeepable`), order-sourcing (`PromiseRevised`, `PromiseBookExhausted`), node-performance (`PromiseKept`, `PromiseBroken`). Nothing consumes the analytics topic.
 
-The AsyncAPI examples for each message carry the full envelope; the payload fields above are copied from them. A real published row can be inspected in `outbox_events` (`event_type`, `topic`, `attempts`, `published_at`); in the quickstart run the policy event went out on the first attempt on `retailnetwork.delivery-promise.analytics`.
+The AsyncAPI examples for each message carry the full envelope; the payload fields above are copied from them. A field marked `?` is optional and additive: `confidence` is the calibrated probability that the quote is kept on time (ADR 0020), omitted while the quote's segment has too few judged promises; consumers must read its absence as unknown, never as zero. A real published row can be inspected in `outbox_events` (`event_type`, `topic`, `attempts`, `published_at`); in the quickstart run the policy event went out on the first attempt on `retailnetwork.delivery-promise.analytics`.
 
 ### Ordering and partition
 
