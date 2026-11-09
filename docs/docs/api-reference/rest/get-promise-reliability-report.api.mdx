@@ -1,0 +1,70 @@
+---
+id: get-promise-reliability-report
+title: "Kept rate of the judged promises, per day, tier and basis"
+description: "Per UTC day of judgement (the CloudEvents time of PromiseKept / PromiseBroken), per tier and per basis of the promise AS MADE (UNKNOWN while its PromiseMade is not projected). judged = kept + broken; keptRate = kept / judged; brokenByCause splits broken by the PromiseBroken cause (LATE, LOST, RETURNED); lateByMinutes is the continuous p50 / p90 of lateByMinutes over the broken LATE promises, null when there is none. Days without a judgement are omitted. Served by cmd/dp-reports (ADR 0018)."
+sidebar_label: "Kept rate of the judged promises, per day, tier and basis"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Kept rate of the judged promises, per day, tier and basis"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/reports/promise-reliability"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Per UTC day of judgement (the CloudEvents time of PromiseKept / PromiseBroken), per tier and per basis of the promise AS MADE (UNKNOWN while its PromiseMade is not projected). judged = kept + broken; keptRate = kept / judged; brokenByCause splits broken by the PromiseBroken cause (LATE, LOST, RETURNED); lateByMinutes is the continuous p50 / p90 of lateByMinutes over the broken LATE promises, null when there is none. Days without a judgement are omitted. Served by cmd/dp-reports (ADR 0018).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-promise-reliability-report.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-promise-reliability-report.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-promise-reliability-report.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
