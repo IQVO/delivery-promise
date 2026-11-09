@@ -115,10 +115,12 @@ func (v *NetworkViews) GetListing(ctx context.Context, id string) (readmodel.Lis
 	return getJSON[readmodel.Listing](ctx, v.q(ctx), `SELECT data FROM rm_listings WHERE id = $1`, id)
 }
 
-// PutListing stores the listing row.
+// PutListing stores the listing row under its (item, node, ownerRef) key
+// columns (ADR 0017).
 func (v *NetworkViews) PutListing(ctx context.Context, l readmodel.Listing) error {
-	return v.put(ctx, `INSERT INTO rm_listings (id, item_id, node_id, data) VALUES ($1, $2, $3, $4)
-		ON CONFLICT (id) DO UPDATE SET item_id = EXCLUDED.item_id, node_id = EXCLUDED.node_id, data = EXCLUDED.data`, l.ID, l.ItemID, l.NodeID, mustJSON(l))
+	return v.put(ctx, `INSERT INTO rm_listings (id, item_id, node_id, owner_ref, data) VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (id) DO UPDATE SET item_id = EXCLUDED.item_id, node_id = EXCLUDED.node_id, owner_ref = EXCLUDED.owner_ref,
+		data = EXCLUDED.data`, l.ID, l.ItemID, l.NodeID, l.OwnerRef, mustJSON(l))
 }
 
 // ListingsForNode returns the node's listings of the items by listing id.

@@ -135,6 +135,9 @@
               "catalogItemId": {
                 "type": "string"
               },
+              "ownerRef": {
+                "type": "string"
+              },
               "quantity": {
                 "type": "integer"
               }
@@ -311,6 +314,9 @@
             "additionalProperties": false,
             "properties": {
               "catalogItemId": {
+                "type": "string"
+              },
+              "ownerRef": {
                 "type": "string"
               },
               "quantity": {
@@ -666,6 +672,9 @@
                   "additionalProperties": false,
                   "properties": {
                     "catalogItemId": {
+                      "type": "string"
+                    },
+                    "ownerRef": {
                       "type": "string"
                     },
                     "quantity": {

@@ -1757,7 +1757,8 @@ components:
       contentType: application/cloudevents+json
       description: 'Consumed from `retailnetwork.offer-availability.events`; `type` = `com.retailnetwork.commerce.offer-availability.listing.ListingCreated`
         (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
-        fields are ignored. Use: Upserts the listing row of AvailabilityView.'
+        fields are ignored. Use: Upserts the listing row of AvailabilityView, keyed by (catalogItemId, nodeId,
+        ownerRef); an absent ownerRef is operator-owned (ADR 0017).'
       tags:
       - name: consumed-offer-availability
       payload:
@@ -1785,7 +1786,8 @@ components:
       contentType: application/cloudevents+json
       description: 'Consumed from `retailnetwork.offer-availability.events`; `type` = `com.retailnetwork.commerce.offer-availability.listing.ListingAvailabilityChanged`
         (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
-        fields are ignored. Use: Sets availableQty; an asOf older than the stored one is ignored.'
+        fields are ignored. Use: Sets availableQty of the (catalogItemId, nodeId, ownerRef) key; an asOf older than the
+        one stored for that key is ignored (ADR 0017).'
       tags:
       - name: consumed-offer-availability
       payload:
@@ -1948,6 +1950,10 @@ components:
         quantity:
           type: integer
           minimum: 1
+        ownerRef:
+          type: string
+          description: The seller (sellerId) whose listing covers the line, chosen by the OwnerChoice rule (ADR 0017).
+            Optional and additive; omitted when the line is operator-owned.
     OrderDeadline:
       type: object
       required:
@@ -2806,6 +2812,10 @@ components:
               listingId: *id001
               catalogItemId: *id001
               nodeId: *id001
+              ownerRef:
+                type: string
+                description: The owning seller (sellerId); absent means operator-owned, stored as '' in the
+                  (catalogItemId, nodeId, ownerRef) key of AvailabilityView (ADR 0017).
     ListingAvailabilityChangedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2821,6 +2831,10 @@ components:
               listingId: *id001
               catalogItemId: *id001
               nodeId: *id001
+              ownerRef:
+                type: string
+                description: The owning seller (sellerId); absent means operator-owned (''). Keys the figure with
+                  catalogItemId and nodeId; the asOf rule applies per key (ADR 0017).
               availableQty: *id003
               asOf: *id002
     ListingSuppressedConsumed:

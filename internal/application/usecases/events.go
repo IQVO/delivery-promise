@@ -96,18 +96,22 @@ type CatalogItemChanged struct {
 	CatalogItemID string `json:"catalogItemId"`
 }
 
-// ListingCreated is offer-availability ListingCreated.
+// ListingCreated is offer-availability ListingCreated. OwnerRef is the owning
+// seller; absent means operator-owned ("", ADR 0017).
 type ListingCreated struct {
 	ListingID     string `json:"listingId"`
 	CatalogItemID string `json:"catalogItemId"`
 	NodeID        string `json:"nodeId"`
+	OwnerRef      string `json:"ownerRef"`
 }
 
-// ListingAvailabilityChanged is offer-availability ListingAvailabilityChanged.
+// ListingAvailabilityChanged is offer-availability ListingAvailabilityChanged;
+// OwnerRef as on ListingCreated.
 type ListingAvailabilityChanged struct {
 	ListingID     string    `json:"listingId"`
 	CatalogItemID string    `json:"catalogItemId"`
 	NodeID        string    `json:"nodeId"`
+	OwnerRef      string    `json:"ownerRef"`
 	AvailableQty  int       `json:"availableQty"`
 	AsOf          time.Time `json:"asOf"`
 }

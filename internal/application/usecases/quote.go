@@ -113,7 +113,7 @@ func (s *Service) offersOfGroup(g search.Group, prefix string, pol *policy.Polic
 		}
 		c := cs[0]
 		o, evs, err := offer.New(offer.Quote{
-			ID: s.IDs.NewOfferID(), GroupNo: g.No, DestinationPrefix: prefix, Tier: t, Lines: g.Lines, Window: c.Window, Witness: c.Witness,
+			ID: s.IDs.NewOfferID(), GroupNo: g.No, DestinationPrefix: prefix, Tier: t, Lines: c.Lines, Window: c.Window, Witness: c.Witness,
 			Basis: c.Basis, PolicyVersion: pol.VersionName(), TTL: pol.OfferTTL(), ExpiresAt: c.ExpiresAt, LatestMeetableAt: c.LatestMeetableAt, PickupCutoffAt: c.ShipBy,
 		}, now)
 		if err != nil {

@@ -44,6 +44,9 @@ func goldenCases() map[string]shared.Event {
 			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}}},
 		"PromiseMade_nominal": promise.PromiseMade{Header: hdr, PromiseID: "prm-2", OfferID: "off-2", Terms: nominal, Witness: shared.Witness{NodeID: "N-AUS3"},
 			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 1}}},
+		// a seller-owned line names its owner, an operator-owned one omits it (ADR 0017)
+		"PromiseMade_sellerOwned": promise.PromiseMade{Header: hdr, PromiseID: "prm-3", OfferID: "off-3", Terms: term, Witness: wit,
+			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}, {CatalogItemID: "ci-2002", Quantity: 1, OwnerRef: "S-0042"}}},
 		"PromiseConfirmed": promise.PromiseConfirmed{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", GroupNo: 1},
 		"PromiseAtRisk":    promise.PromiseAtRisk{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", Reason: "DEPARTURE_CANCELLED", DetectedAt: t0},
 		"PromiseRevised": promise.PromiseRevised{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", RevisionNo: 1, NodeID: "N-AUS3",

@@ -41,7 +41,7 @@ func TestBasisValid(t *testing.T) {
 }
 
 func TestValidateLines(t *testing.T) {
-	ok := []Line{{"ci-1", 1}, {"ci-2", MaxQuantity}}
+	ok := []Line{{"ci-1", 1, ""}, {"ci-2", MaxQuantity, ""}}
 	if err := ValidateLines(ok); err != nil {
 		t.Fatalf("valid lines refused: %v", err)
 	}
@@ -54,12 +54,12 @@ func TestValidateLines(t *testing.T) {
 	}
 	bad := map[string][]Line{
 		"none":         nil,
-		"too many":     append(many, Line{"zzz", 1}),
-		"bad id":       {{"-x", 1}},
-		"duplicate":    {{"a", 1}, {"a", 2}},
-		"zero qty":     {{"a", 0}},
-		"negative qty": {{"a", -1}},
-		"qty ceiling":  {{"a", MaxQuantity + 1}},
+		"too many":     append(many, Line{"zzz", 1, ""}),
+		"bad id":       {{"-x", 1, ""}},
+		"duplicate":    {{"a", 1, ""}, {"a", 2, ""}},
+		"zero qty":     {{"a", 0, ""}},
+		"negative qty": {{"a", -1, ""}},
+		"qty ceiling":  {{"a", MaxQuantity + 1, ""}},
 	}
 	for name, lines := range bad {
 		if err := ValidateLines(lines); !errors.Is(err, ErrValidation) {
@@ -69,17 +69,17 @@ func TestValidateLines(t *testing.T) {
 }
 
 func TestSameLines(t *testing.T) {
-	a := []Line{{"a", 1}, {"b", 2}}
+	a := []Line{{"a", 1, ""}, {"b", 2, ""}}
 	cases := []struct {
 		name string
 		b    []Line
 		want bool
 	}{
-		{"same order", []Line{{"a", 1}, {"b", 2}}, true},
-		{"other order", []Line{{"b", 2}, {"a", 1}}, true},
-		{"other quantity", []Line{{"a", 1}, {"b", 3}}, false},
-		{"other item", []Line{{"a", 1}, {"c", 2}}, false},
-		{"shorter", []Line{{"a", 1}}, false},
+		{"same order", []Line{{"a", 1, ""}, {"b", 2, ""}}, true},
+		{"other order", []Line{{"b", 2, ""}, {"a", 1, ""}}, true},
+		{"other quantity", []Line{{"a", 1, ""}, {"b", 3, ""}}, false},
+		{"other item", []Line{{"a", 1, ""}, {"c", 2, ""}}, false},
+		{"shorter", []Line{{"a", 1, ""}}, false},
 	}
 	for _, c := range cases {
 		if SameLines(a, c.b) != c.want {

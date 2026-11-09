@@ -48,6 +48,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 	}{
 		{"offers", offerCases}, {"promises", promiseCases}, {"books", bookCases}, {"policies", policyCases},
 		{"network views", networkCases}, {"shipment views", shipmentCases}, {"unit of work", unitOfWorkCases},
+		{"owners", ownerCases},
 	}
 	for _, g := range groups {
 		for _, c := range g.cases {
@@ -123,7 +124,8 @@ func NewPromise(t *testing.T, id, offerID, node, pickup string) *promise.Promise
 			Window: shared.Window{Earliest: T0.Add(18 * time.Hour), Latest: T0.Add(30 * time.Hour), TimeZone: "America/Chicago"},
 		},
 		Witness: shared.Witness{NodeID: node, PickupDepartureID: pickup, Legs: []string{"dep-2200"}, DeliveryWaveID: "w-1"},
-		BookID:  string(book.MakeID(node, pickup)), HoldTTL: 15 * time.Minute, Available: map[string]int{"ci-1001": 2},
+		BookID:  string(book.MakeID(node, pickup)), HoldTTL: 15 * time.Minute,
+		Stock: map[string][]shared.OwnerStock{"ci-1001": {{OwnerRef: shared.OperatorOwned, Available: 2}}},
 	}, T0)
 	noErr(t, err)
 	return p
