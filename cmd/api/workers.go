@@ -65,11 +65,13 @@ func startOutboxRelay(store outboxrelay.Store, rt runtimeEnv, env func(string) s
 }
 
 // sweeper is the clock-driven part of the model: it expires offers, releases
-// expired holds, closes books at their cutoff and re-promises at-risk promises.
+// expired holds, closes books at their cutoff, flags the promises whose locked
+// path is running late (ADR 0021) and re-promises at-risk promises.
 type sweeper interface {
 	ExpireOffers(ctx context.Context, limit int) (int, error)
 	ReleaseExpiredHolds(ctx context.Context, limit int) (int, error)
 	CloseBooks(ctx context.Context, limit int) (int, error)
+	FlagPredictedLate(ctx context.Context, limit int) (int, error)
 	RepriceAtRisk(ctx context.Context, limit int) (int, error)
 }
 
@@ -83,6 +85,7 @@ func sweepOnce(ctx context.Context, s sweeper, logger *slog.Logger) {
 		{"expire offers", s.ExpireOffers},
 		{"release expired holds", s.ReleaseExpiredHolds},
 		{"close books", s.CloseBooks},
+		{"flag predicted-late promises", s.FlagPredictedLate}, // before the re-promise: one that is already unreachable is revised in the same sweep
 		{"re-promise at-risk promises", s.RepriceAtRisk},
 	}
 	for _, p := range passes {

@@ -135,14 +135,17 @@ func (f *fakeSweeper) ExpireOffers(context.Context, int) (int, error) { return f
 func (f *fakeSweeper) ReleaseExpiredHolds(context.Context, int) (int, error) {
 	return f.pass("release")
 }
-func (f *fakeSweeper) CloseBooks(context.Context, int) (int, error)    { return f.pass("close") }
+func (f *fakeSweeper) CloseBooks(context.Context, int) (int, error) { return f.pass("close") }
+func (f *fakeSweeper) FlagPredictedLate(context.Context, int) (int, error) {
+	return f.pass("flaglate")
+}
 func (f *fakeSweeper) RepriceAtRisk(context.Context, int) (int, error) { return f.pass("reprice") }
 
 func TestSweepOnceRunsEveryPassEvenWhenOneFails(t *testing.T) {
 	var buf bytes.Buffer
 	f := &fakeSweeper{fail: "release"}
 	sweepOnce(context.Background(), f, slog.New(slog.NewTextHandler(&buf, nil)))
-	if strings.Join(f.calls, ",") != "expire,release,close,reprice" {
+	if strings.Join(f.calls, ",") != "expire,release,close,flaglate,reprice" {
 		t.Fatalf("calls = %v", f.calls)
 	}
 	if !strings.Contains(buf.String(), "sweep pass failed") || !strings.Contains(buf.String(), "release expired holds") {
@@ -160,7 +163,7 @@ func TestRunSweeperTicksUntilCancelled(t *testing.T) {
 	if err := <-done; !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v", err)
 	}
-	if len(f.calls) < 4 {
+	if len(f.calls) < 5 {
 		t.Fatalf("calls = %v", f.calls)
 	}
 }
@@ -185,6 +188,18 @@ func TestStartWorkerLogsAFailure(t *testing.T) {
 	w := startWorker("bad", slog.New(slog.NewTextHandler(&buf, nil)), func(context.Context) error { return errors.New("kaput") })
 	<-w.done
 	if !strings.Contains(buf.String(), "kaput") {
+		t.Fatalf("log = %s", buf.String())
+	}
+}
+
+func TestSweepOnceKeepsRepromisingWhenTheLateRiskPassFails(t *testing.T) {
+	var buf bytes.Buffer
+	f := &fakeSweeper{fail: "flaglate"}
+	sweepOnce(context.Background(), f, slog.New(slog.NewTextHandler(&buf, nil)))
+	if strings.Join(f.calls, ",") != "expire,release,close,flaglate,reprice" {
+		t.Fatalf("calls = %v", f.calls)
+	}
+	if !strings.Contains(buf.String(), "sweep pass failed") || !strings.Contains(buf.String(), "flag predicted-late promises") {
 		t.Fatalf("log = %s", buf.String())
 	}
 }
