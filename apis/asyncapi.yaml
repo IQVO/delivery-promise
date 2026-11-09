@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: delivery-promise Domain Events
-  version: 1.1.0
+  version: 1.2.0
   description: 'Event catalog for the **delivery-promise** bounded context of the retail network (commerce tier, Core): it
     quotes delivery offers from a feasible witness path, holds capacity in PromiseBooks, makes and judges promises (ADR 0002,
     ADR 0003).
@@ -21,6 +21,14 @@ info:
     and dispatches on the full `type`. A transient failure is retried with capped backoff (5 attempts), then the message goes to `<topic>.dlq`
     (headers `x-dlq-*`); a payload that can never be applied goes there at once; an unknown type or a message that is not a valid CloudEvent
     is logged and skipped. Offsets are committed only after handling.
+
+
+    **Own events, read back for analytics (ADR 0018).** The analytics projector (`cmd/dp-projector`) reads this context''s
+    OWN two topics in the fixed group `delivery-promise-analytics` and projects DeliveryOfferQuoted and PromiseMade (from
+    `.analytics`) and PromiseRevised, PromiseUnkeepable, PromiseKept and PromiseBroken (from `.events`) into a separate
+    analytical database. It dedupes on the CloudEvents `id` in the same transaction as the projection, dead-letters only
+    deterministic poison to `retailnetwork.delivery-promise.analytics.dlq` and retries transient failures without a bound.
+    It reads no sibling''s topic.
 
 
     **Envelope (mandatory).** CloudEvents 1.0, structured content mode, Kafka header `content-type: application/cloudevents+json;
@@ -276,6 +284,38 @@ operations:
     - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromiseCancelled'
     - $ref: '#/channels/deliveryPromiseAnalytics/messages/DeliveryOfferQuoted'
     - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromisePolicyPublished'
+  projectOwnEventsForAnalytics:
+    action: receive
+    channel:
+      $ref: '#/channels/deliveryPromiseEvents'
+    title: Project this context's own integration events into the analytical database
+    summary: The analytics projector reads back four of the events this service publishes on its integration topic (ADR 0018).
+    description: Inbound adapter internal/adapters/inbound/kafka/analytics_consumer.go, run by cmd/dp-projector in the consumer
+      group ANALYTICS_CONSUMER_GROUP (default delivery-promise-analytics), the same group as projectOwnAnalyticsForAnalytics.
+      Dispatches on the full `type`; PromiseAtRisk and PromiseBookExhausted are acknowledged without projection; any other
+      type or a non-CloudEvents message is skipped with a sampled warning; poison goes to retailnetwork.delivery-promise.analytics.dlq.
+    tags:
+    - name: delivery-promise
+    messages:
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseRevised'
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseKept'
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseBroken'
+    - $ref: '#/channels/deliveryPromiseEvents/messages/PromiseUnkeepable'
+  projectOwnAnalyticsForAnalytics:
+    action: receive
+    channel:
+      $ref: '#/channels/deliveryPromiseAnalytics'
+    title: Project this context's own analytics-only events into the analytical database
+    summary: The analytics projector reads back two of the events this service publishes on its analytics topic (ADR 0018).
+    description: Inbound adapter internal/adapters/inbound/kafka/analytics_consumer.go, run by cmd/dp-projector in the consumer
+      group ANALYTICS_CONSUMER_GROUP (default delivery-promise-analytics), the same group as projectOwnEventsForAnalytics.
+      Dispatches on the full `type`; PromiseConfirmed, PromiseReleased, PromiseCancelled and PromisePolicyPublished are
+      acknowledged without projection; any other type or a non-CloudEvents message is skipped with a sampled warning.
+    tags:
+    - name: delivery-promise
+    messages:
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/DeliveryOfferQuoted'
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromiseMade'
   receiveCustomerOrderingEvents:
     action: receive
     channel:

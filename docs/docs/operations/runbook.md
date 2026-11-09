@@ -13,7 +13,7 @@ Companion pages: [Configuration](/docs/operations/configuration), [Troubleshooti
 
 ## Runtime shape
 
-Three binaries ship in one image (`cmd/api`, `cmd/mcp`, `cmd/a2a`); the Helm chart `charts/delivery-promise` deploys them as separate Deployments.
+Five binaries ship in one image (`cmd/api`, `cmd/mcp`, `cmd/a2a`, `cmd/dp-projector`, `cmd/dp-reports`); the Helm chart `charts/delivery-promise` deploys them as separate Deployments.
 
 | Component | Chart switch | Port | What runs |
 | --- | --- | --- | --- |
@@ -21,6 +21,8 @@ Three binaries ship in one image (`cmd/api`, `cmd/mcp`, `cmd/a2a`); the Helm cha
 | `mcp` | `mcp.enabled` (off by default) | `:8090` | read-only MCP server, Streamable HTTP on `/mcp`, `GET /healthz` |
 | `a2a` | `a2a.enabled` (off by default) | `:8093` | read-only A2A agent, JSON-RPC on `/` and `/a2a`, Agent Card at `/.well-known/agent-card.json`, `GET /healthz` |
 | `frontend` | `frontend.enabled` (off by default) | `:8080` (nginx) | the `web/` console remote (ADR 0008) |
+| `analytics-projector` | `analytics.enabled` (off by default) | `:8091` (admin probes only, no Service) | `cmd/dp-projector`: projects this context's own `.events` and `.analytics` topics into the separate analytical database (ADR 0018) |
+| `analytics-reports` | `analytics.enabled` (off by default) | `:8092` (Service port 80; opt-in Kong route `/api/delivery-promise/reports` rewritten to `/reports`) | `cmd/dp-reports`: read-only `GET /reports/promise-reliability`, `/reports/promise-precision`, `/reports/quote-conversion`, `/reports/freshness` |
 
 In the local cluster (`warehouse-infra` `helm-values/delivery-promise.yaml`) all four are enabled. Kong exposes the API at `/api/delivery-promise` (prefix stripped), MCP at `/api/mcp/delivery-promise` (rewritten to `/mcp`) and A2A at `/api/a2a/delivery-promise` (rewritten to `/`). `cmd/mcp` and `cmd/a2a` never dial Kafka and run no workers.
 
@@ -60,6 +62,7 @@ Migrations are embedded in the binary (`internal/adapters/outbound/postgres/migr
 | Publishes | `retailnetwork.delivery-promise.analytics` | analytics-only events: `PromiseMade`, `PromiseConfirmed`, `PromiseReleased`, `PromiseCancelled`, `DeliveryOfferQuoted`, `PromisePolicyPublished` |
 | Consumes | `retailnetwork.customer-ordering.events`, `retailnetwork.order-sourcing.events`, `retailnetwork.shipping-and-tracking.events`, `retailnetwork.linehaul-transportation.events`, `retailnetwork.last-mile-delivery.events`, `retailnetwork.node-performance.events`, `retailnetwork.node-topology.events`, `retailnetwork.offer-availability.events` | one consumer group: `DELIVERY_PROMISE_CONSUMER_GROUP` |
 | Dead letters | `<consumed topic>.dlq` | `x-dlq-source-topic`, `x-dlq-source-partition`, `x-dlq-source-offset`, `x-dlq-error`, `x-dlq-failed-at` headers |
+| Consumes (`cmd/dp-projector`, ADR 0018) | `retailnetwork.delivery-promise.events` and `retailnetwork.delivery-promise.analytics` (its own topics) | `ANALYTICS_CONSUMER_GROUP` (`delivery-promise-analytics`); dead letters to `retailnetwork.delivery-promise.analytics.dlq` (poison only; transient failures retry forever) |
 
 The consumer group id is a chart value and must be stable: a rescheduled pod resumes from its committed offsets, while a brand-new group re-reads each topic from the start (the quickstart relies on that to fill the read models). Event contracts: [Events](/docs/api-reference/events).
 
