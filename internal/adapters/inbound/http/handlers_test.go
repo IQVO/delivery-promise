@@ -26,6 +26,8 @@ type fakeAPI struct {
 	err       error
 	created   bool
 	quote     usecases.QuoteCommand
+	estimate  usecases.EstimateCommand
+	estimated views.EstimateResult
 	make      usecases.MakePromiseCommand
 	policy    policy.Input
 	confirm   [3]any
@@ -39,6 +41,11 @@ type fakeAPI struct {
 func (f *fakeAPI) QuoteDeliveryOffers(_ context.Context, c usecases.QuoteCommand) (views.QuoteResult, error) {
 	f.quote = c
 	return views.QuoteResult{Offers: []views.Offer{{OfferID: "off-1", Tier: "NEXT_DAY"}}, Unavailable: []views.Unavailable{}}, f.err
+}
+
+func (f *fakeAPI) EstimateDeliveries(_ context.Context, c usecases.EstimateCommand) (views.EstimateResult, error) {
+	f.estimate = c
+	return f.estimated, f.err
 }
 
 func (f *fakeAPI) GetOffer(_ context.Context, id string) (views.Offer, error) {
@@ -288,6 +295,7 @@ func TestOnlyTheMutatingRoutesAreWrappedByTheIdempotencyMiddleware(t *testing.T)
 	}
 	h := NewRouter(&Server{API: &fakeAPI{}, Idempotency: mw}, nil, "")
 	do(h, "POST", "/delivery-quotes", `{"destinationPostalPrefix":"787","lines":[]}`)
+	do(h, "POST", "/delivery-estimates", `{"destinationPostalPrefix":"787","items":[]}`)
 	do(h, "POST", "/promises", `{"offerId":"o","lines":[]}`)
 	do(h, "POST", "/promises/prm-1/confirmations", `{"orderId":"o","groupNo":1}`)
 	do(h, "POST", "/promises/prm-1/cancellations", ``)

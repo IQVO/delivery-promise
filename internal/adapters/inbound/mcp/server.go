@@ -5,7 +5,9 @@
 //
 // Per docs/adr/0007-mcp-server-adoption.md the surface is READ-ONLY: every
 // tool reads promise data (get_delivery_offer, list_promises_by_order,
-// get_promise, list_promise_books, get_current_policy); quoting, making,
+// get_promise, list_promise_books, get_current_policy) or computes an
+// advisory estimate that stores nothing (estimate_delivery, docs/adr/0019);
+// quoting, making,
 // confirming and cancelling a promise and publishing a policy stay on REST
 // and on the event consumers, and governance_test.go fails the build on a
 // write-verb tool name. This package depends inward on the application layer
@@ -36,7 +38,9 @@ const instructions = "Delivery promises of the retail network (read-only): read 
 	"with get_promise (its terms, witness path, revisions and judgement); see the capacity ledger of a node's pickup " +
 	"cutoffs on one date with list_promise_books (share, provisional and confirmed holds per book) or the " +
 	"promise://books/{nodeId}/{date} resource; and read the current promise policy with get_current_policy (offer " +
-	"TTL, hold TTL, packages per order, capacity share and per-tier order deadlines). Every tool is authority L1 " +
+	"TTL, hold TTL, packages per order, capacity share and per-tier order deadlines). For a listing page, " +
+	"estimate_delivery answers up to 50 items' best option per tier without storing anything (advisory, it never " +
+	"reserves capacity). Every tool is authority L1 " +
 	"(a pure read). Nothing here changes data: quoting and the promise lifecycle are REST operations of " +
 	"delivery-promise, driven by checkout, and the policy is published on REST too. Start with the " +
 	"check_order_promises prompt."

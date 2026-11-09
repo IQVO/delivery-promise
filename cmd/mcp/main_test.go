@@ -12,6 +12,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	inboundmcp "github.com/claudioed/delivery-promise/internal/adapters/inbound/mcp"
+	"github.com/claudioed/delivery-promise/internal/application/usecases"
 	"github.com/claudioed/delivery-promise/internal/application/views"
 )
 
@@ -30,6 +31,10 @@ func newTestServer(t *testing.T) *httptest.Server {
 type stubReads struct{}
 
 func (stubReads) GetOffer(context.Context, string) (views.Offer, error) { return views.Offer{}, nil }
+
+func (stubReads) EstimateDeliveries(context.Context, usecases.EstimateCommand) (views.EstimateResult, error) {
+	return views.EstimateResult{}, nil
+}
 
 func (stubReads) ListPromisesByOrder(context.Context, string) (views.PromiseList, error) {
 	return views.PromiseList{}, nil
@@ -64,7 +69,7 @@ func TestRouter_HealthzIsOpenAndServesOK(t *testing.T) {
 }
 
 // Both mount points speak Streamable HTTP, with no credentials, and a real
-// client lists the five read-only tools.
+// client lists the six read-only tools.
 func TestStreamableHTTP_RootAndMCPPathsServeTools(t *testing.T) {
 	srv := newTestServer(t)
 	for _, path := range []string{"/", "/mcp"} {
@@ -79,8 +84,8 @@ func TestStreamableHTTP_RootAndMCPPathsServeTools(t *testing.T) {
 			if err != nil {
 				t.Fatalf("list tools: %v", err)
 			}
-			if len(tools.Tools) != 5 {
-				t.Fatalf("tools = %d, want 5", len(tools.Tools))
+			if len(tools.Tools) != 6 {
+				t.Fatalf("tools = %d, want 6", len(tools.Tools))
 			}
 			for _, tool := range tools.Tools {
 				if tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {

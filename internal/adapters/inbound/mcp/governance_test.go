@@ -19,14 +19,16 @@ import (
 var update = flag.Bool("update", false, "rewrite the MCP tool registry golden file")
 
 // wantTools is the curated, READ-ONLY tool set (docs/adr/0007): the five GET
-// operations of apis/openapi.yaml.
+// operations of apis/openapi.yaml and the safe POST /delivery-estimates, which
+// stores nothing (docs/adr/0019). Sorted: it is compared with the sorted names.
 var wantTools = []string{
-	"get_current_policy", "get_delivery_offer", "get_promise", "list_promise_books", "list_promises_by_order",
+	"estimate_delivery", "get_current_policy", "get_delivery_offer", "get_promise", "list_promise_books", "list_promises_by_order",
 }
 
 // maxTools is the tool budget. Raising it is a deliberate, reviewed act (an
-// ADR 0007 amendment): TestToolSurface still pins the exact curated set.
-const maxTools = 5
+// ADR 0007 amendment, the last one docs/adr/0019): TestToolSurface still pins
+// the exact curated set.
+const maxTools = 6
 
 // writeVerbs are the verbs of this service's write use cases (quote is a
 // simulation that persists offers, make/confirm/cancel/publish move the
@@ -133,6 +135,11 @@ func checkToolMetadata(t *testing.T, tool *sdk.Tool) {
 // /promise-policies/current, which takes no parameter at all.
 var arglessTools = map[string]bool{"get_current_policy": true}
 
+// optionalArgs are the documented optional arguments: estimate_delivery's
+// tiers mirrors the optional tiers of POST /delivery-estimates (all four when
+// omitted, docs/adr/0019). Every other argument must be required.
+var optionalArgs = map[string]map[string]bool{"estimate_delivery": {"tiers": true}}
+
 func checkToolArguments(t *testing.T, tool *sdk.Tool) {
 	t.Helper()
 	schema, isMap := tool.InputSchema.(map[string]any)
@@ -156,15 +163,16 @@ func checkToolArguments(t *testing.T, tool *sdk.Tool) {
 		}
 	}
 	// Every argument of a tool with arguments is REQUIRED here: the REST
-	// query parameters they mirror (orderId, nodeId, date) are required.
+	// query parameters they mirror (orderId, nodeId, date) are required. The
+	// documented exceptions mirror an optional REST body field.
 	required, _ := schema["required"].([]any)
 	has := map[string]bool{}
 	for _, r := range required {
 		has[r.(string)] = true
 	}
 	for arg := range props {
-		if !has[arg] {
-			t.Errorf("tool %q argument %q is not in the schema's required list", tool.Name, arg)
+		if has[arg] == optionalArgs[tool.Name][arg] {
+			t.Errorf("tool %q argument %q: required %v, want %v", tool.Name, arg, has[arg], !optionalArgs[tool.Name][arg])
 		}
 	}
 }

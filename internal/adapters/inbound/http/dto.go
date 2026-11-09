@@ -28,12 +28,27 @@ type quoteRequest struct {
 	Tiers                   []string  `json:"tiers"`
 }
 
-func (q quoteRequest) command() usecases.QuoteCommand {
-	tiers := make([]shared.Tier, len(q.Tiers))
-	for i, t := range q.Tiers {
+func toTiers(in []string) []shared.Tier {
+	tiers := make([]shared.Tier, len(in))
+	for i, t := range in {
 		tiers[i] = shared.Tier(t)
 	}
-	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, Lines: toLines(q.Lines), Tiers: tiers}
+	return tiers
+}
+
+func (q quoteRequest) command() usecases.QuoteCommand {
+	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, Lines: toLines(q.Lines), Tiers: toTiers(q.Tiers)}
+}
+
+// estimateRequest is the body of POST /delivery-estimates (ADR 0019).
+type estimateRequest struct {
+	DestinationPostalPrefix string    `json:"destinationPostalPrefix"`
+	Items                   []lineDTO `json:"items"`
+	Tiers                   []string  `json:"tiers"`
+}
+
+func (e estimateRequest) command() usecases.EstimateCommand {
+	return usecases.EstimateCommand{DestinationPostalPrefix: e.DestinationPostalPrefix, Items: toLines(e.Items), Tiers: toTiers(e.Tiers)}
 }
 
 type makePromiseRequest struct {
