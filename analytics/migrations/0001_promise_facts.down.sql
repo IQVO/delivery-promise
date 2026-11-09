@@ -1,0 +1,10 @@
+DROP INDEX IF EXISTS idx_analytics_processed_events_occurred_at;
+DROP INDEX IF EXISTS idx_promise_judgements_judged_at;
+DROP INDEX IF EXISTS idx_promises_made_made_at;
+DROP INDEX IF EXISTS idx_offers_quoted_quoted_at;
+DROP TABLE IF EXISTS promise_judgements;
+DROP TABLE IF EXISTS promise_unkeepable;
+DROP TABLE IF EXISTS promise_revisions;
+DROP TABLE IF EXISTS promises_made;
+DROP TABLE IF EXISTS offers_quoted;
+DROP TABLE IF EXISTS analytics_processed_events;

@@ -8,8 +8,10 @@ Every Deployment here carries `app.kubernetes.io/component` in
 selector.matchLabels and its pod labels, and every Service selects on it, so each
 Service selects EXACTLY ONE Deployment. This test fails if that ever stops being
 true. delivery-promise has one always-on component (`api`) plus the
-optional `mcp` (ADR 0007), `a2a` (ADR 0010) and `frontend` (ADR 0008, the
-delivery_promise_mfe remote's nginx pod), all default OFF; the test renders
+optional `mcp` (ADR 0007), `a2a` (ADR 0010), `frontend` (ADR 0008, the
+delivery_promise_mfe remote's nginx pod) and the analytics read side (ADR 0018:
+`analytics-projector`, a Deployment with NO Service, and `analytics-reports`),
+all default OFF; the test renders
 everything at once, so each Service must still select EXACTLY ONE Deployment.
 It also pins the env isolation: the mcp and a2a pods never see
 Kafka/relay/consumer/sweeper env, and the frontend pod never sees a database
@@ -54,6 +56,11 @@ ENABLE_EVERYTHING = BASE + [
     "--set", "a2a.route.parentRefs[0].name=example-gateway",
     "--set", "a2a.route.parentRefs[0].namespace=gateway",
     "--set", "frontend.enabled=true",
+    "--set", "analytics.enabled=true",
+    "--set", "analytics.database.projectorUrl=postgres://projector@example.invalid:5432/analytics",
+    "--set", "analytics.reports.route.enabled=true",
+    "--set", "analytics.reports.route.parentRefs[0].name=example-gateway",
+    "--set", "analytics.reports.route.parentRefs[0].namespace=gateway",
 ]
 
 # Every variable cmd/api reads; each has a dedicated chart value.
@@ -78,6 +85,14 @@ MCP_ENV = ("MCP_ADDR", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_
 A2A_STRAY = MCP_STRAY
 # Every env var cmd/a2a reads that has a dedicated chart value.
 A2A_ENV = ("A2A_ADDR", "A2A_AGENT_URL", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_URL", "MIGRATIONS_DATABASE_URL")
+# The analytics read side (ADR 0018) never sees the OLTP database, the relay,
+# the sweeper or the OLTP consumer group; the reports pod gets no Kafka and no
+# DSN but the reader's.
+ANALYTICS_STRAY = (MCP_STRAY - {"KAFKA_BROKERS"}) | {"DATABASE_URL", "MIGRATIONS_DATABASE_URL"}
+REPORTS_STRAY = ANALYTICS_STRAY | {"KAFKA_BROKERS", "ANALYTICS_DATABASE_URL", "ANALYTICS_CONSUMER_GROUP"}
+PROJECTOR_ENV = ("ANALYTICS_DATABASE_URL", "KAFKA_BROKERS", "ANALYTICS_CONSUMER_GROUP", "ADMIN_ADDR", "LOG_LEVEL",
+                 "SERVICE_VERSION", "ENVIRONMENT")
+REPORTS_ENV = ("ANALYTICS_READER_DATABASE_URL", "HTTP_ADDR", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT")
 
 
 def helm_template(extra_args: list[str]) -> subprocess.CompletedProcess:
@@ -133,17 +148,18 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
     fullname = f"{RELEASE}"
 
     mcp, a2a, frontend = f"{fullname}-mcp", f"{fullname}-a2a", f"{fullname}-frontend"
+    projector, reports = f"{fullname}-projector", f"{fullname}-reports"
     if fullname not in services:
         failures.append("the api Service was not rendered")
     elif selector_of(services[fullname]).get(COMPONENT) != "api":
         failures.append("the api Service selector must pin component=api")
     # mcp (ADR 0007), a2a (ADR 0010) and frontend (ADR 0008) render their own
     # Deployment and Service when enabled (they are in ENABLE_EVERYTHING).
-    if set(deployments) != {fullname, mcp, a2a, frontend}:
-        failures.append(f"the chart must render exactly the api, mcp, a2a and frontend Deployments, got {sorted(deployments)}")
-    if set(services) != {fullname, mcp, a2a, frontend}:
-        failures.append(f"the chart must render exactly the api, mcp, a2a and frontend Services, got {sorted(services)}")
-    for name, component in ((mcp, "mcp"), (a2a, "a2a"), (frontend, "frontend")):
+    if set(deployments) != {fullname, mcp, a2a, frontend, projector, reports}:
+        failures.append(f"the chart must render exactly the api, mcp, a2a, frontend, projector and reports Deployments, got {sorted(deployments)}")
+    if set(services) != {fullname, mcp, a2a, frontend, reports}:
+        failures.append(f"the chart must render exactly the api, mcp, a2a, frontend and reports Services (the projector has none), got {sorted(services)}")
+    for name, component in ((mcp, "mcp"), (a2a, "a2a"), (frontend, "frontend"), (reports, "analytics-reports")):
         if selector_of(services.get(name, {})).get(COMPONENT) != component:
             failures.append(f"the {component} Service selector must pin component={component}")
 
@@ -233,6 +249,8 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
         if not agent_url.startswith("http://") or not agent_url.endswith("-a2a.default.svc.cluster.local:8093/"):
             failures.append(f"the a2a Deployment must advertise its in-cluster Service DNS, got {agent_url!r}")
 
+    check_analytics(deployments, docs, failures)
+
     # --- frontend (ADR 0008): static nginx, no database, no Kafka ---
     fe_dep = deployments.get(f"{fullname}-frontend")
     if fe_dep is None:
@@ -256,6 +274,38 @@ def check_components(docs: list[dict], failures: list[str]) -> None:
             ]
             if targets != ["/"]:
                 failures.append(f"the a2a HTTPRoute must rewrite the host prefix to /, got {targets}")
+
+
+def check_analytics(deployments: dict, docs: list[dict], failures: list[str]) -> None:
+    """The projector and the reports run their own binaries with their own env (ADR 0018)."""
+    wants = (
+        ("projector", "/app/dp-projector", ANALYTICS_STRAY, PROJECTOR_ENV),
+        ("reports", "/app/dp-reports", REPORTS_STRAY, REPORTS_ENV),
+    )
+    for suffix, command, stray_set, needs in wants:
+        dep = deployments.get(f"{RELEASE}-{suffix}")
+        if dep is None:
+            failures.append(f"the analytics {suffix} Deployment was not rendered with analytics.enabled=true")
+            continue
+        if command_of(dep) != [command]:
+            failures.append(f"the analytics {suffix} Deployment must run {command}, got {command_of(dep)}")
+        env = set(env_names(dep))
+        stray = sorted(stray_set & env)
+        if stray:
+            failures.append(f"the analytics {suffix} Deployment must not get {stray}")
+        for need in needs:
+            if need not in env:
+                failures.append(f"the analytics {suffix} Deployment does not render {need}")
+    projector = deployments.get(f"{RELEASE}-projector")
+    if projector is not None and env_value(projector, "ANALYTICS_CONSUMER_GROUP") != "delivery-promise-analytics":
+        failures.append(f"the projector group must default to delivery-promise-analytics, got {env_value(projector, 'ANALYTICS_CONSUMER_GROUP')!r}")
+    for d in docs:
+        if d.get("kind") == "HTTPRoute" and d["metadata"]["name"] == f"{RELEASE}-reports":
+            rule = d["spec"]["rules"][0]
+            prefix = rule["matches"][0]["path"]["value"]
+            targets = [f["urlRewrite"]["path"].get("replacePrefixMatch") for f in rule.get("filters", []) if f.get("type") == "URLRewrite"]
+            if prefix != "/api/delivery-promise/reports" or targets != ["/reports"]:
+                failures.append(f"the reports HTTPRoute must rewrite /api/delivery-promise/reports to /reports, got {prefix} -> {targets}")
 
 
 def check_refusals(failures: list[str]) -> None:
@@ -283,6 +333,10 @@ def check_refusals(failures: list[str]) -> None:
         ("a grace period under the shutdown sum", BASE + ["--set", "terminationGracePeriodSeconds=45"], "terminationGracePeriodSeconds"),
         ("a malformed drain delay", BASE + ["--set", "config.shutdownDrainDelay=soon"], "config.shutdownDrainDelay"),
         ("a malformed sweep interval", BASE + ["--set", "config.sweepInterval=often"], "config.sweepInterval"),
+        ("analytics without a DSN source", BASE + ["--set", "analytics.enabled=true"], "analytics.database.projectorUrl"),
+        ("analytics without a consumer group",
+         BASE + ["--set", "analytics.enabled=true", "--set", "analytics.database.projectorUrl=postgres://p@h/a",
+                 "--set", "analytics.projector.consumerGroup="], "analytics.projector.consumerGroup is required"),
     ]
     for label, args, needle in cases:
         result = helm_template(args)
@@ -324,7 +378,8 @@ def main() -> int:
             print(f"FAIL: {f}")
         return 1
 
-    print("PASS: every Service selects exactly one Deployment (api); HPA, Ingress and HTTPRoute are off by default; "
+    print("PASS: every Service selects exactly one Deployment (api, mcp, a2a, frontend, analytics-reports; "
+          "analytics-projector has none, and the analytics components run their own binaries and env); HPA, Ingress and HTTPRoute are off by default; "
           "every cmd/api env var has a dedicated value; the a2a agent is isolated like the mcp server; the chart refuses to render without a database source, brokers "
           "or the consumer group, with a log/unknown publisher or a *_MODE variable, with a grace period under the "
           "shutdown sum, or with a malformed duration")

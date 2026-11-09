@@ -35,6 +35,10 @@ description: "The interfaces of Delivery Promise (REST, events, MCP, A2A), every
 | PromisePolicy | `POST /promise-policies` | `publishPromisePolicy` | `201`, the new version; `Idempotency-Key` required |
 | PromisePolicy | `GET /promise-policies/current` | `getCurrentPromisePolicy` | `200`; version 0 (`v0`) when nothing was published |
 | Health (not in the spec) | `GET /healthz`, `GET /readyz` | none | `200`; `/readyz` is `503` while draining or when postgres or kafka is down |
+| reports | `GET /reports/promise-reliability?from=&to=` | `getPromiseReliabilityReport` | `200`, per UTC day of judgement, tier and basis: judged, kept, broken, `keptRate`, broken by cause, lateness p50/p90 of the LATE ones. Served by `cmd/dp-reports` on `:8092` (ADR 0018); `400 invalid-report-range` |
+| reports | `GET /reports/promise-precision?from=&to=` | `getPromisePrecisionReport` | `200`, per UTC day of PromiseMade and tier: promises made, window width mean/p50/p90 in minutes, `exactDayShare`, `zoneUnknown`, `revisedShare`, `unkeepableCount` |
+| reports | `GET /reports/quote-conversion?from=&to=` | `getQuoteConversionReport` | `200`, per UTC day and tier: offers quoted, promises made, `conversion` (`null` without offers) |
+| reports | `GET /reports/freshness` | `getReportFreshness` | `200`, `asOf` and `lagSeconds` of the analytics projection (both `null` before the first event) |
 
 The quote route is the **Open Host Service** for storefront contexts; `POST /promises`, `/confirmations`, `/cancellations`, the policy and the books are called only by customer-ordering's checkout or by operators. Storefront contexts must never call the restricted routes.
 

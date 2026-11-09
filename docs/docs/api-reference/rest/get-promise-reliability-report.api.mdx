@@ -1,0 +1,70 @@
+---
+id: get-promise-reliability-report
+title: "Kept rate of the judged promises, per day, tier and basis"
+description: "Per UTC day of judgement (the CloudEvents time of PromiseKept / PromiseBroken), per tier and per basis of the promise AS MADE (UNKNOWN while its PromiseMade is not projected). judged = kept + broken; keptRate = kept / judged; brokenByCause splits broken by the PromiseBroken cause (LATE, LOST, RETURNED); lateByMinutes is the continuous p50 / p90 of lateByMinutes over the broken LATE promises, null when there is none. Days without a judgement are omitted. Served by cmd/dp-reports (ADR 0018)."
+sidebar_label: "Kept rate of the judged promises, per day, tier and basis"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Kept rate of the judged promises, per day, tier and basis"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/reports/promise-reliability"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Per UTC day of judgement (the CloudEvents time of PromiseKept / PromiseBroken), per tier and per basis of the promise AS MADE (UNKNOWN while its PromiseMade is not projected). judged = kept + broken; keptRate = kept / judged; brokenByCause splits broken by the PromiseBroken cause (LATE, LOST, RETURNED); lateByMinutes is the continuous p50 / p90 of lateByMinutes over the broken LATE promises, null when there is none. Days without a judgement are omitted. Served by cmd/dp-reports (ADR 0018).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-promise-reliability-report.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-promise-reliability-report.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-promise-reliability-report.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
