@@ -28,3 +28,4 @@ The decisions of `delivery-promise`, in the order they were taken. The ADR bodie
 | [0014](./0014-measured-transit-basis.md) | measured-transit promising (basis MEASURED) | Accepted (2026-11-05) |
 | [0015](./0015-confirmed-units-stay-decremented.md) | confirmed units stay decremented until the feed that accounts for them lands | Accepted (2026-11-05) |
 | [0016](./0016-book-charge-follows-the-locked-node.md) | the PromiseBook charge follows the node order-sourcing locks | Accepted (2026-11-05) |
+| [0017](./0017-owner-aware-availability-and-promise-netting.md) | Owner-aware availability and promise netting | Accepted (2026-11-08) |
