@@ -83,7 +83,7 @@ The built-in policy `v0` before anything is published:
 
 ```text
 $ curl -s localhost:18080/promise-policies/current
-{"policyVersion":"v0","version":0,"offerTtlMinutes":10,"holdTtlMinutes":15,"packagesPerOrder":1,"capacitySharePercent":100,"transitWindowDays":28,"transitServiceLevelPercent":90,"minTransitObservations":20,"orderDeadlines":[],"publishedAt":"0001-01-01T00:00:00Z"}
+{"policyVersion":"v0","version":0,"offerTtlMinutes":10,"holdTtlMinutes":15,"packagesPerOrder":1,"capacitySharePercent":100,"transitWindowDays":28,"transitServiceLevelPercent":90,"minTransitObservations":20,"targetOnTimeProbabilityPercent":95,"minCalibrationObservations":50,"calibrationWindowDays":28,"maxCalibrationBufferMinutes":720,"orderDeadlines":[],"publishedAt":"0001-01-01T00:00:00Z"}
 ```
 
 Publish a policy (`Idempotency-Key` is required):
@@ -94,7 +94,7 @@ $ curl -s -i -X POST localhost:18080/promise-policies \
     -d '{"offerTtlMinutes":10,"holdTtlMinutes":15,"packagesPerOrder":1,"capacitySharePercent":100,"orderDeadlines":[{"tier":"NEXT_DAY","localTime":"18:00"}]}'
 HTTP/1.1 201 Created
 
-{"policyVersion":"v1","version":1,"offerTtlMinutes":10,"holdTtlMinutes":15,"packagesPerOrder":1,"capacitySharePercent":100,"transitWindowDays":28,"transitServiceLevelPercent":90,"minTransitObservations":20,"orderDeadlines":[{"tier":"NEXT_DAY","localTime":"18:00"}],"publishedAt":"2026-10-31T16:43:38.171412Z"}
+{"policyVersion":"v1","version":1,"offerTtlMinutes":10,"holdTtlMinutes":15,"packagesPerOrder":1,"capacitySharePercent":100,"transitWindowDays":28,"transitServiceLevelPercent":90,"minTransitObservations":20,"targetOnTimeProbabilityPercent":95,"minCalibrationObservations":50,"calibrationWindowDays":28,"maxCalibrationBufferMinutes":720,"orderDeadlines":[{"tier":"NEXT_DAY","localTime":"18:00"}],"publishedAt":"2026-10-31T16:43:38.171412Z"}
 ```
 
 Quote a delivery offer for a catalogue item known to the read models (the `catalogItemId` came from the `rm_listings` table the consumer filled):

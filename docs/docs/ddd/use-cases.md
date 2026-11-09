@@ -27,6 +27,7 @@ All three binaries drive the **same** `Service`: REST (`cmd/api`) exposes the co
 | `ReleaseExpiredHolds` | clock | sweeper | `PromiseReleased` |
 | `ExpireOffers` | clock | sweeper | none |
 | `CloseBooks` | clock | sweeper | none |
+| `FlagPredictedLate` | clock | sweeper | `PromiseAtRisk` (`PREDICTED_LATE`) |
 | `RepriceAtRisk` | clock | sweeper | as `ReviseAtRisk` |
 | Read-model projections | 36 consumed event types | consumer | none |
 | Reads | any | REST GET routes, MCP tools, A2A skills | none |
@@ -37,7 +38,7 @@ Source: `quote.go`, `internal/domain/search`.
 
 - **Input:** `destinationPostalPrefix` (valid prefix, never a full address), `lines[]` (`catalogItemId`, `quantity` of at least 1; at most 100 lines), optional `tiers[]` (default all four of `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`), optional `Idempotency-Key`.
 - **What it does:** reads the current policy (version 0 default when nothing was published), runs the PromisePolicy search over the **local read models only** (no synchronous call) and splits the cart into the fewest shipment groups (one node for the whole cart when one can cover every line). For each (group, tier) with a feasible witness path (node cutoff, pickup departure with room and an OPEN book with share left, linehaul legs, a delivery wave with stops left) it persists a `QUOTED` offer; every other requested (group, tier) is reported with the constraint that blocked it: `DESTINATION_NOT_SERVED`, `ITEM_QUANTITY_NOT_AVAILABLE`, `DELIVERY_SLA_UNAVAILABLE`, `NODE_CAPACITY_EXHAUSTED` or `PAST_ORDER_DEADLINE`.
-- **Invariants:** `expiresAt` is the earlier of `quotedAt + offerTtl` and the latest instant the witness pickup cutoff can still be met (`ErrOfferExpiryTooLate` is never returned, such an offer is not built); only `STANDARD` may fall back to a `NOMINAL` basis (`ErrNominalBasisNotAllowedForTier`); a lane whose measured transit at the policy's service level exceeds a leg's scheduled transit pushes the arrival later and quotes `MEASURED` (ADR 0014); a tier whose order deadline in the destination region has passed is `PAST_ORDER_DEADLINE`.
+- **Invariants:** `expiresAt` is the earlier of `quotedAt + offerTtl` and the latest instant the witness pickup cutoff can still be met (`ErrOfferExpiryTooLate` is never returned, such an offer is not built); only `STANDARD` may fall back to a `NOMINAL` basis (`ErrNominalBasisNotAllowedForTier`); a lane whose measured transit at the policy's service level exceeds a leg's scheduled transit pushes the arrival later and quotes `MEASURED` (ADR 0014); a segment (tier, basis, node grade) with at least `minCalibrationObservations` judged promises adds the target quantile of their lateness, capped, to every candidate's arrival before the wave snap, so the offer lands in a later fixed window and carries a `confidence` (ADR 0020), and below the minimum it quotes exactly as before and carries none; a tier whose order deadline in the destination region has passed is `PAST_ORDER_DEADLINE`.
 - **Errors:** 422 `validation-failed` for a bad prefix, line or tier. "No offer" is a normal 200 with `unavailable` entries.
 - **Idempotency:** safe to repeat; with an `Idempotency-Key`, a repeat inside the offers' TTL returns the same offers.
 - **Events:** `DeliveryOfferQuoted` per offer, written to the outbox in the same transaction as the offers.
@@ -72,7 +73,7 @@ Source: `lifecycle.go`.
 
 Source: `lifecycle.go`, `internal/domain/policy`.
 
-- **Input:** `offerTtlMinutes` and `holdTtlMinutes` (1 to 1440), `packagesPerOrder` (1 to 100), `capacitySharePercent` (1 to 100), the measured-transit parameters `transitWindowDays` (1 to 365), `transitServiceLevelPercent` (50 to 99) and `minTransitObservations` (5 to 1000, ADR 0014) and at most 200 `orderDeadlines` (`tier`, optional `regionId`, `localTime` as `HH:mm` in the destination station's time zone, no duplicate tier and region); `Idempotency-Key` required.
+- **Input:** `offerTtlMinutes` and `holdTtlMinutes` (1 to 1440), `packagesPerOrder` (1 to 100), `capacitySharePercent` (1 to 100), the measured-transit parameters `transitWindowDays` (1 to 365), `transitServiceLevelPercent` (50 to 99) and `minTransitObservations` (5 to 1000, ADR 0014), the calibration parameters `targetOnTimeProbabilityPercent` (50 to 99, one value for every tier), `minCalibrationObservations` (10 to 10000), `calibrationWindowDays` (1 to 365) and `maxCalibrationBufferMinutes` (0 to 2880; only an omitted one defaults to 720, ADR 0020) and at most 200 `orderDeadlines` (`tier`, optional `regionId`, `localTime` as `HH:mm` in the destination station's time zone, no duplicate tier and region); `Idempotency-Key` required.
 - **Invariants:** a published version is immutable and strictly increasing; the current policy is the highest version, and version 0 is the built-in default (10 minutes offer TTL, 15 minutes hold TTL, 1 package, 100 % share, no deadlines). A concurrent publish answers 409 `concurrent-update`.
 - **Events:** `PromisePolicyPublished` on the analytics topic.
 
@@ -91,6 +92,7 @@ These are the only places where other contexts' facts change a promise. All run 
 | `DeliveryWaveCancelled` | `WAVE_CANCELLED` | every active promise whose witness wave it is |
 | `BookingFailed` | `BOOKING_FAILED` | the assignment's promise; that departure is skipped from now on |
 | `BookingMoved` | `BOOKING_MOVED` | the assignment's promise; the departure it left is skipped |
+| none: the clock (`FlagPredictedLate`, ADR 0021) | `PREDICTED_LATE` | every `CONFIRMED` promise whose witness path has a departure past its expected arrival (the timetable plus the measured-transit adjustment of ADR 0014) plus 15 minutes with no `rm_departure_arrival` row |
 
 `flagAtRisk` moves a `CONFIRMED` promise to `AT_RISK` (`PromiseAtRisk`); closed or not yet confirmed promises are skipped. A risk for an assignment whose lock was not seen is logged (`risk for an assignment whose lock was not seen`) and ignored.
 
@@ -98,22 +100,23 @@ These are the only places where other contexts' facts change a promise. All run 
 
 ### JudgeOnDelivery
 
-`FulfillmentLocked` records assignment to (promise, order, group, node); `FulfillmentShipped` records the package set; `PackageDelivered`, `PackageLost` and `PackageReturned` record per-package outcomes; each calls `judge`, which does nothing until the facts are complete (ADR 0002 A25). The earliest lost or returned package breaks the promise with cause `LOST` or `RETURNED`; otherwise it waits until every shipped package is delivered and judges on the latest delivery: `KEPT` if on or before `deliverByLatest`, else `BROKEN` with cause `LATE` and `lateByMinutes`. KEPT, BROKEN, RELEASED and CANCELLED are terminal (`ErrPromiseClosed`). **Events:** `PromiseKept` or `PromiseBroken`.
+`FulfillmentLocked` records assignment to (promise, order, group, node); `FulfillmentShipped` records the package set; `PackageDelivered`, `PackageLost` and `PackageReturned` record per-package outcomes; each calls `judge`, which does nothing until the facts are complete (ADR 0002 A25). The earliest lost or returned package breaks the promise with cause `LOST` or `RETURNED`; otherwise it waits until every shipped package is delivered and judges on the latest delivery: `KEPT` if on or before `deliverByLatest`, else `BROKEN` with cause `LATE` and `lateByMinutes`. In the same unit of work a promise kept (0 minutes) or broken late (`lateByMinutes`) is appended to its segment of `rm_promise_calibration` (tier, basis, the grade of the locked node); a loss or return is not (ADR 0020). KEPT, BROKEN, RELEASED and CANCELLED are terminal (`ErrPromiseClosed`). **Events:** `PromiseKept` or `PromiseBroken`.
 
 ### Read-model projections
 
-Node, lane, service area and region events (node-topology), catalogue item and listing events (offer-availability), scorecards (node-performance), departures and bookings (linehaul-transportation) and waves (last-mile-delivery) are written to the `rm_*` tables that the quote search reads. They change no aggregate and raise no event; a row that a capacity event created earlier keeps its remaining count when the schedule event arrives later.
+Node, lane, service area and region events (node-topology), catalogue item and listing events (offer-availability), scorecards and fast-tier eligibility (node-performance), departures and bookings (linehaul-transportation) and waves (last-mile-delivery) are written to the `rm_*` tables that the quote search reads. They change no aggregate and raise no event; a row that a capacity event created earlier keeps its remaining count when the schedule event arrives later.
 
 ## Sweeper use cases
 
-Run every `SWEEP_INTERVAL` in batches of 100, independently; a failing pass never stops the others.
+Run every `SWEEP_INTERVAL` in batches of 100 (`FlagPredictedLate` pages through every `CONFIRMED` promise, 100 per page), independently; a failing pass never stops the others.
 
 | Use case | Selects | Effect |
 | --- | --- | --- |
 | `ExpireOffers` | `QUOTED` offers past `expiresAt` | `EXPIRED` (an offer consumed meanwhile is skipped) |
 | `ReleaseExpiredHolds` | `PROVISIONAL` promises past `holdExpiresAt` | `RELEASED` with reason `HOLD_EXPIRED`, releases the provisional hold on the book, raises `PromiseReleased` |
 | `CloseBooks` | `OPEN` books whose cutoff was reached | `CLOSED` (already closed is a no-op) |
-| `RepriceAtRisk` | `AT_RISK` promises, including those already reported unkeepable | retries `ReviseAtRisk`, since a new departure may have made them feasible |
+| `FlagPredictedLate` | `CONFIRMED` promises, paged by id | flags `AT_RISK` with `PREDICTED_LATE` those whose locked path is running late; runs before `RepriceAtRisk`; never clears the flag (the judgement closes it) |
+| `RepriceAtRisk` | `AT_RISK` promises, including those already reported unkeepable | retries `ReviseAtRisk`, since a new departure may have made them feasible; a `PREDICTED_LATE` promise whose window is still reachable is skipped (ADR 0021) |
 
 ## Reads
 

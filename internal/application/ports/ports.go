@@ -53,6 +53,13 @@ type PromiseRepository interface {
 	ListHoldsExpired(ctx context.Context, now time.Time, limit int) ([]promise.ID, error)
 	// ListAtRisk returns the ids of AT_RISK promises, oldest first, at most limit.
 	ListAtRisk(ctx context.Context, limit int) ([]promise.ID, error)
+	// ListAtRiskPage returns the ids of AT_RISK promises in the same order as
+	// ListAtRisk (oldest first), skipping the first offset, at most limit.
+	ListAtRiskPage(ctx context.Context, offset, limit int) ([]promise.ID, error)
+	// ListConfirmed returns the ids of CONFIRMED promises with an id greater
+	// than after, ordered by id, at most limit; an empty after starts at the
+	// first. The late-risk sweep pages through them (ADR 0021).
+	ListConfirmed(ctx context.Context, after promise.ID, limit int) ([]promise.ID, error)
 	// ListActiveByPath returns the ids of CONFIRMED and AT_RISK promises whose
 	// witness path uses the departure or the wave of the filter.
 	ListActiveByPath(ctx context.Context, f repository.PromiseRiskFilter) ([]promise.ID, error)
@@ -169,6 +176,21 @@ type TransitActuals interface {
 	MeasuredTransit(ctx context.Context, origin, dest string, percentile, minObservations, windowDays int, now time.Time) (bool, int)
 }
 
+// PromiseCalibrationView stores the calibration read model (ADR 0020): per
+// segment (tier, basis, node grade) the ring of the latest judged promises'
+// lateBy minutes. It is fed only by this service's own judgements, in the unit
+// of work that records the judgement, and read by every search. Every call
+// joins the unit of work carried by ctx when there is one.
+type PromiseCalibrationView interface {
+	// RecordJudgement appends one observation to the segment's ring (latest
+	// 500) under a row lock, pruning what is older than the longest window.
+	RecordJudgement(ctx context.Context, key readmodel.CalibrationKey, obs readmodel.CalibrationObservation) error
+	// Segments returns, per segment, the lateBy minutes of the observations
+	// inside the last windowDays days, oldest first. A segment with none is
+	// absent.
+	Segments(ctx context.Context, windowDays int, now time.Time) (map[readmodel.CalibrationKey][]int, error)
+}
+
 // EventOutbox is the write side of the transactional outbox. Called with the
 // ctx handed to UnitOfWork.Do it joins the SAME transaction as the aggregate
 // Save calls, so the aggregates and their raised events commit or roll back
@@ -204,6 +226,20 @@ type IDGenerator interface {
 	NewPromiseID() promise.ID
 }
 
+// CalibrationMetrics records what the calibration buffer did (ADR 0020). It is
+// an optional capability of PromiseMetrics: the use cases record through it
+// when the Deps' Metrics also implements it, and not at all otherwise. The
+// implementation lives in internal/adapters/outbound/telemetry.
+type CalibrationMetrics interface {
+	// CalibrationBufferApplied records the buffer in minutes folded into the
+	// offer a quote built for the tier (0 when the segment added none).
+	CalibrationBufferApplied(ctx context.Context, tier string, minutes int)
+	// CalibrationSegmentBelowMinimum counts a segment a search loaded whose
+	// observations are fewer than minCalibrationObservations: it quotes as it
+	// did before calibration.
+	CalibrationSegmentBelowMinimum(ctx context.Context, tier, basis, nodeGrade string)
+}
+
 // PromiseMetrics records the business outcome of every MakePromise attempt
 // (Tier 2 of the fleet metrics convention). The use case calls it once per
 // attempt: PromiseMade when a new promise was held, PromiseRefused otherwise,
@@ -217,4 +253,11 @@ type PromiseMetrics interface {
 	// PromiseRefused counts a MakePromise that made no promise; reason is a
 	// stable, low-cardinality slug.
 	PromiseRefused(ctx context.Context, reason string)
+	// TierCandidatesExcluded counts n candidate nodes removed from a fast tier
+	// because node-performance revoked their eligibility (ADR 0022); tier is
+	// SAME_DAY or NEXT_DAY.
+	TierCandidatesExcluded(ctx context.Context, tier string, n int)
+	// TierEligibilityIgnored counts a NodeTierEligibilityChanged the consumer
+	// could not apply; reason is `unknown-tier` or `missing-field`.
+	TierEligibilityIgnored(ctx context.Context, reason string)
 }

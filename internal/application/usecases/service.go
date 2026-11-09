@@ -29,14 +29,25 @@ type Deps struct {
 	Network        ports.NetworkViews
 	Shipments      ports.ShipmentViews
 	TransitActuals ports.TransitActuals
-	Outbox         ports.EventOutbox
-	Inbox          ports.Inbox
-	Clock          ports.Clock
-	IDs            ports.IDGenerator
-	Logger         *slog.Logger
+	// TierEligibility is the NodeTierEligibility read model (ADR 0022); nil
+	// filters nothing.
+	TierEligibility ports.NodeTierEligibility
+	// DepartureArrivals is the DepartureArrival read model of the late-risk
+	// sweep (ADR 0021); nil records and flags nothing.
+	DepartureArrivals ports.DepartureArrivals
+	// Calibration is the PromiseCalibrationView (ADR 0020); nil never buffers
+	// a quote and records no judgement.
+	Calibration ports.PromiseCalibrationView
+	Outbox      ports.EventOutbox
+	Inbox       ports.Inbox
+	Clock       ports.Clock
+	IDs         ports.IDGenerator
+	Logger      *slog.Logger
 	// Metrics records the business outcome of each MakePromise; nil records
 	// nothing, so unit tests need no wiring.
 	Metrics ports.PromiseMetrics
+	// LateRisk counts the late-risk outcomes (ADR 0021); nil records nothing.
+	LateRisk ports.LateRiskMetrics
 }
 
 // Service holds every use case of the context.
@@ -51,6 +62,9 @@ func New(d Deps) *Service {
 	}
 	if d.Metrics == nil {
 		d.Metrics = noMetrics{}
+	}
+	if d.LateRisk == nil {
+		d.LateRisk = noLateRiskMetrics{}
 	}
 	return &Service{Deps: d}
 }

@@ -21,6 +21,9 @@ const (
 	ReasonWaveCanceled      = "WAVE_CANCELLED"
 	ReasonBookingFailed     = "BOOKING_FAILED"
 	ReasonBookingMoved      = "BOOKING_MOVED"
+	// ReasonPredictedLate flags a promise whose locked path is running late
+	// (ADR 0021).
+	ReasonPredictedLate = "PREDICTED_LATE"
 )
 
 // flagAtRisk moves the CONFIRMED promises among ids to AT_RISK inside the
@@ -66,13 +69,29 @@ func (s *Service) ReviseAll(ctx context.Context, ids []promise.ID) {
 // RepriceAtRisk is the sweeper: it retries the re-promise of AT_RISK
 // promises, including those PromiseUnkeepable was raised for (a new departure
 // may have made them feasible). It returns how many it examined.
+//
+// A promise flagged PREDICTED_LATE whose window is still reachable is left
+// alone and does not count against limit (ADR 0021): the pass reads further
+// pages of the AT_RISK list until it holds limit promises to revise.
 func (s *Service) RepriceAtRisk(ctx context.Context, limit int) (int, error) {
-	ids, err := s.Promises.ListAtRisk(ctx, limit)
-	if err != nil {
-		return 0, err
+	var todo []promise.ID
+	view := s.lazyPathView(ctx)
+	for offset := 0; len(todo) < limit; offset += limit {
+		page, err := s.Promises.ListAtRiskPage(ctx, offset, limit)
+		if err != nil {
+			return 0, err
+		}
+		for _, id := range page {
+			if len(todo) < limit && !s.holdsPredictedLate(ctx, view, id) {
+				todo = append(todo, id)
+			}
+		}
+		if len(page) < limit {
+			break
+		}
 	}
-	s.ReviseAll(ctx, ids)
-	return len(ids), nil
+	s.ReviseAll(ctx, todo)
+	return len(todo), nil
 }
 
 func toSet(xs []string) map[string]bool {
@@ -102,7 +121,7 @@ func (s *Service) ReviseAtRisk(ctx context.Context, id promise.ID) error {
 	if err != nil {
 		return err
 	}
-	opt := searchOptions{singleGroup: true}
+	opt := searchOptions{singleGroup: true, existingPromise: true}
 	if a, err := s.Shipments.FindAssignmentByPromise(ctx, string(id)); err == nil {
 		opt.excludeNodes, opt.excludeDepartures = toSet(a.ExcludedNodes), toSet(a.ExcludedDepartures)
 		if a.Locked {
@@ -180,7 +199,7 @@ func (s *Service) tryRevise(ctx context.Context, id promise.ID, c search.Candida
 			return err
 		}
 		revEvents, err := p.Revise(promise.Revising{
-			Terms:   promise.Terms{Tier: c.Tier, ShipBy: c.ShipBy, Window: c.Window, Basis: c.Basis, PolicyVersion: pol.VersionName()},
+			Terms:   promise.Terms{Tier: c.Tier, ShipBy: c.ShipBy, Window: c.Window, Basis: c.Basis, Confidence: c.Confidence, PolicyVersion: pol.VersionName()},
 			Witness: c.Witness, BookID: c.BookID, Reason: p.AtRiskReason(), Lines: c.Lines,
 		}, s.Clock.Now())
 		if err != nil {

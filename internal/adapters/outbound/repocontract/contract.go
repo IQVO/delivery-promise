@@ -28,8 +28,14 @@ type Fixture struct {
 	Policies  ports.PolicyRepository
 	Network   ports.NetworkViews
 	Shipments ports.ShipmentViews
-	Outbox    ports.EventOutbox
-	Inbox     ports.Inbox
+	// TierEligibility is the NodeTierEligibility read model (ADR 0022).
+	TierEligibility ports.NodeTierEligibility
+	// Calibration is the PromiseCalibrationView (ADR 0020).
+	Calibration ports.PromiseCalibrationView
+	Outbox      ports.EventOutbox
+	Inbox       ports.Inbox
+	// Arrivals is the DepartureArrival read model (ADR 0021).
+	Arrivals ports.DepartureArrivals
 	// OutboxCount returns the number of outbox rows committed so far.
 	OutboxCount func() int
 }
@@ -48,7 +54,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 	}{
 		{"offers", offerCases}, {"promises", promiseCases}, {"books", bookCases}, {"policies", policyCases},
 		{"network views", networkCases}, {"shipment views", shipmentCases}, {"unit of work", unitOfWorkCases},
-		{"owners", ownerCases},
+		{"owners", ownerCases}, {"tier eligibility", tierEligibilityCases}, {"late risk", lateRiskCases}, {"calibration", calibrationCases},
 	}
 	for _, g := range groups {
 		for _, c := range g.cases {
@@ -98,7 +104,7 @@ func NewOffer(t *testing.T, id string) *offer.Offer {
 		Lines:   []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}},
 		Window:  shared.Window{Earliest: T0.Add(18 * time.Hour), Latest: T0.Add(30 * time.Hour), TimeZone: "America/Chicago"},
 		Witness: shared.Witness{NodeID: "N-AUS3", PickupDepartureID: "dep-1800", Legs: []string{"dep-2200"}, DeliveryWaveID: "w-1"},
-		Basis:   shared.BasisScheduled, PolicyVersion: "v0", TTL: 10 * time.Minute, ExpiresAt: T0.Add(10 * time.Minute),
+		Basis:   shared.BasisScheduled, Confidence: shared.NewConfidence(0.973), PolicyVersion: "v0", TTL: 10 * time.Minute, ExpiresAt: T0.Add(10 * time.Minute),
 		LatestMeetableAt: T0.Add(3 * time.Hour), PickupCutoffAt: T0.Add(4 * time.Hour),
 	}, T0)
 	noErr(t, err)
@@ -120,7 +126,7 @@ func NewPromise(t *testing.T, id, offerID, node, pickup string) *promise.Promise
 	p, _, err := promise.Make(promise.Making{
 		ID: promise.ID(id), OfferID: offerID, DestinationPrefix: "787", Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}},
 		Terms: promise.Terms{
-			Tier: shared.TierNextDay, ShipBy: T0.Add(4 * time.Hour), Basis: shared.BasisScheduled, PolicyVersion: "v0",
+			Tier: shared.TierNextDay, ShipBy: T0.Add(4 * time.Hour), Basis: shared.BasisScheduled, Confidence: shared.NewConfidence(0.973), PolicyVersion: "v0",
 			Window: shared.Window{Earliest: T0.Add(18 * time.Hour), Latest: T0.Add(30 * time.Hour), TimeZone: "America/Chicago"},
 		},
 		Witness: shared.Witness{NodeID: node, PickupDepartureID: pickup, Legs: []string{"dep-2200"}, DeliveryWaveID: "w-1"},
@@ -132,13 +138,15 @@ func NewPromise(t *testing.T, id, offerID, node, pickup string) *promise.Promise
 }
 
 // NewPolicy publishes version current+1 with a NEXT_DAY deadline and
-// non-default measured-transit parameters (ADR 0014), so the contract suite
-// pins every persisted field.
+// non-default measured-transit and calibration parameters (ADR 0014, ADR
+// 0020), so the contract suite pins every persisted field.
 func NewPolicy(t *testing.T, current int) *policy.Policy {
 	t.Helper()
+	maxBuffer := 0 // the one value an omitted cap must not be mistaken for
 	p, _, err := policy.Publish(current, policy.Input{
 		OfferTTLMinutes: 10, HoldTTLMinutes: 15, PackagesPerOrder: 2, SharePercent: 80,
 		TransitWindowDays: 14, TransitServiceLevelPercent: 95, MinTransitObservations: 40,
+		TargetOnTimeProbabilityPercent: 90, MinCalibrationObservations: 25, CalibrationWindowDays: 14, MaxCalibrationBufferMinutes: &maxBuffer,
 		Deadlines: []policy.Deadline{{Tier: shared.TierNextDay, RegionID: "R-SC", Minute: 23*60 + 59}},
 	}, T0)
 	noErr(t, err)

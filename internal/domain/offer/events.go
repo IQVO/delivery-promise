@@ -15,8 +15,12 @@ type DeliveryOfferQuoted struct {
 	NodeID            string
 	Window            shared.Window
 	Basis             shared.Basis
+	Confidence        shared.Confidence
 	PolicyVersion     string
 	ExpiresAt         time.Time
+	// CapacityBand is the pressure on the book of the offer's window at quote
+	// time (ADR 0023); empty when unknown.
+	CapacityBand shared.CapacityBand
 }
 
 // EventName returns "DeliveryOfferQuoted".

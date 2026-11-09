@@ -154,11 +154,17 @@ func buildServiceWithClock(pool *pgxpool.Pool, logger *slog.Logger, clk ports.Cl
 		// The measured-transit read model, as in cmd/api: estimate_delivery
 		// computes the same basis as the REST estimate (ADR 0014, ADR 0019).
 		TransitActuals: postgres.NewTransitActuals(pool),
-		Outbox:         postgres.NewOutbox(pool, outboundkafka.NewEncoder()),
-		Inbox:          postgres.NewInbox(pool),
-		Clock:          clk,
-		IDs:            ids.UUID{},
-		Logger:         logger,
+		// The fast-tier eligibility read model: estimate_delivery filters the
+		// same candidates as the REST estimate (ADR 0022).
+		TierEligibility: postgres.NewNodeTierEligibility(pool),
+		// The calibration read model, so estimate_delivery buffers its options as
+		// the REST estimate does (ADR 0020).
+		Calibration: postgres.NewPromiseCalibrationView(pool),
+		Outbox:      postgres.NewOutbox(pool, outboundkafka.NewEncoder()),
+		Inbox:       postgres.NewInbox(pool),
+		Clock:       clk,
+		IDs:         ids.UUID{},
+		Logger:      logger,
 	})
 }
 

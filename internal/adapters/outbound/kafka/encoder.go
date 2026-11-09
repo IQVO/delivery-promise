@@ -144,15 +144,25 @@ func payload(e shared.Event) (any, error) {
 	case book.PromiseBookExhausted:
 		return map[string]any{"bookId": ev.BookID, "nodeId": ev.NodeID, "pickupDepartureId": ev.PickupDepartureID, "share": ev.Share}, nil
 	case offer.DeliveryOfferQuoted:
-		return withZone(map[string]any{
-			"offerId": ev.OfferID, "tier": ev.Tier, "destinationPostalPrefix": ev.DestinationPrefix, "nodeId": ev.NodeID,
-			"deliverByEarliest": utc(ev.Window.Earliest), "deliverByLatest": utc(ev.Window.Latest), "basis": ev.Basis,
-			"policyVersion": ev.PolicyVersion, "expiresAt": utc(ev.ExpiresAt),
-		}, ev.Window), nil
+		return quotedData(ev), nil
 	case policy.PromisePolicyPublished:
 		return policyData(ev), nil
 	}
 	return nil, fmt.Errorf("kafka encoder: no payload mapping for %T", e)
+}
+
+// quotedData is the analytics payload of DeliveryOfferQuoted; capacityBand is
+// omitted when the book had no finite capacity (ADR 0023).
+func quotedData(ev offer.DeliveryOfferQuoted) map[string]any {
+	d := map[string]any{
+		"offerId": ev.OfferID, "tier": ev.Tier, "destinationPostalPrefix": ev.DestinationPrefix, "nodeId": ev.NodeID,
+		"deliverByEarliest": utc(ev.Window.Earliest), "deliverByLatest": utc(ev.Window.Latest), "basis": ev.Basis,
+		"policyVersion": ev.PolicyVersion, "expiresAt": utc(ev.ExpiresAt),
+	}
+	if ev.CapacityBand != "" {
+		d["capacityBand"] = ev.CapacityBand
+	}
+	return withConfidence(withZone(d, ev.Window), ev.Confidence)
 }
 
 func madeData(ev promise.PromiseMade) map[string]any {
@@ -164,7 +174,17 @@ func madeData(ev promise.PromiseMade) map[string]any {
 	if ev.Witness.PickupDepartureID != "" { // a NOMINAL promise has none (contracts-delta E8)
 		d["pickupDepartureId"] = ev.Witness.PickupDepartureID
 	}
-	return withZone(d, ev.Terms.Window)
+	return withConfidence(withZone(d, ev.Terms.Window), ev.Terms.Confidence)
+}
+
+// withConfidence adds the optional calibrated confidence of a quote; an unknown
+// one (a segment below the minimum observations) is omitted, never written as
+// zero (ADR 0020).
+func withConfidence(d map[string]any, c shared.Confidence) map[string]any {
+	if c.Known() {
+		d["confidence"] = c.Value()
+	}
+	return d
 }
 
 // withZone adds the optional timeZone of the window to a payload that carries
@@ -197,6 +217,8 @@ func policyData(ev policy.PromisePolicyPublished) map[string]any {
 		"policyVersion": ev.PolicyVersion, "version": ev.Number, "offerTtlMinutes": ev.OfferTTLMinutes, "holdTtlMinutes": ev.HoldTTLMinutes,
 		"packagesPerOrder": ev.PackagesPerOrder, "capacitySharePercent": ev.SharePercent, "transitWindowDays": ev.TransitWindowDays,
 		"transitServiceLevelPercent": ev.TransitServiceLevelPercent, "minTransitObservations": ev.MinTransitObservations,
+		"targetOnTimeProbabilityPercent": ev.TargetOnTimeProbabilityPercent, "minCalibrationObservations": ev.MinCalibrationObservations,
+		"calibrationWindowDays": ev.CalibrationWindowDays, "maxCalibrationBufferMinutes": ev.MaxCalibrationBufferMinutes,
 		"orderDeadlines": ds, "publishedAt": utc(ev.PublishedAt),
 	}
 }

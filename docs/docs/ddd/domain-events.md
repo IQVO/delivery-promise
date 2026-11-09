@@ -47,7 +47,7 @@ Source: aggregates `internal/domain/{offer,promise,book,policy}`; consumers veri
 
 | Event | Aggregate | Meaning | Raised by | Recipients |
 | --- | --- | --- | --- | --- |
-| `DeliveryOfferQuoted` | DeliveryOffer | An offer was persisted with its window and witness. One per offer, so one quote can raise several. | `QuoteDeliveryOffers` | none (analytics: quote-to-order conversion per tier and node) |
+| `DeliveryOfferQuoted` | DeliveryOffer | An offer was persisted with its window and witness, and the optional `capacityBand` of its book at quote time (ADR 0023). One per offer, so one quote can raise several. | `QuoteDeliveryOffers` | none (analytics: quote-to-order conversion per tier and node) |
 | `PromiseMade` | Promise | A provisional promise holds capacity; the offer is consumed. | `MakePromise` | none (analytics) |
 | `PromiseConfirmed` | Promise | The order was placed; the hold became confirmed. A repeated confirm raises nothing. | `ConfirmPromise` | none (analytics) |
 | `PromiseReleased` | Promise | A provisional promise's hold expired and was returned (`reason: HOLD_EXPIRED`). | `ReleaseExpiredHolds` | none (analytics: hold leakage) |
@@ -78,6 +78,7 @@ Each consumed event updates a read model (never an aggregate directly) or runs a
 | `DeliveryWaveCancelled` (last-mile) | mark cancelled; flag promises whose witness wave it is | `RepromiseOnRisk` |
 | `PackageInductionDeferred` (last-mile) | flag the promise | `RepromiseOnRisk` |
 | `NodeScorecardUpdated` (node-performance) | upsert the grade | projection `rm_scorecards` |
+| `NodeTierEligibilityChanged` (node-performance) | upsert the (node, tier) fact when `changedAt` is not older than the stored one; unknown tier or missing field is ignored and counted | projection `rm_node_tier_eligibility` |
 | `FulfillmentLocked`, `FulfillmentShipped` (order-sourcing) | record the assignment, then the packages; may complete the facts for judging | `JudgeOnDelivery` |
 | `FulfillmentUnsourceable` (order-sourcing) | flag the promise at risk and re-promise excluding the listed nodes | `RepromiseOnRisk` |
 | `PackageDelivered`, `PackageLost`, `PackageReturned` (shipping-and-tracking) | record the outcome; judge when complete | `JudgeOnDelivery` |

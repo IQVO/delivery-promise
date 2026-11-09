@@ -711,6 +711,25 @@ components:
       - SCHEDULED
       - MEASURED
       - NOMINAL
+    Confidence:
+      type: number
+      minimum: 0
+      maximum: 1
+      multipleOf: 0.001
+      description: 'The calibrated probability, rounded to three decimals, that a quote is kept on time (ADR 0020):
+        the share of the judged promises of its segment (tier, basis, node grade) whose lateness was within the
+        buffer the quote carries. It is present only when the segment has at least minCalibrationObservations
+        judgements in the window; absent means UNKNOWN, never zero, and consumers must read absence that way.'
+    CapacityBand:
+      type: string
+      description: 'The capacity pressure on the PromiseBook that the offer''s chosen window would charge, read when the
+        offer was quoted (ADR 0023): utilisation u = (provisional + confirmed holds) / capacity share. AMPLE: u < 0.60.
+        TIGHT: 0.60 <= u < 0.85. SCARCE: u >= 0.85. The thresholds are constants of the service, not policy fields. A
+        signal only: the network never computes a fee, and it reserves nothing (only POST /promises holds capacity).'
+      enum:
+      - AMPLE
+      - TIGHT
+      - SCARCE
     OfferConstraint:
       type: string
       description: 'Why a tier has no offer. PAST_ORDER_DEADLINE: the tier''s order deadline in the destination
@@ -860,6 +879,9 @@ components:
             $ref: '#/components/schemas/TierUnavailable'
     DeliveryOffer:
       type: object
+      description: 'One delivery offer. capacityBand (ADR 0023) is optional: it is omitted when the book of the offer''s
+        window has no finite capacity, and on an offer read back with GET /delivery-quotes/{quoteId}, because the band is
+        a quote-time reading that is not stored. It changes no offer, window or order.'
       required:
       - offerId
       - state
@@ -912,9 +934,13 @@ components:
           description: Quote-relative shipment group number (1 for a single-node cart).
         basis:
           $ref: '#/components/schemas/Basis'
+        confidence:
+          $ref: '#/components/schemas/Confidence'
         policyVersion:
           type: string
           description: The promise policy version the quote used (G8).
+        capacityBand:
+          $ref: '#/components/schemas/CapacityBand'
     EstimateItem:
       type: object
       required:
@@ -980,7 +1006,7 @@ components:
     EstimateOption:
       type: object
       description: The best option of one tier, with the same fields and semantics as the quote's best offer of that
-        tier for the same single line.
+        tier for the same single line. capacityBand (ADR 0023) is optional and omitted when unknown.
       required:
       - tier
       - window
@@ -992,11 +1018,15 @@ components:
           $ref: '#/components/schemas/EstimateWindow'
         basis:
           $ref: '#/components/schemas/Basis'
+        confidence:
+          $ref: '#/components/schemas/Confidence'
         orderByAt:
           type: string
           format: date-time
           description: The latest instant an order can be placed and still make this window's witness pickup cutoff, as
             on a quote's offer; omitted when unknown.
+        capacityBand:
+          $ref: '#/components/schemas/CapacityBand'
     EstimateConstraint:
       type: object
       description: Why a tier has no option, in the quote's OfferConstraint vocabulary. tier is omitted when the
@@ -1101,6 +1131,8 @@ components:
             stored before it was carried (ADR 0011), in which case read the window in UTC.
         basis:
           $ref: '#/components/schemas/Basis'
+        confidence:
+          $ref: '#/components/schemas/Confidence'
         policyVersion:
           type: string
     Revision:
@@ -1211,7 +1243,9 @@ components:
           description: Present when RELEASED.
         atRiskReason:
           type: string
-          description: Present while AT_RISK.
+          description: 'Present while AT_RISK. One of NODE_UNSOURCEABLE, PACKAGE_EXCEPTION, INDUCTION_DEFERRED, DEPARTURE_CANCELLED,
+            WAVE_CANCELLED, BOOKING_FAILED, BOOKING_MOVED or PREDICTED_LATE (a departure of the witness path is past its expected
+            arrival with no arrival seen). A PREDICTED_LATE promise stays AT_RISK until it is judged, even if the load arrives later.'
     PromisePage:
       type: object
       required:
@@ -1345,6 +1379,29 @@ components:
           maximum: 1000
           description: Observations a lane needs inside the window before its measured transit can push a promise
             later than the timetable (ADR 0014). Default 20 when omitted or 0.
+        targetOnTimeProbabilityPercent:
+          type: integer
+          minimum: 50
+          maximum: 99
+          description: Share of the promises of a calibration segment the buffer aims to deliver on time; ONE value
+            for every tier (ADR 0020). Default 95 when omitted or 0.
+        minCalibrationObservations:
+          type: integer
+          minimum: 10
+          maximum: 10000
+          description: Judgements a segment (tier, basis, node grade) needs inside the window before its buffer
+            applies and its quotes carry a confidence (ADR 0020). Default 50 when omitted or 0.
+        calibrationWindowDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: Days of judgements a calibration segment keeps (ADR 0020). Default 28 when omitted or 0.
+        maxCalibrationBufferMinutes:
+          type: integer
+          minimum: 0
+          maximum: 2880
+          description: Cap of a segment's buffer in minutes; 0 switches the buffer off and keeps the confidence
+            (ADR 0020). Default 720 only when the field is omitted.
         orderDeadlines:
           type: array
           maxItems: 200
@@ -1378,6 +1435,10 @@ components:
       - transitWindowDays
       - transitServiceLevelPercent
       - minTransitObservations
+      - targetOnTimeProbabilityPercent
+      - minCalibrationObservations
+      - calibrationWindowDays
+      - maxCalibrationBufferMinutes
       - orderDeadlines
       - publishedAt
       properties:
@@ -1412,6 +1473,29 @@ components:
           maximum: 1000
           description: Observations a lane needs inside the window before its measured transit can push a promise
             later than the timetable (ADR 0014).
+        targetOnTimeProbabilityPercent:
+          type: integer
+          minimum: 50
+          maximum: 99
+          description: Share of the promises of a calibration segment the buffer aims to deliver on time; ONE value
+            for every tier (ADR 0020).
+        minCalibrationObservations:
+          type: integer
+          minimum: 10
+          maximum: 10000
+          description: Judgements a segment (tier, basis, node grade) needs inside the window before its buffer
+            applies and its quotes carry a confidence (ADR 0020).
+        calibrationWindowDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: Days of judgements a calibration segment keeps (ADR 0020).
+        maxCalibrationBufferMinutes:
+          type: integer
+          minimum: 0
+          maximum: 2880
+          description: Cap of a segment's buffer in minutes; 0 switches the buffer off and keeps the confidence
+            (ADR 0020).
         orderDeadlines:
           type: array
           items:

@@ -42,19 +42,26 @@ type Witness struct {
 
 // Offer is a delivery offer.
 type Offer struct {
-	OfferID                 string    `json:"offerId"`
-	State                   string    `json:"state"`
-	GroupNo                 int       `json:"groupNo"`
-	DestinationPostalPrefix string    `json:"destinationPostalPrefix"`
-	Tier                    string    `json:"tier"`
-	Lines                   []Line    `json:"lines"`
-	Window                  Window    `json:"window"`
-	WitnessPath             Witness   `json:"witnessPath"`
-	Basis                   string    `json:"basis"`
-	PolicyVersion           string    `json:"policyVersion"`
-	QuotedAt                time.Time `json:"quotedAt"`
-	ExpiresAt               time.Time `json:"expiresAt"`
-	OrderByAt               time.Time `json:"orderByAt"`
+	OfferID                 string  `json:"offerId"`
+	State                   string  `json:"state"`
+	GroupNo                 int     `json:"groupNo"`
+	DestinationPostalPrefix string  `json:"destinationPostalPrefix"`
+	Tier                    string  `json:"tier"`
+	Lines                   []Line  `json:"lines"`
+	Window                  Window  `json:"window"`
+	WitnessPath             Witness `json:"witnessPath"`
+	Basis                   string  `json:"basis"`
+	// Confidence is the calibrated on-time probability of the quote, omitted
+	// when unknown (ADR 0020).
+	Confidence    *float64  `json:"confidence,omitempty"`
+	PolicyVersion string    `json:"policyVersion"`
+	QuotedAt      time.Time `json:"quotedAt"`
+	ExpiresAt     time.Time `json:"expiresAt"`
+	OrderByAt     time.Time `json:"orderByAt"`
+	// CapacityBand is AMPLE, TIGHT or SCARCE, the pressure on the book of the
+	// offer's window when it was quoted (ADR 0023); omitted when unknown, and
+	// on an offer read back from storage.
+	CapacityBand string `json:"capacityBand,omitempty"`
 }
 
 // Unavailable says why a (group, tier) has no offer.
@@ -77,9 +84,12 @@ type Terms struct {
 	DeliverByEarliest time.Time `json:"deliverByEarliest"`
 	DeliverByLatest   time.Time `json:"deliverByLatest"`
 	// TimeZone names the local calendar of deliverByEarliest/Latest (ADR 0011).
-	TimeZone      string `json:"timeZone,omitempty"`
-	Basis         string `json:"basis"`
-	PolicyVersion string `json:"policyVersion"`
+	TimeZone string `json:"timeZone,omitempty"`
+	Basis    string `json:"basis"`
+	// Confidence is the calibrated on-time probability the promise was quoted
+	// with, omitted when unknown (ADR 0020).
+	Confidence    *float64 `json:"confidence,omitempty"`
+	PolicyVersion string   `json:"policyVersion"`
 }
 
 // Revision is one re-promise.
@@ -155,17 +165,22 @@ type OrderDeadline struct {
 
 // Policy is a promise policy version.
 type Policy struct {
-	PolicyVersion              string          `json:"policyVersion"`
-	Version                    int             `json:"version"`
-	OfferTTLMinutes            int             `json:"offerTtlMinutes"`
-	HoldTTLMinutes             int             `json:"holdTtlMinutes"`
-	PackagesPerOrder           int             `json:"packagesPerOrder"`
-	CapacitySharePercent       int             `json:"capacitySharePercent"`
-	TransitWindowDays          int             `json:"transitWindowDays"`
-	TransitServiceLevelPercent int             `json:"transitServiceLevelPercent"`
-	MinTransitObservations     int             `json:"minTransitObservations"`
-	OrderDeadlines             []OrderDeadline `json:"orderDeadlines"`
-	PublishedAt                time.Time       `json:"publishedAt"`
+	PolicyVersion              string `json:"policyVersion"`
+	Version                    int    `json:"version"`
+	OfferTTLMinutes            int    `json:"offerTtlMinutes"`
+	HoldTTLMinutes             int    `json:"holdTtlMinutes"`
+	PackagesPerOrder           int    `json:"packagesPerOrder"`
+	CapacitySharePercent       int    `json:"capacitySharePercent"`
+	TransitWindowDays          int    `json:"transitWindowDays"`
+	TransitServiceLevelPercent int    `json:"transitServiceLevelPercent"`
+	MinTransitObservations     int    `json:"minTransitObservations"`
+	// The calibration fields of ADR 0020.
+	TargetOnTimeProbabilityPercent int             `json:"targetOnTimeProbabilityPercent"`
+	MinCalibrationObservations     int             `json:"minCalibrationObservations"`
+	CalibrationWindowDays          int             `json:"calibrationWindowDays"`
+	MaxCalibrationBufferMinutes    int             `json:"maxCalibrationBufferMinutes"`
+	OrderDeadlines                 []OrderDeadline `json:"orderDeadlines"`
+	PublishedAt                    time.Time       `json:"publishedAt"`
 }
 
 func lines(in []shared.Line) []Line {
@@ -187,7 +202,7 @@ func witness(w shared.Witness) Witness {
 func terms(t promise.Terms) Terms {
 	return Terms{
 		Tier: string(t.Tier), ShipBy: t.ShipBy.UTC(), DeliverByEarliest: t.Window.Earliest.UTC(), DeliverByLatest: t.Window.Latest.UTC(),
-		TimeZone: t.Window.TimeZone, Basis: string(t.Basis), PolicyVersion: t.PolicyVersion,
+		TimeZone: t.Window.TimeZone, Basis: string(t.Basis), Confidence: t.Confidence.Ptr(), PolicyVersion: t.PolicyVersion,
 	}
 }
 
@@ -196,8 +211,8 @@ func FromOffer(o *offer.Offer) Offer {
 	return Offer{
 		OfferID: string(o.ID()), State: string(o.State()), GroupNo: o.GroupNo(), DestinationPostalPrefix: o.DestinationPrefix(),
 		Tier: string(o.Tier()), Lines: lines(o.Lines()), Window: Window{Earliest: o.Window().Earliest.UTC(), Latest: o.Window().Latest.UTC(), TimeZone: o.Window().TimeZone},
-		WitnessPath: witness(o.Witness()), Basis: string(o.Basis()), PolicyVersion: o.PolicyVersion(), QuotedAt: o.QuotedAt().UTC(), ExpiresAt: o.ExpiresAt().UTC(),
-		OrderByAt: o.OrderByAt().UTC(),
+		WitnessPath: witness(o.Witness()), Basis: string(o.Basis()), Confidence: o.Confidence().Ptr(), PolicyVersion: o.PolicyVersion(), QuotedAt: o.QuotedAt().UTC(), ExpiresAt: o.ExpiresAt().UTC(),
+		OrderByAt: o.OrderByAt().UTC(), CapacityBand: string(o.CapacityBand()),
 	}
 }
 
@@ -250,6 +265,8 @@ func FromPolicy(p *policy.Policy) Policy {
 		PolicyVersion: p.VersionName(), Version: p.Version(), OfferTTLMinutes: int(p.OfferTTL() / time.Minute), HoldTTLMinutes: int(p.HoldTTL() / time.Minute),
 		PackagesPerOrder: p.PackagesPerOrder(), CapacitySharePercent: p.SharePercent(), TransitWindowDays: p.TransitWindowDays(),
 		TransitServiceLevelPercent: p.TransitServiceLevelPercent(), MinTransitObservations: p.MinTransitObservations(),
+		TargetOnTimeProbabilityPercent: p.TargetOnTimeProbabilityPercent(), MinCalibrationObservations: p.MinCalibrationObservations(),
+		CalibrationWindowDays: p.CalibrationWindowDays(), MaxCalibrationBufferMinutes: p.MaxCalibrationBufferMinutes(),
 		OrderDeadlines: ds, PublishedAt: p.PublishedAt().UTC(),
 	}
 }

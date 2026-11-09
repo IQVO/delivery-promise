@@ -31,27 +31,31 @@ import (
 // state is everything a unit of work can change. Stored values are replaced,
 // never edited in place, so copying the maps is enough.
 type state struct {
-	offers       map[offer.ID]offer.Snapshot
-	promises     map[promise.ID]promise.Snapshot
-	books        map[book.ID]book.Snapshot
-	policies     map[int]policy.Snapshot
-	nodes        map[string]readmodel.Node
-	regions      map[string]readmodel.Region
-	areas        map[string]readmodel.Area
-	lanes        map[string]search.Lane
-	items        map[string]readmodel.Item
-	listings     map[string]readmodel.Listing
-	departures   map[string]search.Departure
-	waves        map[string]search.Wave
-	scorecards   map[string]readmodel.Scorecard
-	assignments  map[string]readmodel.Assignment
-	shipments    map[string][]string
-	trackingOf   map[string]string
-	outcomes     map[string]readmodel.PackageOutcome
-	transitOpen  map[string]transitOpenRow
-	transitRings map[transitPair][]readmodel.TransitObservation
-	inbox        map[string]string
-	outbox       []shared.Event
+	offers          map[offer.ID]offer.Snapshot
+	promises        map[promise.ID]promise.Snapshot
+	books           map[book.ID]book.Snapshot
+	policies        map[int]policy.Snapshot
+	nodes           map[string]readmodel.Node
+	regions         map[string]readmodel.Region
+	areas           map[string]readmodel.Area
+	lanes           map[string]search.Lane
+	items           map[string]readmodel.Item
+	listings        map[string]readmodel.Listing
+	departures      map[string]search.Departure
+	waves           map[string]search.Wave
+	scorecards      map[string]readmodel.Scorecard
+	assignments     map[string]readmodel.Assignment
+	shipments       map[string][]string
+	trackingOf      map[string]string
+	outcomes        map[string]readmodel.PackageOutcome
+	transitOpen     map[string]transitOpenRow
+	transitRings    map[transitPair][]readmodel.TransitObservation
+	tierEligibility map[tierKey]readmodel.NodeTierEligibility
+	calibration     map[readmodel.CalibrationKey][]readmodel.CalibrationObservation
+	// arrivals is the DepartureArrival read model (ADR 0021): departureId -> arrivedAt.
+	arrivals map[string]time.Time
+	inbox    map[string]string
+	outbox   []shared.Event
 }
 
 // transitOpenRow is the open pairing row of a departed load (ADR 0014).
@@ -71,7 +75,9 @@ func newState() state {
 		listings: map[string]readmodel.Listing{}, departures: map[string]search.Departure{}, waves: map[string]search.Wave{},
 		scorecards: map[string]readmodel.Scorecard{}, assignments: map[string]readmodel.Assignment{}, shipments: map[string][]string{},
 		trackingOf: map[string]string{}, outcomes: map[string]readmodel.PackageOutcome{}, transitOpen: map[string]transitOpenRow{},
-		transitRings: map[transitPair][]readmodel.TransitObservation{}, inbox: map[string]string{},
+		transitRings: map[transitPair][]readmodel.TransitObservation{}, tierEligibility: map[tierKey]readmodel.NodeTierEligibility{},
+		calibration: map[readmodel.CalibrationKey][]readmodel.CalibrationObservation{},
+		arrivals:    map[string]time.Time{}, inbox: map[string]string{},
 	}
 }
 
@@ -90,7 +96,8 @@ func (st state) clone() state {
 		items: cloneMap(st.items), listings: cloneMap(st.listings), departures: cloneMap(st.departures), waves: cloneMap(st.waves),
 		scorecards: cloneMap(st.scorecards), assignments: cloneMap(st.assignments), shipments: cloneMap(st.shipments),
 		trackingOf: cloneMap(st.trackingOf), outcomes: cloneMap(st.outcomes), transitOpen: cloneMap(st.transitOpen),
-		transitRings: cloneTransitRings(st.transitRings), inbox: cloneMap(st.inbox),
+		transitRings: cloneTransitRings(st.transitRings), tierEligibility: cloneMap(st.tierEligibility), arrivals: cloneMap(st.arrivals),
+		calibration: cloneMap(st.calibration), inbox: cloneMap(st.inbox),
 		outbox: append([]shared.Event(nil), st.outbox...),
 	}
 }
@@ -145,6 +152,15 @@ func (s *Store) Shipments() *ShipmentViews { return &ShipmentViews{s} }
 
 // TransitActuals returns the TransitActuals double (ADR 0014).
 func (s *Store) TransitActuals() *TransitActuals { return &TransitActuals{s} }
+
+// Calibration returns the PromiseCalibrationView double (ADR 0020).
+func (s *Store) Calibration() *PromiseCalibrationView { return &PromiseCalibrationView{s} }
+
+// TierEligibility returns the NodeTierEligibility double (ADR 0022).
+func (s *Store) TierEligibility() *NodeTierEligibility { return &NodeTierEligibility{s} }
+
+// DepartureArrivals returns the DepartureArrivals double (ADR 0021).
+func (s *Store) DepartureArrivals() *DepartureArrivals { return &DepartureArrivals{s} }
 
 // Outbox returns the EventOutbox double.
 func (s *Store) Outbox() *Outbox { return &Outbox{s} }

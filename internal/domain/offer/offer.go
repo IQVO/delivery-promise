@@ -60,6 +60,7 @@ type Offer struct {
 	window       shared.Window
 	witness      shared.Witness
 	basis        shared.Basis
+	confidence   shared.Confidence
 	policy       string
 	quotedAt     time.Time
 	expiresAt    time.Time
@@ -68,6 +69,9 @@ type Offer struct {
 	closedAt     time.Time
 	version      int64
 	pickupCutoff time.Time
+	// capacityBand is the capacity pressure read at quote time (ADR 0023). It
+	// is NOT persisted: Restore leaves it empty.
+	capacityBand shared.CapacityBand
 }
 
 // Snapshot is the persisted form of an offer. Restore validates it.
@@ -80,9 +84,13 @@ type Snapshot struct {
 	Window            shared.Window
 	Witness           shared.Witness
 	Basis             shared.Basis
-	PolicyVersion     string
-	QuotedAt          time.Time
-	ExpiresAt         time.Time
+	// Confidence is the calibrated on-time probability of the quote (ADR 0020);
+	// unknown (the zero value) for a snapshot persisted before the field existed
+	// or a segment below the minimum observations.
+	Confidence    shared.Confidence
+	PolicyVersion string
+	QuotedAt      time.Time
+	ExpiresAt     time.Time
 	// OrderByAt is the cutoff-bound half of expiresAt: the latest instant the
 	// order can be placed and still make the witness pickup cutoff. Unlike
 	// expiresAt it is NOT capped by the offer TTL. Snapshots persisted before
@@ -105,8 +113,11 @@ type Quote struct {
 	Window            shared.Window
 	Witness           shared.Witness
 	Basis             shared.Basis
-	PolicyVersion     string
-	TTL               time.Duration
+	// Confidence is the segment's calibrated confidence, unknown when the
+	// segment has too few observations (ADR 0020).
+	Confidence    shared.Confidence
+	PolicyVersion string
+	TTL           time.Duration
 	// ExpiresAt is the expiry the search computed: min(now + TTL, the latest
 	// instant the pickup cutoff can still be met).
 	ExpiresAt time.Time
@@ -115,6 +126,9 @@ type Quote struct {
 	LatestMeetableAt time.Time
 	// PickupCutoffAt is the witness pickup cutoff (shipBy).
 	PickupCutoffAt time.Time
+	// CapacityBand is the pressure on the book the offer's window charges
+	// (ADR 0023); empty when the book has no finite capacity.
+	CapacityBand shared.CapacityBand
 }
 
 // New creates a QUOTED offer at version 1 and raises DeliveryOfferQuoted.
@@ -133,52 +147,15 @@ func New(q Quote, now time.Time) (*Offer, []shared.Event, error) {
 	}
 	o := &Offer{
 		id: q.ID, groupNo: q.GroupNo, destination: q.DestinationPrefix, tier: q.Tier, lines: slices.Clone(q.Lines),
-		window: q.Window, witness: q.Witness.Clone(), basis: q.Basis, policy: q.PolicyVersion, quotedAt: now,
+		window: q.Window, witness: q.Witness.Clone(), basis: q.Basis, confidence: q.Confidence, policy: q.PolicyVersion, quotedAt: now,
 		expiresAt: shared.UTC(q.ExpiresAt), orderByAt: shared.UTC(q.LatestMeetableAt), state: StateQuoted,
-		version: 1, pickupCutoff: shared.UTC(q.PickupCutoffAt),
+		version: 1, pickupCutoff: shared.UTC(q.PickupCutoffAt), capacityBand: q.CapacityBand,
 	}
 	ev := DeliveryOfferQuoted{
 		Header: shared.Header{Version: o.version, At: now}, OfferID: o.id, Tier: o.tier, DestinationPrefix: o.destination,
-		NodeID: o.witness.NodeID, Window: o.window, Basis: o.basis, PolicyVersion: o.policy, ExpiresAt: o.expiresAt,
+		NodeID: o.witness.NodeID, Window: o.window, Basis: o.basis, Confidence: o.confidence, PolicyVersion: o.policy, ExpiresAt: o.expiresAt, CapacityBand: o.capacityBand,
 	}
 	return o, []shared.Event{ev}, nil
-}
-
-func validateQuote(q Quote) error {
-	if !shared.ValidID(string(q.ID)) {
-		return shared.Invalid("offerId %q is not a valid id", q.ID)
-	}
-	if q.GroupNo < 1 || q.GroupNo > shared.MaxLines {
-		return shared.Invalid("groupNo must be between 1 and %d", shared.MaxLines)
-	}
-	if !shared.ValidPostalPrefix(q.DestinationPrefix) {
-		return shared.Invalid("destinationPostalPrefix %q is not valid", q.DestinationPrefix)
-	}
-	if !q.Tier.Valid() {
-		return shared.Invalid("tier %q is not a tier", q.Tier)
-	}
-	if !q.Basis.Valid() {
-		return shared.Invalid("basis %q is not SCHEDULED, NOMINAL or MEASURED", q.Basis)
-	}
-	if q.PolicyVersion == "" || len(q.PolicyVersion) > shared.MaxID {
-		return shared.Invalid("policyVersion is required")
-	}
-	if q.TTL <= 0 {
-		return shared.Invalid("the offer TTL must be positive")
-	}
-	if err := shared.ValidateLines(q.Lines); err != nil {
-		return err
-	}
-	if err := q.Window.Validate(); err != nil {
-		return err
-	}
-	if err := q.Witness.Validate(q.Basis); err != nil {
-		return err
-	}
-	if q.Basis == shared.BasisNominal && !q.Tier.AllowsNominal() {
-		return fmt.Errorf("%w: %s", ErrNominalBasisNotAllowedForTier, q.Tier)
-	}
-	return nil
 }
 
 // Restore rebuilds a persisted offer, validating every invariant.
@@ -188,35 +165,10 @@ func Restore(s Snapshot) (*Offer, error) {
 	}
 	return &Offer{
 		id: s.ID, groupNo: s.GroupNo, destination: s.DestinationPrefix, tier: s.Tier, lines: slices.Clone(s.Lines),
-		window: s.Window, witness: s.Witness.Clone(), basis: s.Basis, policy: s.PolicyVersion, quotedAt: shared.UTC(s.QuotedAt),
+		window: s.Window, witness: s.Witness.Clone(), basis: s.Basis, confidence: s.Confidence, policy: s.PolicyVersion, quotedAt: shared.UTC(s.QuotedAt),
 		expiresAt: shared.UTC(s.ExpiresAt), orderByAt: shared.UTC(s.OrderByAt), state: s.State,
 		closedAt: shared.UTC(s.ClosedAt), version: s.Version, pickupCutoff: shared.UTC(s.PickupCutoffAt),
 	}, nil
-}
-
-func checkSnapshot(s Snapshot) error {
-	if s.Version < 1 {
-		return errors.New("a version of at least 1 is required")
-	}
-	if !s.State.Valid() {
-		return fmt.Errorf("state %q is not QUOTED, EXPIRED or CONSUMED", s.State)
-	}
-	if s.QuotedAt.IsZero() || !s.ExpiresAt.After(s.QuotedAt) {
-		return errors.New("expiresAt must be after quotedAt")
-	}
-	if err := validateQuote(Quote{
-		ID: s.ID, GroupNo: s.GroupNo, DestinationPrefix: s.DestinationPrefix, Tier: s.Tier, Lines: s.Lines, Window: s.Window,
-		Witness: s.Witness, Basis: s.Basis, PolicyVersion: s.PolicyVersion, TTL: time.Nanosecond,
-	}); err != nil {
-		return err
-	}
-	if s.State == StateQuoted && !s.ClosedAt.IsZero() {
-		return errors.New("a QUOTED offer has no closedAt")
-	}
-	if s.State != StateQuoted && s.ClosedAt.IsZero() {
-		return errors.New("an EXPIRED or CONSUMED offer needs closedAt")
-	}
-	return nil
 }
 
 // Consume moves a QUOTED offer, not yet past expiresAt, to CONSUMED. Anything
@@ -275,6 +227,10 @@ func (o *Offer) Witness() shared.Witness { return o.witness.Clone() }
 // Basis returns SCHEDULED or NOMINAL.
 func (o *Offer) Basis() shared.Basis { return o.basis }
 
+// Confidence returns the calibrated on-time probability of the quote, unknown
+// when its segment had too few observations (ADR 0020).
+func (o *Offer) Confidence() shared.Confidence { return o.confidence }
+
 // PolicyVersion returns the policy version of the quote.
 func (o *Offer) PolicyVersion() string { return o.policy }
 
@@ -289,6 +245,11 @@ func (o *Offer) ExpiresAt() time.Time { return o.expiresAt }
 // handling, in business time). Unlike ExpiresAt it is not capped by the offer
 // TTL: ordering before it keeps the quoted window even after a re-quote.
 func (o *Offer) OrderByAt() time.Time { return o.orderByAt }
+
+// CapacityBand returns the capacity pressure read when the offer was quoted
+// (ADR 0023): empty when the book has no finite capacity and always empty on an
+// offer restored from storage, because the band is a quote-time reading.
+func (o *Offer) CapacityBand() shared.CapacityBand { return o.capacityBand }
 
 // PickupCutoffAt returns the witness pickup cutoff (shipBy).
 func (o *Offer) PickupCutoffAt() time.Time { return o.pickupCutoff }
@@ -306,7 +267,7 @@ func (o *Offer) Version() int64 { return o.version }
 func (o *Offer) Snapshot() Snapshot {
 	return Snapshot{
 		ID: o.id, GroupNo: o.groupNo, DestinationPrefix: o.destination, Tier: o.tier, Lines: slices.Clone(o.lines), Window: o.window,
-		Witness: o.witness.Clone(), Basis: o.basis, PolicyVersion: o.policy, QuotedAt: o.quotedAt, ExpiresAt: o.expiresAt,
+		Witness: o.witness.Clone(), Basis: o.basis, Confidence: o.confidence, PolicyVersion: o.policy, QuotedAt: o.quotedAt, ExpiresAt: o.expiresAt,
 		OrderByAt: o.orderByAt, State: o.state, ClosedAt: o.closedAt, PickupCutoffAt: o.pickupCutoff, Version: o.version,
 	}
 }

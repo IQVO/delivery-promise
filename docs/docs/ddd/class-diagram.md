@@ -26,6 +26,7 @@ classDiagram
     +time quotedAt
     +time expiresAt
     +time orderByAt
+    +CapacityBand capacityBand (quote-time only, not stored)
     +State state
     +Consume(now)
     +Expire(now)
@@ -147,7 +148,7 @@ classDiagram
 
 Source: `internal/domain/offer/offer.go`, `internal/domain/promise/promise.go`, `internal/domain/book/book.go`, `internal/domain/policy/policy.go`, `internal/domain/search`, `internal/domain/shared`.
 
-Enumerations: `Tier` (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`; only `STANDARD` allows a `NOMINAL` basis), `Basis` (`SCHEDULED`, `MEASURED`, `NOMINAL`), offer `State` (`QUOTED`, `EXPIRED`, `CONSUMED`), promise `State` (`PROVISIONAL`, `CONFIRMED`, `AT_RISK`, `KEPT`, `BROKEN`, `RELEASED`, `CANCELLED`), book `State` (`OPEN`, `CLOSED`), `Outcome` (`KEPT`, `BROKEN`), `Cause` (`LATE`, `LOST`, `RETURNED`). Each aggregate has a `Snapshot` and a `Restore` that validates every invariant (`shared.Corrupt` otherwise). Domain events (`PromiseMade`, `PromiseConfirmed`, `PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseReleased`, `PromiseCancelled`, `PromiseUnkeepable`, `PromiseBookExhausted`, `DeliveryOfferQuoted`, `PromisePolicyPublished`) are returned by the commands and appended to the outbox by the use case.
+Enumerations: `Tier` (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`; only `STANDARD` allows a `NOMINAL` basis), `Basis` (`SCHEDULED`, `MEASURED`, `NOMINAL`), `CapacityBand` (`AMPLE`, `TIGHT`, `SCARCE`; ADR 0023), offer `State` (`QUOTED`, `EXPIRED`, `CONSUMED`), promise `State` (`PROVISIONAL`, `CONFIRMED`, `AT_RISK`, `KEPT`, `BROKEN`, `RELEASED`, `CANCELLED`), book `State` (`OPEN`, `CLOSED`), `Outcome` (`KEPT`, `BROKEN`), `Cause` (`LATE`, `LOST`, `RETURNED`). Each aggregate has a `Snapshot` and a `Restore` that validates every invariant (`shared.Corrupt` otherwise). Domain events (`PromiseMade`, `PromiseConfirmed`, `PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseReleased`, `PromiseCancelled`, `PromiseUnkeepable`, `PromiseBookExhausted`, `DeliveryOfferQuoted`, `PromisePolicyPublished`) are returned by the commands and appended to the outbox by the use case.
 
 ## Ports and adapters
 

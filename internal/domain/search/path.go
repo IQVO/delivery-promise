@@ -42,15 +42,7 @@ func (s *searcher) usable(d Departure, strict bool) bool {
 // scheduled transit arrivesAt - departsAt: a one-sided adjustment, measured
 // transit never promises earlier than the timetable (ADR 0014).
 func (s *searcher) measuredAt(d Departure) (time.Time, bool) {
-	if s.in.MeasuredTransit == nil {
-		return d.ArrivesAt, false
-	}
-	if ok, minutes := s.in.MeasuredTransit(d.Origin, d.Dest); ok {
-		if delta := float64(minutes) - d.ArrivesAt.Sub(d.DepartsAt).Minutes(); delta > 0 {
-			return d.ArrivesAt.Add(time.Duration(delta) * time.Minute), true
-		}
-	}
-	return d.ArrivesAt, false
+	return ExpectedArrival(d, s.in.MeasuredTransit)
 }
 
 // earliestArrival is the time-expanded earliest-arrival search from the
