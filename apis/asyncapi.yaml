@@ -809,6 +809,7 @@ components:
             basis: SCHEDULED
             policyVersion: v3
             expiresAt: '2026-10-22T19:15:00Z'
+            capacityBand: TIGHT
     PromisePolicyPublished:
       name: PromisePolicyPublished
       title: Promise policy published
@@ -2282,6 +2283,16 @@ components:
                 $ref: '#/components/schemas/Basis'
               policyVersion: *id001
               expiresAt: *id002
+              capacityBand:
+                type: string
+                enum:
+                - AMPLE
+                - TIGHT
+                - SCARCE
+                description: 'The capacity pressure on the PromiseBook the offer''s window would charge, read at quote time
+                  (ADR 0023): AMPLE below 60% of the share used by provisional plus confirmed holds, TIGHT from 60% to below
+                  85%, SCARCE from 85%. Optional and additive; omitted when the book has no finite capacity, never an empty
+                  string. Consumers decode tolerantly and ignore it.'
     PromisePolicyPublishedEvent:
       allOf:
       - $ref: '#/components/schemas/CloudEventEnvelope'
