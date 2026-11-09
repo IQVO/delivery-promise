@@ -36,6 +36,7 @@ The first table is this context's own language, with the identifier each term ha
 | **Revision** | One re-promise: `{no, previousTerms, reason, revisedAt}`. | `promise.Revision` | |
 | **Hold expiry** | `holdExpiresAt`: the instant a provisional promise is released if no order confirmed it. | `promise.Promise.HoldExpiresAt` | The offer's `expiresAt` |
 | **Order-by instant** | `orderByAt`: the latest instant the order can be placed and still make the quoted window's witness pickup cutoff — `expiresAt`'s cutoff bound uncapped by the offer TTL. | `offer.Offer.OrderByAt` | A node **Cutoff** minus effective handling |
+| **Capacity band** | `capacityBand`: `AMPLE` (< 60%), `TIGHT` (60% to < 85%) or `SCARCE` (>= 85%) of the share of the PromiseBook behind an offer's window already held (provisional + confirmed), read at quote time and never stored. Omitted when the book has no finite capacity. A signal only: the network never computes a fee (ADR 0023). | `shared.CapacityBand`, `shared.CapacityBandFor` | A price, or a **Constraint** (`NODE_CAPACITY_EXHAUSTED` means no room at all) |
 | **Read model** | A local copy of another context's facts, fed only by events. | `rm_*` tables, `internal/application/readmodel` | An aggregate: no invariant is enforced on it |
 | **Outbox / Inbox** | Events written with the aggregates and published later; consumed event ids claimed with their effect. | `outbox_events`, `processed_events` | |
 

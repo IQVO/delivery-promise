@@ -177,7 +177,10 @@ func (s *Service) fill(ctx context.Context, in *search.Input, stationID string, 
 		return err
 	}
 	for _, b := range books {
-		in.Books[string(b.ID())] = search.BookView{Open: b.State() == book.StateOpen, Room: b.Room(), HoldDeadlineAt: b.HoldDeadlineAt()}
+		in.Books[string(b.ID())] = search.BookView{
+			Open: b.State() == book.StateOpen, Room: b.Room(), HoldDeadlineAt: b.HoldDeadlineAt(),
+			Share: b.Share(), Used: b.Provisional() + b.Confirmed(),
+		}
 	}
 	return nil
 }
