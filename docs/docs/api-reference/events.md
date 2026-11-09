@@ -30,7 +30,7 @@ Topics: integration events on `retailnetwork.delivery-promise.events`, analytics
 
 | Event | Entity | Topic | Raised by | Key data fields |
 | --- | --- | --- | --- | --- |
-| `PromiseAtRisk` | `promise` | events | flag at risk | `promiseId`, `orderId`, `reason` (`NODE_UNSOURCEABLE`, `PACKAGE_EXCEPTION`, `INDUCTION_DEFERRED`, `DEPARTURE_CANCELLED`, `WAVE_CANCELLED`, `BOOKING_FAILED`, `BOOKING_MOVED`), `detectedAt` |
+| `PromiseAtRisk` | `promise` | events | flag at risk; the late-risk sweep `FlagPredictedLate` for `PREDICTED_LATE` (ADR 0021) | `promiseId`, `orderId`, `reason` (`NODE_UNSOURCEABLE`, `PACKAGE_EXCEPTION`, `INDUCTION_DEFERRED`, `DEPARTURE_CANCELLED`, `WAVE_CANCELLED`, `BOOKING_FAILED`, `BOOKING_MOVED`, `PREDICTED_LATE`), `detectedAt` |
 | `PromiseRevised` | `promise` | events | `ReviseAtRisk` | `promiseId`, `orderId`, `revisionNo`, `previousDeliverByLatest`, `deliverByEarliest`, `deliverByLatest`, `timeZone`, `shipBy`, `nodeId`, `reason` |
 | `PromiseKept` | `promise` | events | `JudgePromise` | `promiseId`, `orderId`, `nodeId`, `deliveredAt`, `deliverByLatest` |
 | `PromiseBroken` | `promise` | events | `JudgePromise` | as kept, plus `lateByMinutes` and `cause` (`LATE`, `LOST`, `RETURNED`); `deliveredAt` omitted for `LOST` and `RETURNED` |
@@ -60,7 +60,7 @@ Dispatch is on the full `type`; payloads are decoded tolerantly (unknown fields 
 | `retailnetwork.customer-ordering.events` | `commerce.customer-ordering.customerorder` | `CustomerOrderPlaced`, `CustomerOrderCancelled` | reconciling confirm; cancel |
 | `retailnetwork.order-sourcing.events` | `commerce.order-sourcing.assignment` | `FulfillmentLocked`, `FulfillmentShipped`, `FulfillmentUnsourceable` | assignment facts; at risk |
 | `retailnetwork.shipping-and-tracking.events` | `logistics.shipping-and-tracking.journey` | `PackageDelivered`, `PackageExceptionRaised`, `PackageLost`, `PackageReturned` | judge; at risk |
-| `retailnetwork.linehaul-transportation.events` | `logistics.linehaul-transportation.departure`, `.load` | `DepartureScheduled`, `DepartureCapacityChanged`, `DepartureCancelled`, `BookingMoved`, `BookingFailed`, `LoadDeparted`, `LoadArrived` | `rm_departures`; at risk; `rm_transit_actuals` (ADR 0014) |
+| `retailnetwork.linehaul-transportation.events` | `logistics.linehaul-transportation.departure`, `.load` | `DepartureScheduled`, `DepartureCapacityChanged`, `DepartureCancelled`, `BookingMoved`, `BookingFailed`, `LoadDeparted`, `LoadArrived` | `rm_departures`; at risk; `rm_transit_actuals` (ADR 0014); `rm_departure_arrival` from the optional `departureId` of `LoadArrived` (ADR 0021) |
 | `retailnetwork.last-mile-delivery.events` | `logistics.last-mile-delivery.wave` (and `packageattempthistory` for `PackageInductionDeferred`) | `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged`, `DeliveryWaveCancelled`, `PackageInductionDeferred` | `rm_waves`; at risk |
 | `retailnetwork.node-performance.events` | `partner.node-performance.scorecard` | `NodeScorecardUpdated` | `rm_scorecards` |
 | `retailnetwork.node-topology.events` | `logistics.node-topology.node`, `.lane`, `.servicearea`, `.region` | `NodeRegistered`, `NodeOperationalProfileDeclared`, `NodeActivated`, `NodeSuspended`, `NodeRetired`, `LaneOpened`, `LaneClosed`, `ServiceAreaAssigned`, `RegionDefined` | `rm_nodes`, `rm_lanes`, `rm_areas`, `rm_regions` |

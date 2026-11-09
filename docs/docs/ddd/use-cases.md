@@ -27,6 +27,7 @@ All three binaries drive the **same** `Service`: REST (`cmd/api`) exposes the co
 | `ReleaseExpiredHolds` | clock | sweeper | `PromiseReleased` |
 | `ExpireOffers` | clock | sweeper | none |
 | `CloseBooks` | clock | sweeper | none |
+| `FlagPredictedLate` | clock | sweeper | `PromiseAtRisk` (`PREDICTED_LATE`) |
 | `RepriceAtRisk` | clock | sweeper | as `ReviseAtRisk` |
 | Read-model projections | 36 consumed event types | consumer | none |
 | Reads | any | REST GET routes, MCP tools, A2A skills | none |
@@ -91,6 +92,7 @@ These are the only places where other contexts' facts change a promise. All run 
 | `DeliveryWaveCancelled` | `WAVE_CANCELLED` | every active promise whose witness wave it is |
 | `BookingFailed` | `BOOKING_FAILED` | the assignment's promise; that departure is skipped from now on |
 | `BookingMoved` | `BOOKING_MOVED` | the assignment's promise; the departure it left is skipped |
+| none: the clock (`FlagPredictedLate`, ADR 0021) | `PREDICTED_LATE` | every `CONFIRMED` promise whose witness path has a departure past its expected arrival (the timetable plus the measured-transit adjustment of ADR 0014) plus 15 minutes with no `rm_departure_arrival` row |
 
 `flagAtRisk` moves a `CONFIRMED` promise to `AT_RISK` (`PromiseAtRisk`); closed or not yet confirmed promises are skipped. A risk for an assignment whose lock was not seen is logged (`risk for an assignment whose lock was not seen`) and ignored.
 
@@ -106,14 +108,15 @@ Node, lane, service area and region events (node-topology), catalogue item and l
 
 ## Sweeper use cases
 
-Run every `SWEEP_INTERVAL` in batches of 100, independently; a failing pass never stops the others.
+Run every `SWEEP_INTERVAL` in batches of 100 (`FlagPredictedLate` pages through every `CONFIRMED` promise, 100 per page), independently; a failing pass never stops the others.
 
 | Use case | Selects | Effect |
 | --- | --- | --- |
 | `ExpireOffers` | `QUOTED` offers past `expiresAt` | `EXPIRED` (an offer consumed meanwhile is skipped) |
 | `ReleaseExpiredHolds` | `PROVISIONAL` promises past `holdExpiresAt` | `RELEASED` with reason `HOLD_EXPIRED`, releases the provisional hold on the book, raises `PromiseReleased` |
 | `CloseBooks` | `OPEN` books whose cutoff was reached | `CLOSED` (already closed is a no-op) |
-| `RepriceAtRisk` | `AT_RISK` promises, including those already reported unkeepable | retries `ReviseAtRisk`, since a new departure may have made them feasible |
+| `FlagPredictedLate` | `CONFIRMED` promises, paged by id | flags `AT_RISK` with `PREDICTED_LATE` those whose locked path is running late; runs before `RepriceAtRisk`; never clears the flag (the judgement closes it) |
+| `RepriceAtRisk` | `AT_RISK` promises, including those already reported unkeepable | retries `ReviseAtRisk`, since a new departure may have made them feasible; a `PREDICTED_LATE` promise whose window is still reachable is skipped (ADR 0021) |
 
 ## Reads
 

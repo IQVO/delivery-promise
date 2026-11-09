@@ -370,7 +370,8 @@ operations:
       LoadArrived from linehaul-transportation.
     description: The service consumes DepartureScheduled, DepartureCapacityChanged, DepartureCancelled, BookingMoved, BookingFailed,
       LoadDeparted and LoadArrived from `retailnetwork.linehaul-transportation.events` to keep its local read models (the
-      load events pair by loadId into the measured-transit read model, ADR 0014) and to drive RepromiseOnRisk, JudgeOnDelivery
+      load events pair by loadId into the measured-transit read model, ADR 0014, and LoadArrived records the arrival of its
+      departureId, when it carries one, for the late-risk sweep, ADR 0021) and to drive RepromiseOnRisk, JudgeOnDelivery
       and CancelPromise. It never calls linehaul-transportation synchronously.
     tags:
     - name: consumed-linehaul-transportation
@@ -532,8 +533,10 @@ components:
       description: '`type` = `com.retailnetwork.commerce.delivery-promise.promise.PromiseAtRisk`; `dataschema` = `urn:retailnetwork:delivery-promise:events:PromiseAtRisk:v1`;
         subject and key = the promiseId. Topic: retailnetwork.delivery-promise.events. Raised by FlagPromiseAtRisk (RepromiseOnRisk)
         on FulfillmentUnsourceable, PackageExceptionRaised, PackageInductionDeferred, DepartureCancelled, DeliveryWaveCancelled,
-        BookingFailed or BookingMoved affecting the witness path. Consumed by customer-ordering. `reason` is one of NODE_UNSOURCEABLE,
-        PACKAGE_EXCEPTION, INDUCTION_DEFERRED, DEPARTURE_CANCELLED, WAVE_CANCELLED, BOOKING_FAILED, BOOKING_MOVED.'
+        BookingFailed or BookingMoved affecting the witness path, and by the clock-driven late-risk sweep (FlagPredictedLate, ADR 0021)
+        when a departure of the witness path is past its expected arrival plus 15 minutes with no arrival seen. Consumed by
+        customer-ordering. `reason` is one of NODE_UNSOURCEABLE, PACKAGE_EXCEPTION, INDUCTION_DEFERRED, DEPARTURE_CANCELLED,
+        WAVE_CANCELLED, BOOKING_FAILED, BOOKING_MOVED, PREDICTED_LATE.'
       tags:
       - name: promise
       payload:
@@ -1275,7 +1278,8 @@ components:
       contentType: application/cloudevents+json
       description: 'Consumed from `retailnetwork.linehaul-transportation.events`; `type` = `com.retailnetwork.logistics.linehaul-transportation.load.LoadDeparted`
         (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
-        fields are ignored. Use: opens the load''s pairing row of the measured-transit read model (ADR 0014).'
+        fields are ignored. Use: opens the load''s pairing row of the measured-transit read model (ADR 0014). The optional
+        `departureId` (the scheduled departure the load serves) is carried but not used.'
       tags:
       - name: consumed-linehaul-transportation
       payload:
@@ -1294,6 +1298,7 @@ components:
           dataschema: urn:retailnetwork:linehaul-transportation:events:LoadDeparted:v1
           data:
             loadId: ld-91f2
+            departureId: dep-AUS3-1800
             originNodeId: N-AUS3
             departedAt: '2026-10-22T23:15:00Z'
     LoadArrived:
@@ -1303,7 +1308,9 @@ components:
       contentType: application/cloudevents+json
       description: 'Consumed from `retailnetwork.linehaul-transportation.events`; `type` = `com.retailnetwork.logistics.linehaul-transportation.load.LoadArrived`
         (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
-        fields are ignored. Use: pairs the load''s open row into one measured transit observation (ADR 0014).'
+        fields are ignored. Use: pairs the load''s open row into one measured transit observation (ADR 0014); when the optional
+        `departureId` is present, records the departure''s arrival in the DepartureArrival read model that the late-risk sweep
+        reads (ADR 0021). An event without a `departureId` is ignored by that model and counted.'
       tags:
       - name: consumed-linehaul-transportation
       payload:
@@ -1322,6 +1329,7 @@ components:
           dataschema: urn:retailnetwork:linehaul-transportation:events:LoadArrived:v1
           data:
             loadId: ld-91f2
+            departureId: dep-AUS3-1800
             destinationNodeId: N-SAU1
             arrivedAt: '2026-10-23T00:45:00Z'
     DeliveryWaveScheduled:
@@ -2558,6 +2566,7 @@ components:
             - departedAt
             properties:
               loadId: *id001
+              departureId: *id001
               originNodeId: *id001
               departedAt: *id002
     LoadArrivedConsumed:
@@ -2573,6 +2582,7 @@ components:
             - arrivedAt
             properties:
               loadId: *id001
+              departureId: *id001
               destinationNodeId: *id001
               arrivedAt: *id002
     DeliveryWaveScheduledConsumed:
