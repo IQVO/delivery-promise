@@ -15,6 +15,7 @@ type DeliveryOfferQuoted struct {
 	NodeID            string
 	Window            shared.Window
 	Basis             shared.Basis
+	Confidence        shared.Confidence
 	PolicyVersion     string
 	ExpiresAt         time.Time
 }

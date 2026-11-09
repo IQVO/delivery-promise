@@ -79,10 +79,13 @@ const ReleaseHoldExpired = "HOLD_EXPIRED"
 
 // Terms are the PromiseTerms value object.
 type Terms struct {
-	Tier          shared.Tier
-	ShipBy        time.Time
-	Window        shared.Window
-	Basis         shared.Basis
+	Tier   shared.Tier
+	ShipBy time.Time
+	Window shared.Window
+	Basis  shared.Basis
+	// Confidence is the calibrated on-time probability the promise was quoted
+	// with, unknown when its segment had too few observations (ADR 0020).
+	Confidence    shared.Confidence
 	PolicyVersion string
 }
 

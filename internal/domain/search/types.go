@@ -159,6 +159,12 @@ type Input struct {
 	// too few observations. A nil closure never measures: the timetable stands
 	// (ADR 0014).
 	MeasuredTransit func(origin, dest string) (ok bool, minutes int)
+	// CalibrationBuffer answers the calibration of a segment (tier, basis,
+	// node grade): the buffer added to a candidate's final arrival before it is
+	// snapped to a delivery window, and the confidence the quote carries
+	// (ADR 0020). A nil closure never buffers, and the paths are then computed
+	// once for all tiers, as before calibration existed.
+	CalibrationBuffer func(tier shared.Tier, basis shared.Basis, grade Grade) Calibration
 	// Books holds the existing books by bookId; a missing book is opened lazily
 	// with the computed share.
 	Books             map[string]BookView
@@ -177,6 +183,11 @@ type Candidate struct {
 	Window  shared.Window
 	Basis   shared.Basis
 	Witness shared.Witness
+	// BufferMinutes is the calibration buffer folded into the window (0 when
+	// none) and Confidence the segment's confidence, unknown below the minimum
+	// observations (ADR 0020).
+	BufferMinutes int
+	Confidence    shared.Confidence
 	// BookID is the PromiseBook the hold goes on.
 	BookID string
 	// ExpiresAt is min(now + offerTtl, LatestMeetableAt).

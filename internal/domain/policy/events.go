@@ -9,17 +9,21 @@ import (
 // PromisePolicyPublished is raised by Publish (analytics only).
 type PromisePolicyPublished struct {
 	shared.Header
-	PolicyVersion              string
-	Number                     int
-	OfferTTLMinutes            int
-	HoldTTLMinutes             int
-	PackagesPerOrder           int
-	SharePercent               int
-	TransitWindowDays          int
-	TransitServiceLevelPercent int
-	MinTransitObservations     int
-	Deadlines                  []Deadline
-	PublishedAt                time.Time
+	PolicyVersion                  string
+	Number                         int
+	OfferTTLMinutes                int
+	HoldTTLMinutes                 int
+	PackagesPerOrder               int
+	SharePercent                   int
+	TransitWindowDays              int
+	TransitServiceLevelPercent     int
+	MinTransitObservations         int
+	TargetOnTimeProbabilityPercent int
+	MinCalibrationObservations     int
+	CalibrationWindowDays          int
+	MaxCalibrationBufferMinutes    int
+	Deadlines                      []Deadline
+	PublishedAt                    time.Time
 }
 
 // EventName returns "PromisePolicyPublished".
