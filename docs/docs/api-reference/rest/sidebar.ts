@@ -30,6 +30,22 @@ const sidebar: SidebarsConfig = {
     },
     {
       type: "category",
+      label: "DeliveryEstimates",
+      link: {
+        type: "doc",
+        id: "api-reference/rest/delivery-estimates",
+      },
+      items: [
+        {
+          type: "doc",
+          id: "api-reference/rest/estimate-deliveries",
+          label: "Estimate delivery options for up to 50 items of a listing page (nothing is stored)",
+          className: "api-method post",
+        },
+      ],
+    },
+    {
+      type: "category",
       label: "Promises",
       link: {
         type: "doc",

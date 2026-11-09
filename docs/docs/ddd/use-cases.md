@@ -16,6 +16,7 @@ All three binaries drive the **same** `Service`: REST (`cmd/api`) exposes the co
 | Use case | Trigger | Adapter | Events raised |
 | --- | --- | --- | --- |
 | `QuoteDeliveryOffers` | shopper or checkout | REST `POST /delivery-quotes` | `DeliveryOfferQuoted` (analytics) per offer |
+| `EstimateDeliveries` | listing page (storefront) | REST `POST /delivery-estimates`; MCP `estimate_delivery` | none: stores nothing, advisory (ADR 0019) |
 | `MakePromise` | checkout | REST `POST /promises` | `PromiseMade`, and `PromiseBookExhausted` when the hold fills the book |
 | `ConfirmPromise` | checkout, then `CustomerOrderPlaced` | REST `POST /promises/{promiseId}/confirmations`; consumer `OnCustomerOrderPlaced` | `PromiseConfirmed` |
 | `CancelPromise` | checkout compensation, `CustomerOrderCancelled` | REST `POST /promises/{promiseId}/cancellations`; consumer `OnCustomerOrderCancelled` | `PromiseCancelled` |

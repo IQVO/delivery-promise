@@ -1,0 +1,1 @@
+{"parameters":[{"name":"Idempotency-Key","in":"header","required":false,"description":"Not required. This operation stores nothing, so a key that is sent is ignored; it is never read, stored or replayed (ADR 0019).","schema":{"type":"string","maxLength":128}}]}

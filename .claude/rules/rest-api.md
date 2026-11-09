@@ -12,6 +12,8 @@ Route -> use case, kept in sync with `apis/openapi.yaml`. Routes are registered 
 the wiring is `cmd/api/main.go` `run`:
 
 - `POST /delivery-quotes` -> `QuoteDeliveryOffers` (200; `Idempotency-Key` optional)
+- `POST /delivery-estimates` -> `EstimateDeliveries` (200; SAFE, stores nothing, registered WITHOUT the
+  Idempotency-Key middleware: a sent key is ignored; up to 50 items; ADR 0019)
 - `GET /delivery-offers/{offerId}` -> `GetOffer`
 - `POST /promises` -> `MakePromise` (201; a replay of the same offer answers 200)
 - `GET /promises/{promiseId}` -> `GetPromise`
@@ -43,7 +45,8 @@ the wiring is `cmd/api/main.go` `run`:
   `idempotency-key-reused`, a missing key 400 `idempotency-key-required`; keys live
   24 h in `idempotency_keys`. The handler runs in a SAVEPOINT: a 4xx is stored but
   leaves no writes, a 5xx is never stored. A new state-changing route registers
-  through `Server.idempotent`, never a bare `r.Post`.
+  through `Server.idempotent`, never a bare `r.Post`; only a SAFE route that stores
+  nothing (`POST /delivery-estimates`) is a bare `r.Post`.
 - **NUL** (U+0000) is rejected before anything else (`nul.go`).
 - Bodies are decoded strictly (`decodeJSON`): unknown fields are 400
   `malformed-request`; a value the domain refuses is 422.

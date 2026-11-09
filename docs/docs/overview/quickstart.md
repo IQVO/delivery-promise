@@ -155,7 +155,7 @@ curl -s -X POST localhost:18090/mcp -H 'Content-Type: application/json' \
 # -> structuredContent {"capacitySharePercent":100,"holdTtlMinutes":15,"minTransitObservations":20,"offerTtlMinutes":10,"orderDeadlines":[{"localTime":"18:00","tier":"NEXT_DAY"}],"packagesPerOrder":1,"policyVersion":"v1","publishedAt":"2026-10-31T16:43:38.171412Z","transitServiceLevelPercent":90,"transitWindowDays":28,"version":1}
 ```
 
-All five tools are listed in [MCP tools](/docs/mcp/tools).
+All six tools are listed in [MCP tools](/docs/mcp/tools).
 
 ### A2A (JSON-RPC 2.0, read-only)
 
