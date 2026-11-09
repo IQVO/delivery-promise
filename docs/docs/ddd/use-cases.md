@@ -102,7 +102,7 @@ These are the only places where other contexts' facts change a promise. All run 
 
 ### Read-model projections
 
-Node, lane, service area and region events (node-topology), catalogue item and listing events (offer-availability), scorecards (node-performance), departures and bookings (linehaul-transportation) and waves (last-mile-delivery) are written to the `rm_*` tables that the quote search reads. They change no aggregate and raise no event; a row that a capacity event created earlier keeps its remaining count when the schedule event arrives later.
+Node, lane, service area and region events (node-topology), catalogue item and listing events (offer-availability), scorecards and fast-tier eligibility (node-performance), departures and bookings (linehaul-transportation) and waves (last-mile-delivery) are written to the `rm_*` tables that the quote search reads. They change no aggregate and raise no event; a row that a capacity event created earlier keeps its remaining count when the schedule event arrives later.
 
 ## Sweeper use cases
 

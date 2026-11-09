@@ -78,6 +78,7 @@ Each consumed event updates a read model (never an aggregate directly) or runs a
 | `DeliveryWaveCancelled` (last-mile) | mark cancelled; flag promises whose witness wave it is | `RepromiseOnRisk` |
 | `PackageInductionDeferred` (last-mile) | flag the promise | `RepromiseOnRisk` |
 | `NodeScorecardUpdated` (node-performance) | upsert the grade | projection `rm_scorecards` |
+| `NodeTierEligibilityChanged` (node-performance) | upsert the (node, tier) fact when `changedAt` is not older than the stored one; unknown tier or missing field is ignored and counted | projection `rm_node_tier_eligibility` |
 | `FulfillmentLocked`, `FulfillmentShipped` (order-sourcing) | record the assignment, then the packages; may complete the facts for judging | `JudgeOnDelivery` |
 | `FulfillmentUnsourceable` (order-sourcing) | flag the promise at risk and re-promise excluding the listed nodes | `RepromiseOnRisk` |
 | `PackageDelivered`, `PackageLost`, `PackageReturned` (shipping-and-tracking) | record the outcome; judge when complete | `JudgeOnDelivery` |

@@ -25,6 +25,9 @@ type searchOptions struct {
 	excludeNodes      map[string]bool
 	excludeDepartures map[string]bool
 	excludeWaves      map[string]bool
+	// existingPromise marks the re-promising of a promise already made: the
+	// fast-tier eligibility filter applies to future quotes only (ADR 0022).
+	existingPromise bool
 }
 
 // ToSearchNode converts a NodeProfileView row to the search's node. A row whose
@@ -97,6 +100,12 @@ func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Po
 		ExcludeNodes: opt.excludeNodes, ExcludeDepartures: opt.excludeDepartures, ExcludeWaves: opt.excludeWaves,
 		Nodes: map[string]search.Node{}, Grades: map[string]search.Grade{}, Books: map[string]search.BookView{},
 		Stock: func(string, string) []shared.OwnerStock { return nil }, MeasuredTransit: s.measuredTransitOf(ctx, pol, now),
+	}
+	var err error
+	if !opt.existingPromise {
+		if in.TierIneligible, err = s.tierIneligibleOf(ctx, tiers); err != nil {
+			return in, err
+		}
 	}
 	area, err := s.Network.GetArea(ctx, prefix)
 	if errors.Is(err, ports.ErrNotFound) {

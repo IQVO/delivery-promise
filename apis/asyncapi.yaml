@@ -205,6 +205,8 @@ channels:
     messages:
       NodeScorecardUpdated:
         $ref: '#/components/messages/NodeScorecardUpdated'
+      NodeTierEligibilityChanged:
+        $ref: '#/components/messages/NodeTierEligibilityChanged'
   nodeTopologyEvents:
     address: retailnetwork.node-topology.events
     title: node-topology integration topic (consumed)
@@ -404,13 +406,15 @@ operations:
     channel:
       $ref: '#/channels/nodePerformanceEvents'
     title: Consume node-performance events
-    summary: Consume NodeScorecardUpdated from node-performance.
-    description: The service consumes NodeScorecardUpdated from `retailnetwork.node-performance.events` to keep its local
-      read models and to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls node-performance synchronously.
+    summary: Consume NodeScorecardUpdated, NodeTierEligibilityChanged from node-performance.
+    description: The service consumes NodeScorecardUpdated, NodeTierEligibilityChanged from `retailnetwork.node-performance.events`
+      to keep its local read models and to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls node-performance
+      synchronously.
     tags:
     - name: consumed-node-performance
     messages:
     - $ref: '#/channels/nodePerformanceEvents/messages/NodeScorecardUpdated'
+    - $ref: '#/channels/nodePerformanceEvents/messages/NodeTierEligibilityChanged'
   receiveNodeTopologyEvents:
     action: receive
     channel:
@@ -1470,6 +1474,45 @@ components:
             grade: B
             observations: 120
             computedAt: '2026-10-22T06:00:00Z'
+    NodeTierEligibilityChanged:
+      name: NodeTierEligibilityChanged
+      title: A node's fast-tier eligibility changed
+      summary: A node's fast-tier eligibility changed.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.node-performance.events`; `type` = `com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged`
+        (dispatch on the full type); subject and Kafka key = the scorecardId (`<nodeId>:7d`). Tolerant local copy: only the
+        fields delivery-promise relies on are listed and unknown fields are ignored (the producer also sends `metric`, `value`,
+        `threshold` and `window`). Raised by node-performance only when the node''s eligibility flips, as one event per tier
+        with the same `changedAt`. Use: upserts NodeTierEligibility (`rm_node_tier_eligibility`) when `changedAt` is not older
+        than the stored one; a missing row means ELIGIBLE. An ineligible node is removed from the SAME_DAY or NEXT_DAY candidates
+        of future quotes and estimates (ADR 0022); existing promises are never touched. An event with a `tier` other than
+        SAME_DAY or NEXT_DAY, or with a missing `nodeId`, `tier`, `eligible` or `changedAt`, is ignored and counted
+        (`deliverypromise_tier_eligibility_events_ignored_total`), never dead-lettered.'
+      tags:
+      - name: consumed-node-performance
+      payload:
+        $ref: '#/components/schemas/NodeTierEligibilityChangedConsumed'
+      examples:
+      - name: nodeTierEligibilityChanged
+        summary: A node lost its NEXT_DAY eligibility.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0030
+          source: /retailnetwork/node-performance
+          type: com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged
+          subject: N-VWS-AUS3:7d
+          time: '2026-11-09T12:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:node-performance:events:NodeTierEligibilityChanged:v1
+          data:
+            nodeId: N-VWS-AUS3
+            tier: NEXT_DAY
+            eligible: false
+            metric: onTimeHandoverRate
+            value: 0.87
+            threshold: 0.9
+            window: 7d
+            changedAt: '2026-11-09T12:00:00Z'
     NodeRegistered:
       name: NodeRegistered
       title: A node was registered
@@ -2667,6 +2710,30 @@ components:
                 - PROVISIONAL
               observations: *id003
               computedAt: *id002
+    NodeTierEligibilityChangedConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - nodeId
+            - tier
+            - eligible
+            - changedAt
+            properties:
+              nodeId: *id001
+              tier:
+                type: string
+                description: SAME_DAY or NEXT_DAY, the tiers node-performance governs. Any other value is ignored and counted.
+              eligible:
+                type: boolean
+                description: false = the node is removed from the tier's candidates; true = reinstated.
+              changedAt:
+                type: string
+                format: date-time
+                description: RFC 3339 UTC instant of the flip; an event older than the stored changedAt of the (node, tier) is dropped.
     NodeRegisteredConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
