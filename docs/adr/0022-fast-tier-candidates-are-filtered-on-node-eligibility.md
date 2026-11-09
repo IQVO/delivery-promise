@@ -36,4 +36,5 @@ The event contract this ADR builds against (the producer's side, restated here a
 - A fast tier can lose its only candidate and yield no offer (the shopper sees the slower tiers). That is the intended cost: it is cheaper than a broken promise.
 - The read model can briefly lag the producer; the quote it feeds is a future promise, and the promise still has to survive every other search rule. A stale ineligible row (a missed reinstatement) is corrected by the next event of that `(node, tier)`.
 - Deploy: none. The topic is already consumed, the consumer group is unchanged and there are no new environment variables or chart values. Migration 0007 runs with the existing migration step.
+- Observability: ADR 0009's one Tier 2 business counter gains two siblings, both on the existing meter (no new exporter or setting): the exclusion counter above and the ignored-event counter. The documented reading is on the observability page.
 - Judging, the PromiseBook and the outbox are untouched; the REST and MCP surfaces are unchanged.
