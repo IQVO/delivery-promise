@@ -530,6 +530,31 @@ components:
           type: integer
           minimum: 1
           maximum: 2147483647
+    PromisedLine:
+      type: object
+      description: A line of a delivery offer or a promise, with the owner whose stock at the witness node covers it
+        (ADR 0017). One owner covers the whole line; the units of several owners never add up.
+      required:
+      - catalogItemId
+      - quantity
+      properties:
+        catalogItemId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]*$
+          description: Unique within the group.
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        ownerRef:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]*$
+          description: The seller (sellerId) whose listing covers the line, chosen by the OwnerChoice rule. Optional and
+            additive; omitted when the line is operator-owned.
     DeliveryWindow:
       type: object
       description: 'The delivery window as two instants (RFC 3339 UTC) and the local calendar they belong to. A delivery
@@ -658,7 +683,7 @@ components:
         lines:
           type: array
           items:
-            $ref: '#/components/schemas/GroupLine'
+            $ref: '#/components/schemas/PromisedLine'
         window:
           $ref: '#/components/schemas/DeliveryWindow'
         witnessPath:
@@ -813,7 +838,7 @@ components:
         lines:
           type: array
           items:
-            $ref: '#/components/schemas/GroupLine'
+            $ref: '#/components/schemas/PromisedLine'
         terms:
           $ref: '#/components/schemas/PromiseTerms'
         witnessPath:
