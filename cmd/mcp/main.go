@@ -1,7 +1,8 @@
 // Command mcp is the composition root for the delivery-promise MCP server
 // (docs/adr/0007-mcp-server-adoption.md): it wires env config to the SAME
-// usecases.Service the REST adapter of cmd/api drives, and exposes its five
-// read queries as MCP tools over Streamable HTTP (and nothing else: no
+// usecases.Service the REST adapter of cmd/api drives, and exposes its six
+// read use cases (five queries and the stored-nothing estimate of ADR 0019)
+// as MCP tools over Streamable HTTP (and nothing else: no
 // stdio, no SSE). It is a second, independent deployable alongside cmd/api.
 //
 // The surface is READ-ONLY: only the read queries are reachable (the MCP
@@ -150,11 +151,14 @@ func buildServiceWithClock(pool *pgxpool.Pool, logger *slog.Logger, clk ports.Cl
 		Policies:  postgres.NewPolicyRepository(pool),
 		Network:   postgres.NewNetworkViews(pool),
 		Shipments: postgres.NewShipmentViews(pool),
-		Outbox:    postgres.NewOutbox(pool, outboundkafka.NewEncoder()),
-		Inbox:     postgres.NewInbox(pool),
-		Clock:     clk,
-		IDs:       ids.UUID{},
-		Logger:    logger,
+		// The measured-transit read model, as in cmd/api: estimate_delivery
+		// computes the same basis as the REST estimate (ADR 0014, ADR 0019).
+		TransitActuals: postgres.NewTransitActuals(pool),
+		Outbox:         postgres.NewOutbox(pool, outboundkafka.NewEncoder()),
+		Inbox:          postgres.NewInbox(pool),
+		Clock:          clk,
+		IDs:            ids.UUID{},
+		Logger:         logger,
 	})
 }
 
