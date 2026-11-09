@@ -181,7 +181,7 @@ func (s *Service) tryRevise(ctx context.Context, id promise.ID, c search.Candida
 		}
 		revEvents, err := p.Revise(promise.Revising{
 			Terms:   promise.Terms{Tier: c.Tier, ShipBy: c.ShipBy, Window: c.Window, Basis: c.Basis, PolicyVersion: pol.VersionName()},
-			Witness: c.Witness, BookID: c.BookID, Reason: p.AtRiskReason(),
+			Witness: c.Witness, BookID: c.BookID, Reason: p.AtRiskReason(), Lines: c.Lines,
 		}, s.Clock.Now())
 		if err != nil {
 			return err

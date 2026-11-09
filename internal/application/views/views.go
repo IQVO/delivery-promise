@@ -15,10 +15,12 @@ import (
 	"github.com/claudioed/delivery-promise/internal/domain/shared"
 )
 
-// Line is a shipment group line.
+// Line is a shipment group line. OwnerRef is the seller whose stock covers it
+// (ADR 0017), omitted when operator-owned.
 type Line struct {
 	CatalogItemID string `json:"catalogItemId"`
 	Quantity      int    `json:"quantity"`
+	OwnerRef      string `json:"ownerRef,omitempty"`
 }
 
 // Window is a delivery window. TimeZone is the IANA name of the delivery
@@ -52,6 +54,7 @@ type Offer struct {
 	PolicyVersion           string    `json:"policyVersion"`
 	QuotedAt                time.Time `json:"quotedAt"`
 	ExpiresAt               time.Time `json:"expiresAt"`
+	OrderByAt               time.Time `json:"orderByAt"`
 }
 
 // Unavailable says why a (group, tier) has no offer.
@@ -152,20 +155,23 @@ type OrderDeadline struct {
 
 // Policy is a promise policy version.
 type Policy struct {
-	PolicyVersion        string          `json:"policyVersion"`
-	Version              int             `json:"version"`
-	OfferTTLMinutes      int             `json:"offerTtlMinutes"`
-	HoldTTLMinutes       int             `json:"holdTtlMinutes"`
-	PackagesPerOrder     int             `json:"packagesPerOrder"`
-	CapacitySharePercent int             `json:"capacitySharePercent"`
-	OrderDeadlines       []OrderDeadline `json:"orderDeadlines"`
-	PublishedAt          time.Time       `json:"publishedAt"`
+	PolicyVersion              string          `json:"policyVersion"`
+	Version                    int             `json:"version"`
+	OfferTTLMinutes            int             `json:"offerTtlMinutes"`
+	HoldTTLMinutes             int             `json:"holdTtlMinutes"`
+	PackagesPerOrder           int             `json:"packagesPerOrder"`
+	CapacitySharePercent       int             `json:"capacitySharePercent"`
+	TransitWindowDays          int             `json:"transitWindowDays"`
+	TransitServiceLevelPercent int             `json:"transitServiceLevelPercent"`
+	MinTransitObservations     int             `json:"minTransitObservations"`
+	OrderDeadlines             []OrderDeadline `json:"orderDeadlines"`
+	PublishedAt                time.Time       `json:"publishedAt"`
 }
 
 func lines(in []shared.Line) []Line {
 	out := make([]Line, len(in))
 	for i, l := range in {
-		out[i] = Line{CatalogItemID: l.CatalogItemID, Quantity: l.Quantity}
+		out[i] = Line{CatalogItemID: l.CatalogItemID, Quantity: l.Quantity, OwnerRef: l.OwnerRef}
 	}
 	return out
 }
@@ -191,6 +197,7 @@ func FromOffer(o *offer.Offer) Offer {
 		OfferID: string(o.ID()), State: string(o.State()), GroupNo: o.GroupNo(), DestinationPostalPrefix: o.DestinationPrefix(),
 		Tier: string(o.Tier()), Lines: lines(o.Lines()), Window: Window{Earliest: o.Window().Earliest.UTC(), Latest: o.Window().Latest.UTC(), TimeZone: o.Window().TimeZone},
 		WitnessPath: witness(o.Witness()), Basis: string(o.Basis()), PolicyVersion: o.PolicyVersion(), QuotedAt: o.QuotedAt().UTC(), ExpiresAt: o.ExpiresAt().UTC(),
+		OrderByAt: o.OrderByAt().UTC(),
 	}
 }
 
@@ -241,6 +248,8 @@ func FromPolicy(p *policy.Policy) Policy {
 	}
 	return Policy{
 		PolicyVersion: p.VersionName(), Version: p.Version(), OfferTTLMinutes: int(p.OfferTTL() / time.Minute), HoldTTLMinutes: int(p.HoldTTL() / time.Minute),
-		PackagesPerOrder: p.PackagesPerOrder(), CapacitySharePercent: p.SharePercent(), OrderDeadlines: ds, PublishedAt: p.PublishedAt().UTC(),
+		PackagesPerOrder: p.PackagesPerOrder(), CapacitySharePercent: p.SharePercent(), TransitWindowDays: p.TransitWindowDays(),
+		TransitServiceLevelPercent: p.TransitServiceLevelPercent(), MinTransitObservations: p.MinTransitObservations(),
+		OrderDeadlines: ds, PublishedAt: p.PublishedAt().UTC(),
 	}
 }

@@ -142,6 +142,7 @@ type Promise struct {
 	releaseReason string
 	unkeepable    bool
 	madeAt        time.Time
+	confirmedAt   time.Time
 	version       int64
 }
 
@@ -165,7 +166,10 @@ type Snapshot struct {
 	ReleaseReason     string
 	Unkeepable        bool
 	MadeAt            time.Time
-	Version           int64
+	// ConfirmedAt is when the hold became a confirmed order; zero for a promise
+	// that is not confirmed yet or was confirmed before the field existed.
+	ConfirmedAt time.Time
+	Version     int64
 }
 
 // Making is the input of Make.
@@ -180,9 +184,12 @@ type Making struct {
 	// NOMINAL promise the nominal pickup book).
 	BookID  string
 	HoldTTL time.Duration
-	// Available is the units of each item shippable from the witness node, net
-	// of provisional holds.
-	Available map[string]int
+	// Stock is, per item, the net units each owner can ship from the witness
+	// node (one entry per owner, net of the holds of that same owner). Make
+	// re-applies the OwnerChoice rule (shared.ChooseOwner, ADR 0017) to every
+	// line: the owner chosen at quote time is kept only when the rule still
+	// picks it, and a line no single owner covers is ErrGroupSpansNodes.
+	Stock map[string][]shared.OwnerStock
 }
 
 func validateTerms(t Terms) error {
@@ -233,14 +240,13 @@ func Make(in Making, now time.Time) (*Promise, []shared.Event, error) {
 	if err := in.Witness.Validate(in.Terms.Basis); err != nil {
 		return nil, nil, err
 	}
-	for _, l := range in.Lines {
-		if in.Available[l.CatalogItemID] < l.Quantity {
-			return nil, nil, fmt.Errorf("%w: %s x%d is not shippable from %s", ErrGroupSpansNodes, l.CatalogItemID, l.Quantity, in.Witness.NodeID)
-		}
+	lines, err := ChooseOwners(in.Lines, in.Stock)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w from %s", err, in.Witness.NodeID)
 	}
 	now = shared.UTC(now)
 	p := &Promise{
-		id: in.ID, offerID: in.OfferID, state: StateProvisional, destination: in.DestinationPrefix, lines: slices.Clone(in.Lines),
+		id: in.ID, offerID: in.OfferID, state: StateProvisional, destination: in.DestinationPrefix, lines: lines,
 		terms: normTerms(in.Terms), witness: in.Witness.Clone(), bookID: in.BookID, holdExpiresAt: now.Add(in.HoldTTL), madeAt: now, version: 1,
 	}
 	ev := PromiseMade{
@@ -315,6 +321,10 @@ func (p *Promise) ReleaseReason() string { return p.releaseReason }
 
 // Unkeepable reports whether PromiseUnkeepable was raised.
 func (p *Promise) Unkeepable() bool { return p.unkeepable }
+
+// ConfirmedAt returns when the promise was confirmed (zero before, or for a
+// promise confirmed before the instant was recorded).
+func (p *Promise) ConfirmedAt() time.Time { return p.confirmedAt }
 
 // MadeAt returns when the promise was made.
 func (p *Promise) MadeAt() time.Time { return p.madeAt }

@@ -22,6 +22,9 @@ func (s *Service) OnFulfillmentLocked(ctx context.Context, m Meta, e Fulfillment
 		if err := s.Shipments.PutAssignment(ctx, a); err != nil {
 			return err
 		}
+		if err := s.rehomeOnLock(ctx, e); err != nil {
+			return err
+		}
 		return s.judge(ctx, e.AssignmentID)
 	})
 }

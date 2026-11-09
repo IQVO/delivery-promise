@@ -173,7 +173,8 @@ func (r *PromiseRepository) ListActiveByPath(ctx context.Context, f repository.P
 	return ids(rows, len(rows)), nil
 }
 
-// HeldQuantities sums the lines of PROVISIONAL promises per (node, item).
+// HeldQuantities sums the lines of PROVISIONAL promises per (node, item,
+// ownerRef).
 func (r *PromiseRepository) HeldQuantities(ctx context.Context, nodeIDs []string) (map[repository.HoldKey]int, error) {
 	defer r.s.enter(ctx)()
 	out := map[repository.HoldKey]int{}
@@ -182,7 +183,27 @@ func (r *PromiseRepository) HeldQuantities(ctx context.Context, nodeIDs []string
 			continue
 		}
 		for _, l := range p.Lines {
-			out[repository.HoldKey{NodeID: p.Witness.NodeID, ItemID: l.CatalogItemID}] += l.Quantity
+			out[repository.HoldKey{NodeID: p.Witness.NodeID, ItemID: l.CatalogItemID, OwnerRef: l.OwnerRef}] += l.Quantity
+		}
+	}
+	return out, nil
+}
+
+// ConfirmedHolds lists the lines of the CONFIRMED and AT_RISK promises per
+// (node, item, ownerRef), oldest confirmation first.
+func (r *PromiseRepository) ConfirmedHolds(ctx context.Context, nodeIDs []string) ([]repository.ConfirmedHold, error) {
+	defer r.s.enter(ctx)()
+	var out []repository.ConfirmedHold
+	for _, p := range r.s.st.promises {
+		if !p.State.Active() || !slices.Contains(nodeIDs, p.Witness.NodeID) {
+			continue
+		}
+		at := p.ConfirmedAt
+		if at.IsZero() {
+			at = p.HoldExpiresAt // confirmed before the instant was recorded: the latest it can have been
+		}
+		for _, l := range p.Lines {
+			out = append(out, repository.ConfirmedHold{Key: repository.HoldKey{NodeID: p.Witness.NodeID, ItemID: l.CatalogItemID, OwnerRef: l.OwnerRef}, Qty: l.Quantity, ConfirmedAt: at})
 		}
 	}
 	return out, nil

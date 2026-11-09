@@ -1,0 +1,70 @@
+---
+id: get-quote-conversion-report
+title: "Offers quoted against promises made, per day and tier"
+description: "Per UTC day and tier, offersQuoted counts DeliveryOfferQuoted and promisesMade counts PromiseMade of that day (each by its own CloudEvents time); conversion = promisesMade / offersQuoted, null when no offer was quoted that day and tier. Same-day counts, not an offer-to-promise cohort. Days with neither are omitted. Served by cmd/dp-reports (ADR 0018)."
+sidebar_label: "Offers quoted against promises made, per day and tier"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Offers quoted against promises made, per day and tier"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/reports/quote-conversion"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Per UTC day and tier, offersQuoted counts DeliveryOfferQuoted and promisesMade counts PromiseMade of that day (each by its own CloudEvents time); conversion = promisesMade / offersQuoted, null when no offer was quoted that day and tier. Same-day counts, not an offer-to-promise cohort. Days with neither are omitted. Served by cmd/dp-reports (ADR 0018).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-quote-conversion-report.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-quote-conversion-report.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-quote-conversion-report.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

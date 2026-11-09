@@ -35,6 +35,10 @@ description: "The interfaces of Delivery Promise (REST, events, MCP, A2A), every
 | PromisePolicy | `POST /promise-policies` | `publishPromisePolicy` | `201`, the new version; `Idempotency-Key` required |
 | PromisePolicy | `GET /promise-policies/current` | `getCurrentPromisePolicy` | `200`; version 0 (`v0`) when nothing was published |
 | Health (not in the spec) | `GET /healthz`, `GET /readyz` | none | `200`; `/readyz` is `503` while draining or when postgres or kafka is down |
+| reports | `GET /reports/promise-reliability?from=&to=` | `getPromiseReliabilityReport` | `200`, per UTC day of judgement, tier and basis: judged, kept, broken, `keptRate`, broken by cause, lateness p50/p90 of the LATE ones. Served by `cmd/dp-reports` on `:8092` (ADR 0018); `400 invalid-report-range` |
+| reports | `GET /reports/promise-precision?from=&to=` | `getPromisePrecisionReport` | `200`, per UTC day of PromiseMade and tier: promises made, window width mean/p50/p90 in minutes, `exactDayShare`, `zoneUnknown`, `revisedShare`, `unkeepableCount` |
+| reports | `GET /reports/quote-conversion?from=&to=` | `getQuoteConversionReport` | `200`, per UTC day and tier: offers quoted, promises made, `conversion` (`null` without offers) |
+| reports | `GET /reports/freshness` | `getReportFreshness` | `200`, `asOf` and `lagSeconds` of the analytics projection (both `null` before the first event) |
 
 The quote route is the **Open Host Service** for storefront contexts; `POST /promises`, `/confirmations`, `/cancellations`, the policy and the books are called only by customer-ordering's checkout or by operators. Storefront contexts must never call the restricted routes.
 
@@ -43,7 +47,7 @@ The quote route is the **Open Host Service** for storefront contexts; `POST /pro
 - **Idempotency.** `Idempotency-Key` is required on every POST, the quote included (`NewRouter` wraps `POST /delivery-quotes` in the idempotency middleware; a repeat of the same key and body returns the same offers). Missing: `400 idempotency-key-required`. The key is global (not per route) and stored with a hash of method, path and body: the same key with the same request replays the stored status and body (header `Idempotency-Replayed: true`); any other request is `409 idempotency-key-reused`; a key that is not 1-128 printable ASCII is `400 idempotency-key-invalid`. A 2xx commits aggregates, outbox rows and the key together; a 4xx rolls the writes back but stores and replays the problem; a 5xx stores nothing. Keys are purged after 24 hours.
 - **Errors** are RFC 9457 `application/problem+json`, `type = https://retailnetwork.example/problems/<slug>` (see below).
 - **Windows.** A delivery window is two UTC instants (`earliest`, `latest`) plus the IANA `timeZone` of the destination delivery station, the local calendar its days belong to; `timeZone` is omitted only on an offer stored before ADR 0011 carried it.
-- **Tiers** are `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`; `basis` is `SCHEDULED` or `NOMINAL` (`NOMINAL` only for `STANDARD`).
+- **Tiers** are `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`; `basis` is `SCHEDULED`, `MEASURED` or `NOMINAL` (`NOMINAL` only for `STANDARD`; `MEASURED` when a leg's measured transit pushed the arrival later, ADR 0014).
 - **Policy versions.** `policyVersion` is `v` plus an integer; a publish stores the next version (strictly increasing) and a concurrent publish is `409 concurrent-update`.
 - **No personal data** appears in any schema: the destination is a postal prefix, never an address.
 - **Auth: none.** The fleet reverted REST, MCP and A2A auth on 2026-09-11; `TestNoAuthMiddlewareReintroduced` fails CI if auth middleware returns. The in-cluster boundary is the access control.

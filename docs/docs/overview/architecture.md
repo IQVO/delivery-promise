@@ -50,7 +50,7 @@ charts/         Helm chart (api, mcp, a2a, frontend)
 | Binary | Role | Port | Runs | Needs |
 | --- | --- | --- | --- | --- |
 | `cmd/api` | REST API (`apis/openapi.yaml`), `/healthz`, `/readyz` | `:8080` (`HTTP_ADDR`) | Kafka consumer (8 topics, 1 group), sweeper (15 s), outbox relay (1 s) | Postgres **and** Kafka |
-| `cmd/mcp` | Read-only MCP server, Streamable HTTP on `/mcp` and `/`, `GET /healthz`; five tools | `:8090` (`MCP_ADDR`) | HTTP server only | Postgres |
+| `cmd/mcp` | Read-only MCP server, Streamable HTTP on `/mcp` and `/`, `GET /healthz`; six tools | `:8090` (`MCP_ADDR`) | HTTP server only | Postgres |
 | `cmd/a2a` | Read-only A2A agent, JSON-RPC 2.0 on `/` and `/a2a`, Agent Card at `/.well-known/agent-card.json`, `GET /healthz`; two skills | `:8093` (`A2A_ADDR`) | HTTP server only | Postgres |
 
 `cmd/mcp` and `cmd/a2a` are independent deployables that wire the **same** `usecases.Service` over the Postgres repositories. Their adapters' `Reads` interface has no write method, so they can never move an aggregate or insert into the outbox, and they never start the relay, consumer or sweeper or dial Kafka. All three run the idempotent embedded migrations at boot (golang-migrate's advisory lock makes concurrent starts safe). The `web/` remote is served by its own nginx pod and calls the REST GETs through the console shell.
@@ -85,7 +85,7 @@ flowchart LR
   api --> db
   mcp --> db
   a2a --> db
-  producers -->|"34 event types"| kafka
+  producers -->|"36 event types"| kafka
   kafka -->|"consume"| api
   api -->|"outbox relay: 12 event types"| kafka
 ```
@@ -94,7 +94,7 @@ Source: `cmd/api/main.go`, `cmd/api/workers.go`, `cmd/mcp/main.go`, `cmd/a2a/mai
 
 ## Data stores
 
-One PostgreSQL database, owned by `cmd/api` and shared read-only by `cmd/mcp` and `cmd/a2a`. Migrations: `internal/adapters/outbound/postgres/migrations/0001_delivery_promise_schema` and `0002_window_time_zone`.
+One PostgreSQL database, owned by `cmd/api` and shared read-only by `cmd/mcp` and `cmd/a2a`. Migrations: `internal/adapters/outbound/postgres/migrations/0001_delivery_promise_schema` to `0005_listing_owner` (the owner key of `rm_listings`, ADR 0017).
 
 | Table(s) | Holds |
 | --- | --- |

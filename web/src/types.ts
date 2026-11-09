@@ -9,10 +9,11 @@ export type OfferState = (typeof OFFER_STATES)[number];
 export const TIERS = ["SAME_DAY", "NEXT_DAY", "TWO_DAY", "STANDARD"] as const;
 export type Tier = (typeof TIERS)[number];
 
-/** A shipment group line. */
+/** A shipment group line; ownerRef names the seller whose stock covers it, absent when operator-owned (ADR 0017). */
 export interface GroupLine {
   catalogItemId: string;
   quantity: number;
+  ownerRef?: string;
 }
 
 /** The node, pickup departure, legs and delivery wave that prove feasibility. */

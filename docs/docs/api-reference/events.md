@@ -7,7 +7,7 @@ description: "Every CloudEvents type Delivery Promise publishes and consumes, wi
 
 # Event catalogue
 
-The contract is `apis/asyncapi.yaml` (AsyncAPI 3.0.0, document version 1.1.0). `TestEventCatalogueMatchesContract` (`internal/architecture/catalogue_fitness_test.go`) ties the types in code to it. Every message is a **CloudEvents 1.0** event in structured content mode, built only by `internal/adapters/kafka/cloudevents` (`TestCloudEventsOnly`). Field-level detail and the model behind each event are on [Domain events](/docs/ddd/domain-events); how they flow is in [Integration](/docs/ecosystem/integration).
+The contract is `apis/asyncapi.yaml` (AsyncAPI 3.0.0, document version 1.2.0). `TestEventCatalogueMatchesContract` (`internal/architecture/catalogue_fitness_test.go`) ties the types in code to it. Every message is a **CloudEvents 1.0** event in structured content mode, built only by `internal/adapters/kafka/cloudevents` (`TestCloudEventsOnly`). Field-level detail and the model behind each event are on [Domain events](/docs/ddd/domain-events); how they flow is in [Integration](/docs/ecosystem/integration).
 
 ## Envelope
 
@@ -53,14 +53,14 @@ The Kafka key is the `subject`, so all events of one promise share a partition a
 
 ## Consumed
 
-Dispatch is on the full `type`; payloads are decoded tolerantly (unknown fields ignored). 34 types from eight producer topics, each handled idempotently on the CloudEvents `id`. The full type is `com.retailnetwork.<tier>.<producer>.<entity>.<Event>`; `Handlers` in `internal/adapters/inbound/kafka/dispatch.go` is the registry.
+Dispatch is on the full `type`; payloads are decoded tolerantly (unknown fields ignored). 36 types from eight producer topics, each handled idempotently on the CloudEvents `id`. The full type is `com.retailnetwork.<tier>.<producer>.<entity>.<Event>`; `Handlers` in `internal/adapters/inbound/kafka/dispatch.go` is the registry.
 
 | Topic | Tier and entity | Events | Effect |
 | --- | --- | --- | --- |
 | `retailnetwork.customer-ordering.events` | `commerce.customer-ordering.customerorder` | `CustomerOrderPlaced`, `CustomerOrderCancelled` | reconciling confirm; cancel |
 | `retailnetwork.order-sourcing.events` | `commerce.order-sourcing.assignment` | `FulfillmentLocked`, `FulfillmentShipped`, `FulfillmentUnsourceable` | assignment facts; at risk |
 | `retailnetwork.shipping-and-tracking.events` | `logistics.shipping-and-tracking.journey` | `PackageDelivered`, `PackageExceptionRaised`, `PackageLost`, `PackageReturned` | judge; at risk |
-| `retailnetwork.linehaul-transportation.events` | `logistics.linehaul-transportation.departure` | `DepartureScheduled`, `DepartureCapacityChanged`, `DepartureCancelled`, `BookingMoved`, `BookingFailed` | `rm_departures`; at risk |
+| `retailnetwork.linehaul-transportation.events` | `logistics.linehaul-transportation.departure`, `.load` | `DepartureScheduled`, `DepartureCapacityChanged`, `DepartureCancelled`, `BookingMoved`, `BookingFailed`, `LoadDeparted`, `LoadArrived` | `rm_departures`; at risk; `rm_transit_actuals` (ADR 0014) |
 | `retailnetwork.last-mile-delivery.events` | `logistics.last-mile-delivery.wave` (and `packageattempthistory` for `PackageInductionDeferred`) | `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged`, `DeliveryWaveCancelled`, `PackageInductionDeferred` | `rm_waves`; at risk |
 | `retailnetwork.node-performance.events` | `partner.node-performance.scorecard` | `NodeScorecardUpdated` | `rm_scorecards` |
 | `retailnetwork.node-topology.events` | `logistics.node-topology.node`, `.lane`, `.servicearea`, `.region` | `NodeRegistered`, `NodeOperationalProfileDeclared`, `NodeActivated`, `NodeSuspended`, `NodeRetired`, `LaneOpened`, `LaneClosed`, `ServiceAreaAssigned`, `RegionDefined` | `rm_nodes`, `rm_lanes`, `rm_areas`, `rm_regions` |
@@ -71,6 +71,10 @@ What the handlers require (events without these ids are dead-lettered as malform
 ### Dead letters
 
 `<topic>.dlq` (`DLQSuffix`) carries the original key, value and headers plus `x-dlq-source-topic`, `x-dlq-source-partition`, `x-dlq-source-offset`, `x-dlq-error` and `x-dlq-failed-at`. Reasons: five failed attempts at a transient error, or a payload that can never be applied. See the [Runbook](/docs/operations/runbook#kafka-topics-and-consumer-groups).
+
+### Own events, read back for analytics (ADR 0018)
+
+`cmd/dp-projector` reads this context's OWN two topics in the separate group `delivery-promise-analytics` (`ANALYTICS_CONSUMER_GROUP`) and projects `DeliveryOfferQuoted` and `PromiseMade` (from `.analytics`) and `PromiseRevised`, `PromiseUnkeepable`, `PromiseKept` and `PromiseBroken` (from `.events`) into a separate analytical database; the other six own types are acknowledged without projection. It dedupes on the CloudEvents `id` in the same transaction as the projection, dead-letters only deterministic poison to `retailnetwork.delivery-promise.analytics.dlq` and retries transient failures without a bound. It reads no sibling's topic (AsyncAPI operations `projectOwnEventsForAnalytics` and `projectOwnAnalyticsForAnalytics`).
 
 ## Changing an event
 

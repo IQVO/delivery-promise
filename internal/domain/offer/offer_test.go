@@ -169,7 +169,7 @@ func TestRestoreRoundTrip(t *testing.T) {
 			t.Fatalf("%s: %v", step, err)
 		}
 		a, b := o.Snapshot(), got.Snapshot()
-		if a.State != b.State || a.Version != b.Version || !a.ClosedAt.Equal(b.ClosedAt) || !a.ExpiresAt.Equal(b.ExpiresAt) || a.Witness.NodeID != b.Witness.NodeID {
+		if a.State != b.State || a.Version != b.Version || !a.ClosedAt.Equal(b.ClosedAt) || !a.ExpiresAt.Equal(b.ExpiresAt) || !a.OrderByAt.Equal(b.OrderByAt) || a.Witness.NodeID != b.Witness.NodeID {
 			t.Fatalf("%s: %+v vs %+v", step, a, b)
 		}
 	}
@@ -245,7 +245,22 @@ func assertQuotedOffer(t *testing.T, o *Offer) {
 	eqTime(t, "quotedAt", o.QuotedAt(), now)
 	eq(t, "quotedAt zone", o.QuotedAt().Location(), time.UTC)
 	eqTime(t, "expiresAt", o.ExpiresAt(), now.Add(10*time.Minute))
+	eqTime(t, "order by", o.OrderByAt(), now.Add(3*time.Hour))
 	eqTime(t, "pickup cutoff", o.PickupCutoffAt(), now.Add(4*time.Hour))
+}
+
+// A snapshot persisted before orderByAt existed restores with the zero time:
+// the field is additive and legacy rows stay readable (the PickupCutoffAt
+// tolerance is the precedent).
+func TestRestoreToleratesMissingOrderByAt(t *testing.T) {
+	o, _, _ := New(quote(), now)
+	s := o.Snapshot()
+	s.OrderByAt = time.Time{}
+	got, err := Restore(s)
+	if err != nil {
+		t.Fatalf("restore legacy snapshot: %v", err)
+	}
+	eqTime(t, "order by", got.OrderByAt(), time.Time{})
 }
 
 func assertQuotedEvent(t *testing.T, ev shared.Event, o *Offer) {

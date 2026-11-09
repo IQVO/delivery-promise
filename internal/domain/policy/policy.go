@@ -26,6 +26,16 @@ const (
 	DefaultHoldTTL        = 15
 	DefaultPackagesPerOrd = 1
 	DefaultSharePercent   = 100
+	// Measured-transit bounds (ADR 0014).
+	MinTransitWindowDays       = 1
+	MaxTransitWindowDays       = 365
+	DefaultTransitWindowDays   = 28
+	MinTransitServiceLevel     = 50
+	MaxTransitServiceLevel     = 99
+	DefaultTransitServiceLevel = 90
+	MinTransitObservations     = 5
+	MaxTransitObservations     = 1000
+	DefaultTransitObservations = 20
 )
 
 // ErrVersionNotNext marks a publish whose version is not the stored one + 1.
@@ -46,28 +56,39 @@ type Policy struct {
 	holdTTL          int
 	packagesPerOrder int
 	sharePercent     int
+	transitWindow    int
+	transitPct       int
+	transitMinObs    int
 	deadlines        []Deadline
 	publishedAt      time.Time
 }
 
 // Snapshot is the persisted form of a policy. Restore validates it.
 type Snapshot struct {
-	Version          int
-	OfferTTLMinutes  int
-	HoldTTLMinutes   int
-	PackagesPerOrder int
-	SharePercent     int
-	Deadlines        []Deadline
-	PublishedAt      time.Time
+	Version                    int
+	OfferTTLMinutes            int
+	HoldTTLMinutes             int
+	PackagesPerOrder           int
+	SharePercent               int
+	TransitWindowDays          int
+	TransitServiceLevelPercent int
+	MinTransitObservations     int
+	Deadlines                  []Deadline
+	PublishedAt                time.Time
 }
 
-// Input is the data of PublishPromisePolicy.
+// Input is the data of PublishPromisePolicy. The three transit fields are
+// optional: an omitted (0) one takes its default, a value outside its bounds
+// is refused (ADR 0014).
 type Input struct {
-	OfferTTLMinutes  int
-	HoldTTLMinutes   int
-	PackagesPerOrder int
-	SharePercent     int
-	Deadlines        []Deadline
+	OfferTTLMinutes            int
+	HoldTTLMinutes             int
+	PackagesPerOrder           int
+	SharePercent               int
+	TransitWindowDays          int
+	TransitServiceLevelPercent int
+	MinTransitObservations     int
+	Deadlines                  []Deadline
 }
 
 // Default returns version 0: the policy in force before anything is published.
@@ -75,6 +96,7 @@ func Default() *Policy {
 	return &Policy{
 		version: 0, offerTTL: DefaultOfferTTL, holdTTL: DefaultHoldTTL,
 		packagesPerOrder: DefaultPackagesPerOrd, sharePercent: DefaultSharePercent,
+		transitWindow: DefaultTransitWindowDays, transitPct: DefaultTransitServiceLevel, transitMinObs: DefaultTransitObservations,
 	}
 }
 
@@ -91,7 +113,42 @@ func validate(in Input) error {
 	if in.SharePercent < 1 || in.SharePercent > MaxSharePercent {
 		return shared.Invalid("capacitySharePercent must be between 1 and %d", MaxSharePercent)
 	}
+	if err := validateTransit(in); err != nil {
+		return err
+	}
 	return validateDeadlines(in.Deadlines)
+}
+
+// validateTransit checks the measured-transit parameters, an omitted (0) one
+// taking its default first, so a snapshot persisted before ADR 0014 restores
+// with the defaults (ADR 0014).
+func validateTransit(in Input) error {
+	w, p, o := transitOrDefaults(in)
+	if w < MinTransitWindowDays || w > MaxTransitWindowDays {
+		return shared.Invalid("transitWindowDays must be between %d and %d", MinTransitWindowDays, MaxTransitWindowDays)
+	}
+	if p < MinTransitServiceLevel || p > MaxTransitServiceLevel {
+		return shared.Invalid("transitServiceLevelPercent must be between %d and %d", MinTransitServiceLevel, MaxTransitServiceLevel)
+	}
+	if o < MinTransitObservations || o > MaxTransitObservations {
+		return shared.Invalid("minTransitObservations must be between %d and %d", MinTransitObservations, MaxTransitObservations)
+	}
+	return nil
+}
+
+// transitOrDefaults fills an omitted (0) transit parameter with its default.
+func transitOrDefaults(in Input) (window, percent, minObs int) {
+	w, p, o := in.TransitWindowDays, in.TransitServiceLevelPercent, in.MinTransitObservations
+	if w == 0 {
+		w = DefaultTransitWindowDays
+	}
+	if p == 0 {
+		p = DefaultTransitServiceLevel
+	}
+	if o == 0 {
+		o = DefaultTransitObservations
+	}
+	return w, p, o
 }
 
 func validateDeadlines(ds []Deadline) error {
@@ -155,17 +212,20 @@ func Publish(current int, in Input, now time.Time) (*Policy, []shared.Event, err
 	if err := validate(in); err != nil {
 		return nil, nil, err
 	}
-	p := &Policy{
+	w, p, o := transitOrDefaults(in)
+	pl := &Policy{
 		version: current + 1, offerTTL: in.OfferTTLMinutes, holdTTL: in.HoldTTLMinutes,
 		packagesPerOrder: in.PackagesPerOrder, sharePercent: in.SharePercent,
+		transitWindow: w, transitPct: p, transitMinObs: o,
 		deadlines: sortedDeadlines(in.Deadlines), publishedAt: shared.UTC(now),
 	}
 	ev := PromisePolicyPublished{
-		Header: shared.Header{Version: int64(p.version), At: p.publishedAt}, PolicyVersion: p.VersionName(), Number: p.version,
-		OfferTTLMinutes: p.offerTTL, HoldTTLMinutes: p.holdTTL, PackagesPerOrder: p.packagesPerOrder,
-		SharePercent: p.sharePercent, Deadlines: slices.Clone(p.deadlines), PublishedAt: p.publishedAt,
+		Header: shared.Header{Version: int64(pl.version), At: pl.publishedAt}, PolicyVersion: pl.VersionName(), Number: pl.version,
+		OfferTTLMinutes: pl.offerTTL, HoldTTLMinutes: pl.holdTTL, PackagesPerOrder: pl.packagesPerOrder,
+		SharePercent: pl.sharePercent, TransitWindowDays: w, TransitServiceLevelPercent: p, MinTransitObservations: o,
+		Deadlines: slices.Clone(pl.deadlines), PublishedAt: pl.publishedAt,
 	}
-	return p, []shared.Event{ev}, nil
+	return pl, []shared.Event{ev}, nil
 }
 
 // Restore rebuilds a persisted policy, validating every invariant. Version 0
@@ -173,7 +233,8 @@ func Publish(current int, in Input, now time.Time) (*Policy, []shared.Event, err
 func Restore(s Snapshot) (*Policy, error) {
 	in := Input{
 		OfferTTLMinutes: s.OfferTTLMinutes, HoldTTLMinutes: s.HoldTTLMinutes, PackagesPerOrder: s.PackagesPerOrder,
-		SharePercent: s.SharePercent, Deadlines: s.Deadlines,
+		SharePercent: s.SharePercent, TransitWindowDays: s.TransitWindowDays, TransitServiceLevelPercent: s.TransitServiceLevelPercent,
+		MinTransitObservations: s.MinTransitObservations, Deadlines: s.Deadlines,
 	}
 	if err := validate(in); err != nil {
 		return nil, shared.Corrupt("policy %d: %v", s.Version, err)
@@ -181,9 +242,11 @@ func Restore(s Snapshot) (*Policy, error) {
 	if s.Version < 1 || s.Version > shared.MaxInt32 || s.PublishedAt.IsZero() {
 		return nil, shared.Corrupt("policy %d: a version of at least 1 and publishedAt are required", s.Version)
 	}
+	w, p, o := transitOrDefaults(in)
 	return &Policy{
 		version: s.Version, offerTTL: s.OfferTTLMinutes, holdTTL: s.HoldTTLMinutes, packagesPerOrder: s.PackagesPerOrder,
-		sharePercent: s.SharePercent, deadlines: sortedDeadlines(s.Deadlines), publishedAt: shared.UTC(s.PublishedAt),
+		sharePercent: s.SharePercent, transitWindow: w, transitPct: p, transitMinObs: o,
+		deadlines: sortedDeadlines(s.Deadlines), publishedAt: shared.UTC(s.PublishedAt),
 	}, nil
 }
 
@@ -206,6 +269,18 @@ func (p *Policy) PackagesPerOrder() int { return p.packagesPerOrder }
 // SharePercent returns the share of cutoff capacity the promise side may use.
 func (p *Policy) SharePercent() int { return p.sharePercent }
 
+// TransitWindowDays returns how many days of observed transits the
+// measured-transit read model keeps (ADR 0014).
+func (p *Policy) TransitWindowDays() int { return p.transitWindow }
+
+// TransitServiceLevelPercent returns the service-level percentile quoted
+// against measured transit (ADR 0014).
+func (p *Policy) TransitServiceLevelPercent() int { return p.transitPct }
+
+// MinTransitObservations returns how many in-window observations a lane needs
+// before its measured transit beats the timetable (ADR 0014).
+func (p *Policy) MinTransitObservations() int { return p.transitMinObs }
+
 // Deadlines returns a copy of the order deadlines.
 func (p *Policy) Deadlines() []Deadline { return slices.Clone(p.deadlines) }
 
@@ -216,7 +291,8 @@ func (p *Policy) PublishedAt() time.Time { return p.publishedAt }
 func (p *Policy) Snapshot() Snapshot {
 	return Snapshot{
 		Version: p.version, OfferTTLMinutes: p.offerTTL, HoldTTLMinutes: p.holdTTL, PackagesPerOrder: p.packagesPerOrder,
-		SharePercent: p.sharePercent, Deadlines: slices.Clone(p.deadlines), PublishedAt: p.publishedAt,
+		SharePercent: p.sharePercent, TransitWindowDays: p.transitWindow, TransitServiceLevelPercent: p.transitPct,
+		MinTransitObservations: p.transitMinObs, Deadlines: slices.Clone(p.deadlines), PublishedAt: p.publishedAt,
 	}
 }
 

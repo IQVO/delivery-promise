@@ -131,7 +131,8 @@ func (s *searcher) candidateNodes() []Node {
 }
 
 func (s *searcher) covers(n Node, l shared.Line) bool {
-	return s.in.Available(n.ID, l.CatalogItemID) >= l.Quantity
+	_, ok := s.ownerOf(n.ID, l)
+	return ok
 }
 
 func (s *searcher) groupLines(nodes []Node) ([][]shared.Line, bool) {
@@ -178,7 +179,7 @@ func (s *searcher) searchGroup(no int, lines []shared.Line, nodes []Node, tiers 
 			}
 			continue
 		}
-		g.Candidates[t] = cs
+		g.Candidates[t] = s.owned(cs, lines)
 	}
 	return g
 }
@@ -326,9 +327,13 @@ func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool)
 	if !found || !d.CutoffAt.Before(w.WindowStart) {
 		return Candidate{}, false
 	}
+	basis := shared.BasisScheduled
+	if arr.measured { // at least one leg ran later than the timetable (ADR 0014)
+		basis = shared.BasisMeasured
+	}
 	id, op, _ := s.bookFor(n, d.ID, d.CutoffAt, false)
 	return Candidate{
-		NodeID: n.ID, ShipBy: d.CutoffAt, Window: shared.Window{Earliest: w.WindowStart, Latest: w.WindowEnd, TimeZone: s.timeZone()}, Basis: shared.BasisScheduled,
+		NodeID: n.ID, ShipBy: d.CutoffAt, Window: shared.Window{Earliest: w.WindowStart, Latest: w.WindowEnd, TimeZone: s.timeZone()}, Basis: basis,
 		Witness: shared.Witness{NodeID: n.ID, PickupDepartureID: d.ID, Legs: arr.legs, DeliveryWaveID: w.ID}, BookID: string(id),
 		ExpiresAt: expires, LatestMeetableAt: meet, Grade: s.in.Grades[n.ID], InRegion: n.RegionID == s.in.AreaRegionID,
 		LegCount: len(arr.legs), Direct: d.Dest == s.in.Station.ID && (n.Subtype == SubtypeSubSameDay || n.Subtype == SubtypeMicro), Opening: op,

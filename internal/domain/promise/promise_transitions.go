@@ -42,7 +42,7 @@ func (p *Promise) Confirm(orderID string, groupNo int, now time.Time) ([]shared.
 	if !now.Before(p.holdExpiresAt) {
 		return nil, fmt.Errorf("%w: promise %s held until %s", ErrPromiseHoldExpired, p.id, p.holdExpiresAt.Format(time.RFC3339))
 	}
-	p.state, p.orderID, p.groupNo = StateConfirmed, orderID, groupNo
+	p.state, p.orderID, p.groupNo, p.confirmedAt = StateConfirmed, orderID, groupNo, shared.UTC(now)
 	p.version++
 	return []shared.Event{PromiseConfirmed{Header: p.header(now), PromiseID: p.id, OrderID: orderID, GroupNo: groupNo}}, nil
 }
@@ -63,12 +63,43 @@ func (p *Promise) FlagAtRisk(reason string, now time.Time) ([]shared.Event, erro
 	return []shared.Event{PromiseAtRisk{Header: p.header(now), PromiseID: p.id, OrderID: p.orderID, Reason: reason, DetectedAt: shared.UTC(now)}}, nil
 }
 
+// Rehome points a CONFIRMED or AT_RISK promise at the node order-sourcing
+// locked for it, when that is not the node it was quoted on: the witness
+// names the fulfilling node and pickup, and bookId the PromiseBook that now
+// carries the charge, so a later release hits the book that was charged.
+// lines are the promise's lines re-netted under the locked node's owners (ADR
+// 0017); nil keeps the current owners. The terms are unchanged. It raises no
+// event: the promise made is unchanged.
+func (p *Promise) Rehome(w shared.Witness, bookID string, lines []shared.Line) error {
+	if bookID == "" {
+		return shared.Invalid("a bookId is required")
+	}
+	if err := p.closed(); err != nil {
+		return err
+	}
+	if !p.state.Active() {
+		return p.illegal("Rehome")
+	}
+	if err := w.Validate(p.terms.Basis); err != nil {
+		return err
+	}
+	if err := p.reown(lines); err != nil {
+		return err
+	}
+	p.witness, p.bookID = w.Clone(), bookID
+	p.version++
+	return nil
+}
+
 // Revising is the input of Revise.
 type Revising struct {
 	Terms   Terms
 	Witness shared.Witness
 	BookID  string
 	Reason  string
+	// Lines are the promise's lines with the owners chosen at the new witness
+	// node (ADR 0017); nil keeps the current owners.
+	Lines []shared.Line
 }
 
 // Revise moves a CONFIRMED or AT_RISK promise to the new terms and witness and
@@ -96,6 +127,9 @@ func (p *Promise) Revise(in Revising, now time.Time) ([]shared.Event, error) {
 	}
 	if in.Terms.Window.Latest.Before(p.terms.Window.Latest) {
 		return nil, fmt.Errorf("%w: %s is before %s", ErrRevisionMovesEarlier, in.Terms.Window.Latest.UTC().Format(time.RFC3339), p.terms.Window.Latest.Format(time.RFC3339))
+	}
+	if err := p.reown(in.Lines); err != nil {
+		return nil, err
 	}
 	previous := p.terms.Window.Latest
 	p.revisions = append(p.revisions, Revision{No: len(p.revisions) + 1, PreviousTerms: p.terms, Reason: in.Reason, RevisedAt: shared.UTC(now)})

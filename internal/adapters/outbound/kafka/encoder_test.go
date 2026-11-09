@@ -44,6 +44,9 @@ func goldenCases() map[string]shared.Event {
 			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}}},
 		"PromiseMade_nominal": promise.PromiseMade{Header: hdr, PromiseID: "prm-2", OfferID: "off-2", Terms: nominal, Witness: shared.Witness{NodeID: "N-AUS3"},
 			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 1}}},
+		// a seller-owned line names its owner, an operator-owned one omits it (ADR 0017)
+		"PromiseMade_sellerOwned": promise.PromiseMade{Header: hdr, PromiseID: "prm-3", OfferID: "off-3", Terms: term, Witness: wit,
+			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}, {CatalogItemID: "ci-2002", Quantity: 1, OwnerRef: "S-0042"}}},
 		"PromiseConfirmed": promise.PromiseConfirmed{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", GroupNo: 1},
 		"PromiseAtRisk":    promise.PromiseAtRisk{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", Reason: "DEPARTURE_CANCELLED", DetectedAt: t0},
 		"PromiseRevised": promise.PromiseRevised{Header: hdr, PromiseID: "prm-1", OrderID: "ord-1", RevisionNo: 1, NodeID: "N-AUS3",
@@ -64,7 +67,7 @@ func goldenCases() map[string]shared.Event {
 		"DeliveryOfferQuoted": offer.DeliveryOfferQuoted{Header: hdr, OfferID: "off-1", Tier: shared.TierNextDay, DestinationPrefix: "787", NodeID: "N-AUS3",
 			Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute)},
 		"PromisePolicyPublished": policy.PromisePolicyPublished{Header: hdr, PolicyVersion: "v2", Number: 2, OfferTTLMinutes: 10, HoldTTLMinutes: 15,
-			PackagesPerOrder: 2, SharePercent: 80, PublishedAt: t0,
+			PackagesPerOrder: 2, SharePercent: 80, TransitWindowDays: 21, TransitServiceLevelPercent: 95, MinTransitObservations: 30, PublishedAt: t0,
 			Deadlines: []policy.Deadline{{Tier: shared.TierNextDay, RegionID: "R-SC", Minute: 23*60 + 59}, {Tier: shared.TierSameDay, Minute: 9*60 + 5}}},
 	}
 }

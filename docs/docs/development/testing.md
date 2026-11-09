@@ -42,7 +42,7 @@ Ten files tagged `integration`: the Postgres adapter (`main_integration_test.go`
 ## Contract tests
 
 - **Events:** `TestEventCatalogueMatchesContract` (`internal/architecture/catalogue_fitness_test.go`) ties the event catalogue in code to `apis/asyncapi.yaml`; `TestCloudEventsOnly` forbids any non-CloudEvents envelope.
-- **MCP:** `TestToolSurface`, `TestWriteVerbSensorFailsOnWriteNames` and `TestToolRegistryGolden` (`internal/adapters/inbound/mcp/governance_test.go`) pin the five tools, forbid write verbs and pin the registry (`TestToolRegistryGolden`).
+- **MCP:** `TestToolSurface`, `TestWriteVerbSensorFailsOnWriteNames` and `TestToolRegistryGolden` (`internal/adapters/inbound/mcp/governance_test.go`) pin the six tools, forbid write verbs and pin the registry (`TestToolRegistryGolden`).
 - **REST and events specs:** `spectral lint` of `apis/openapi.yaml` and `apis/asyncapi.yaml` (CI job `api-lint`, `--fail-severity=warn`). There is no test that replays the OpenAPI document against the live router beyond `features/rest.feature`.
 
 ## Mutation tests

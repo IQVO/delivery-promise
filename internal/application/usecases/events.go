@@ -96,18 +96,22 @@ type CatalogItemChanged struct {
 	CatalogItemID string `json:"catalogItemId"`
 }
 
-// ListingCreated is offer-availability ListingCreated.
+// ListingCreated is offer-availability ListingCreated. OwnerRef is the owning
+// seller; absent means operator-owned ("", ADR 0017).
 type ListingCreated struct {
 	ListingID     string `json:"listingId"`
 	CatalogItemID string `json:"catalogItemId"`
 	NodeID        string `json:"nodeId"`
+	OwnerRef      string `json:"ownerRef"`
 }
 
-// ListingAvailabilityChanged is offer-availability ListingAvailabilityChanged.
+// ListingAvailabilityChanged is offer-availability ListingAvailabilityChanged;
+// OwnerRef as on ListingCreated.
 type ListingAvailabilityChanged struct {
 	ListingID     string    `json:"listingId"`
 	CatalogItemID string    `json:"catalogItemId"`
 	NodeID        string    `json:"nodeId"`
+	OwnerRef      string    `json:"ownerRef"`
 	AvailableQty  int       `json:"availableQty"`
 	AsOf          time.Time `json:"asOf"`
 }
@@ -155,6 +159,20 @@ type BookingFailed struct {
 	DepartureID  string `json:"departureId"`
 }
 
+// LoadDeparted is linehaul-transportation LoadDeparted (ADR 0014).
+type LoadDeparted struct {
+	LoadID       string    `json:"loadId"`
+	OriginNodeID string    `json:"originNodeId"`
+	DepartedAt   time.Time `json:"departedAt"`
+}
+
+// LoadArrived is linehaul-transportation LoadArrived (ADR 0014).
+type LoadArrived struct {
+	LoadID            string    `json:"loadId"`
+	DestinationNodeID string    `json:"destinationNodeId"`
+	ArrivedAt         time.Time `json:"arrivedAt"`
+}
+
 // WaveScheduled is last-mile-delivery DeliveryWaveScheduled.
 type WaveScheduled struct {
 	WaveID         string    `json:"waveId"`
@@ -198,6 +216,9 @@ type FulfillmentLocked struct {
 	GroupNo      int    `json:"groupNo"`
 	PromiseID    string `json:"promiseId"`
 	NodeID       string `json:"nodeId"`
+	// PickupDepartureID is the departure order-sourcing locked the group on:
+	// with NodeID the book that must carry the charge. Absent on older producers.
+	PickupDepartureID string `json:"pickupDepartureId,omitempty"`
 }
 
 // FulfillmentShipped is order-sourcing FulfillmentShipped.

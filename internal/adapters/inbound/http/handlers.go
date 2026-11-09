@@ -22,6 +22,19 @@ func (s *Server) handleQuote(w http.ResponseWriter, r *http.Request) {
 	respond(w, r, http.StatusOK, res, err)
 }
 
+// handleEstimate answers POST /delivery-estimates. The route is safe: it is
+// registered without the Idempotency-Key middleware, so a key that is sent is
+// never read or stored (ADR 0019).
+func (s *Server) handleEstimate(w http.ResponseWriter, r *http.Request) {
+	var req estimateRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	res, err := s.API.EstimateDeliveries(r.Context(), req.command())
+	respond(w, r, http.StatusOK, res, err)
+}
+
 func (s *Server) handleGetOffer(w http.ResponseWriter, r *http.Request) {
 	res, err := s.API.GetOffer(r.Context(), chi.URLParam(r, "offerId"))
 	respond(w, r, http.StatusOK, res, err)

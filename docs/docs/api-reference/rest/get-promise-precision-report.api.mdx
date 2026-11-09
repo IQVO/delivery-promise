@@ -1,0 +1,70 @@
+---
+id: get-promise-precision-report
+title: "Window width, exact-day, revision and unkeepable figures of the promises made, per day and tier"
+description: "Per UTC day of PromiseMade (its CloudEvents time) and per tier. windowMinutes is the mean / p50 / p90 of deliverByLatest - deliverByEarliest in minutes; exactDayShare is the share of promises whose window starts and ends on the same LOCAL calendar day in the window's timeZone (ADR 0011); a window without a loadable zone is read in UTC and also counted in zoneUnknown. revisedShare is the share with at least one PromiseRevised; unkeepableCount counts those with a PromiseUnkeepable (both at any time). Days without a promise are omitted. Served by cmd/dp-reports (ADR 0018)."
+sidebar_label: "Window width, exact-day, revision and unkeepable figures of the promises made, per day and tier"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Window width, exact-day, revision and unkeepable figures of the promises made, per day and tier"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/reports/promise-precision"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Per UTC day of PromiseMade (its CloudEvents time) and per tier. windowMinutes is the mean / p50 / p90 of deliverByLatest - deliverByEarliest in minutes; exactDayShare is the share of promises whose window starts and ends on the same LOCAL calendar day in the window's timeZone (ADR 0011); a window without a loadable zone is read in UTC and also counted in zoneUnknown. revisedShare is the share with at least one PromiseRevised; unkeepableCount counts those with a PromiseUnkeepable (both at any time). Days without a promise are omitted. Served by cmd/dp-reports (ADR 0018).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-promise-precision-report.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-promise-precision-report.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-promise-precision-report.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

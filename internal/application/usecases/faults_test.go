@@ -138,6 +138,13 @@ func (fw *fPromiseRepository) HeldQuantities(ctx context.Context, nodeIDs []stri
 	return fw.in.HeldQuantities(ctx, nodeIDs)
 }
 
+func (fw *fPromiseRepository) ConfirmedHolds(ctx context.Context, nodeIDs []string) ([]repository.ConfirmedHold, error) {
+	if err := fw.f.hit(); err != nil {
+		return nil, err
+	}
+	return fw.in.ConfirmedHolds(ctx, nodeIDs)
+}
+
 func (fw *fPromiseRepository) Save(ctx context.Context, p *promise.Promise) error {
 	if err := fw.f.hit(); err != nil {
 		return err

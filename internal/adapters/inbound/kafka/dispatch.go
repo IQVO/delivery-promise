@@ -97,6 +97,8 @@ func Handlers(s *usecases.Service) map[string]HandlerFunc {
 	h[typ("logistics", "linehaul-transportation", "departure", "DepartureCancelled")] = handle(func(v usecases.DepartureCancelled) []string { return ids(v.DepartureID) }, s.OnDepartureCancelled)
 	h[typ("logistics", "linehaul-transportation", "departure", "BookingMoved")] = handle(func(v usecases.BookingMoved) []string { return ids(v.AssignmentID) }, s.OnBookingMoved)
 	h[typ("logistics", "linehaul-transportation", "departure", "BookingFailed")] = handle(func(v usecases.BookingFailed) []string { return ids(v.AssignmentID) }, s.OnBookingFailed)
+	h[typ("logistics", "linehaul-transportation", "load", "LoadDeparted")] = handle(func(v usecases.LoadDeparted) []string { return ids(v.LoadID) }, s.OnLoadDeparted)
+	h[typ("logistics", "linehaul-transportation", "load", "LoadArrived")] = handle(func(v usecases.LoadArrived) []string { return ids(v.LoadID) }, s.OnLoadArrived)
 
 	h[typ("logistics", "last-mile-delivery", "wave", "DeliveryWaveScheduled")] = handle(func(v usecases.WaveScheduled) []string { return ids(v.WaveID, v.StationNodeID) }, s.OnWaveScheduled)
 	h[typ("logistics", "last-mile-delivery", "wave", "DeliveryWaveCapacityChanged")] = handle(func(v usecases.WaveCapacityChanged) []string { return ids(v.WaveID) }, s.OnWaveCapacityChanged)

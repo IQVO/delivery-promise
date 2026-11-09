@@ -41,9 +41,42 @@ describe("requests", () => {
     expect(call.headers).toEqual({});
   });
 
-  it("normalizes a missing item list", async () => {
-    mockApi({ "GET /promises?orderId=ord-1": json({}) });
-    expect(await listPromisesByOrder("ord-1")).toEqual({ items: [] });
+  it("follows nextCursor and returns the promises of every page", async () => {
+    const api = mockApi({
+      "GET /promises?orderId=ord-1": json({ items: [promise({ promiseId: "prm-1" })], nextCursor: "c1" }),
+      "GET /promises?orderId=ord-1&cursor=c1": json({ items: [promise({ promiseId: "prm-2" })], nextCursor: "c2" }),
+      "GET /promises?orderId=ord-1&cursor=c2": json({ items: [promise({ promiseId: "prm-3" })] }),
+    });
+    const page = await listPromisesByOrder("ord-1");
+    expect(page.items.map((p) => p.promiseId)).toEqual(["prm-1", "prm-2", "prm-3"]);
+    expect(api.calls).toHaveLength(3);
+  });
+
+  it("follows nextCursor for the books of a node and date", async () => {
+    mockApi({
+      "GET /promise-books?nodeId=N-AUS3&date=2026-10-22": json({ items: [book({ bookId: "b-1" })], nextCursor: "c1" }),
+      "GET /promise-books?nodeId=N-AUS3&date=2026-10-22&cursor=c1": json({ items: [book({ bookId: "b-2" })] }),
+    });
+    const page = await listPromiseBooks("N-AUS3", "2026-10-22");
+    expect(page.items.map((b) => b.bookId)).toEqual(["b-1", "b-2"]);
+  });
+
+  it.each([
+    ["a missing items", {}],
+    ["items null", { items: null }],
+    ["a bare array", [{ promiseId: "prm-1" }]],
+  ])("refuses %s instead of reading it as no promises", async (_n, body) => {
+    mockApi({ "GET /promises?orderId=ord-1": json(body), "GET /promise-books?nodeId=N&date=2026-10-22": json(body) });
+    expect((await failingAs(listPromisesByOrder("ord-1"))).title).toMatch(/page/i);
+    expect((await failingAs(listPromiseBooks("N", "2026-10-22"))).title).toMatch(/page/i);
+  });
+
+  it("stops a runaway cursor chain with an error rather than a truncated list", async () => {
+    mockApi({
+      "GET /promises?orderId=ord-1": json({ items: [], nextCursor: "loop" }),
+      "GET /promises?orderId=ord-1&cursor=loop": json({ items: [], nextCursor: "loop" }),
+    });
+    expect((await failingAs(listPromisesByOrder("ord-1"))).title).toMatch(/pages/i);
   });
 
   it("lists the books of a node and date", async () => {

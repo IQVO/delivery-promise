@@ -140,6 +140,7 @@ func TestReadsEmitNothing(t *testing.T) {
 	h.ok(t, "list_promises_by_order", map[string]any{"orderId": "ord-1001"})
 	h.ok(t, "list_promise_books", map[string]any{"nodeId": "N-AUS3", "date": "2026-10-22"})
 	h.ok(t, "get_current_policy", map[string]any{})
+	h.ok(t, "estimate_delivery", map[string]any{"destinationPostalPrefix": "787", "items": []any{map[string]any{"catalogItemId": "ci-1001", "quantity": 1}}})
 	if after := len(h.store.Outbox().Events()); after != before {
 		t.Fatalf("events %d -> %d: a read tool emitted an event", before, after)
 	}

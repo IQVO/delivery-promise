@@ -134,6 +134,7 @@ func TestStateless_ToolsListCarriesAuthorityMeta(t *testing.T) {
 	}
 	tools, _ := resultOf(t, resp)["tools"].([]any)
 	want := map[string]string{
+		"estimate_delivery":      "L1",
 		"get_current_policy":     "L1",
 		"get_delivery_offer":     "L1",
 		"get_promise":            "L1",

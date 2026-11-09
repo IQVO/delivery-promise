@@ -27,6 +27,7 @@ const DefaultServiceName = "delivery-promise"
 // production implementation.
 type API interface {
 	QuoteDeliveryOffers(ctx context.Context, cmd usecases.QuoteCommand) (views.QuoteResult, error)
+	EstimateDeliveries(ctx context.Context, cmd usecases.EstimateCommand) (views.EstimateResult, error)
 	GetOffer(ctx context.Context, id string) (views.Offer, error)
 	MakePromise(ctx context.Context, cmd usecases.MakePromiseCommand) (usecases.MakePromiseResult, error)
 	ListPromisesByOrder(ctx context.Context, orderID string) (views.PromiseList, error)
@@ -80,6 +81,8 @@ func NewRouter(s *Server, logger *slog.Logger, serviceName string) http.Handler 
 	r.Get("/readyz", s.handleReadyz)
 
 	r.Method(http.MethodPost, "/delivery-quotes", s.idempotent(s.handleQuote))
+	// Safe: writes nothing, so no Idempotency-Key middleware (ADR 0019).
+	r.Post("/delivery-estimates", s.handleEstimate)
 	r.Get("/delivery-offers/{offerId}", s.handleGetOffer)
 	r.Method(http.MethodPost, "/promises", s.idempotent(s.handleMakePromise))
 	r.Get("/promises", s.handleListPromises)

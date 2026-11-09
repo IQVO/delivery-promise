@@ -10,6 +10,7 @@ import (
 	"github.com/claudioed/delivery-promise/internal/application/readmodel"
 	"github.com/claudioed/delivery-promise/internal/domain/promise"
 	"github.com/claudioed/delivery-promise/internal/domain/search"
+	"github.com/claudioed/delivery-promise/internal/domain/shared"
 )
 
 // ScorecardWindow is the only scorecard window the promise reads (E18).
@@ -165,21 +166,35 @@ func (s *Service) OnCatalogItemChanged(ctx context.Context, m Meta, e CatalogIte
 	})
 }
 
-// OnListingCreated projects ListingCreated.
+// OnListingCreated projects ListingCreated into the row of its (item, node,
+// ownerRef) key; an absent ownerRef is operator-owned (ADR 0017). A row the
+// suppression events created first (it knows no item) gains its key; a known
+// listing is left alone.
 func (s *Service) OnListingCreated(ctx context.Context, m Meta, e ListingCreated) error {
+	if err := validOwner(e.OwnerRef); err != nil {
+		return err
+	}
 	return s.project(ctx, m, func(ctx context.Context) error {
-		if _, err := s.Network.GetListing(ctx, e.ListingID); err == nil {
-			return nil
-		} else if !notFound(err) {
+		l, err := s.Network.GetListing(ctx, e.ListingID)
+		if err != nil && !notFound(err) {
 			return err
 		}
-		return s.Network.PutListing(ctx, readmodel.Listing{ID: e.ListingID, ItemID: e.CatalogItemID, NodeID: e.NodeID})
+		if err == nil && l.ItemID != "" {
+			return nil
+		}
+		l.ID, l.ItemID, l.NodeID, l.OwnerRef = e.ListingID, e.CatalogItemID, e.NodeID, e.OwnerRef
+		return s.Network.PutListing(ctx, l)
 	})
 }
 
-// OnListingAvailabilityChanged projects ListingAvailabilityChanged; an asOf
-// older than the stored one is ignored.
+// OnListingAvailabilityChanged projects ListingAvailabilityChanged into the
+// row of its (item, node, ownerRef) key; an asOf older than the one stored for
+// that key is ignored. The producer keeps one listing per key, so the listing's
+// row is the key's row and two owners' figures never order each other.
 func (s *Service) OnListingAvailabilityChanged(ctx context.Context, m Meta, e ListingAvailabilityChanged) error {
+	if err := validOwner(e.OwnerRef); err != nil {
+		return err
+	}
 	return s.project(ctx, m, func(ctx context.Context) error {
 		l, err := s.Network.GetListing(ctx, e.ListingID)
 		if err != nil && !notFound(err) {
@@ -188,9 +203,18 @@ func (s *Service) OnListingAvailabilityChanged(ctx context.Context, m Meta, e Li
 		if err == nil && e.AsOf.Before(l.AsOf) {
 			return nil
 		}
-		l.ID, l.ItemID, l.NodeID, l.AvailableQty, l.AsOf = e.ListingID, e.CatalogItemID, e.NodeID, e.AvailableQty, e.AsOf.UTC()
+		l.ID, l.ItemID, l.NodeID, l.OwnerRef, l.AvailableQty, l.AsOf = e.ListingID, e.CatalogItemID, e.NodeID, e.OwnerRef, e.AvailableQty, e.AsOf.UTC()
 		return s.Network.PutListing(ctx, l)
 	})
+}
+
+// validOwner refuses an ownerRef that cannot be a key: empty (operator-owned)
+// or a valid id.
+func validOwner(ownerRef string) error {
+	if ownerRef != shared.OperatorOwned && !shared.ValidID(ownerRef) {
+		return shared.Invalid("ownerRef %q is not a valid id", ownerRef)
+	}
+	return nil
 }
 
 // OnListingToggled projects ListingSuppressed (suppressed true) and

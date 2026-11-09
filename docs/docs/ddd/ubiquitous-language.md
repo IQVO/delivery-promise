@@ -19,7 +19,7 @@ The first table is this context's own language, with the identifier each term ha
 | **Ship-By** | The pickup cutoff at the witness node the package must be ready for. | `promise.Terms.ShipBy` | **Required Ship-By** on a vendor purchase order |
 | **Deliver-By Window** | `deliverByEarliest` to `deliverByLatest` shown to the customer, with the destination's `timeZone`. | `promise.Terms.Window`, `shared.Window` | The offer's `window`: the same shape before it becomes a promise |
 | **Witness Path** | The concrete node, pickup departure, legs and delivery wave that prove a promise is feasible. `order-sourcing` may later choose a different path. | `shared.Witness` | **Candidate** (`order-sourcing`): a path optimised for cost. The witness is proof, not a plan |
-| **Promise Basis** | `SCHEDULED` (from real departures and waves) or `NOMINAL` (`STANDARD` only, from nominal lane times). | `shared.Basis` | **Availability Basis** (`offer-availability`): about quantity, not time |
+| **Promise Basis** | `SCHEDULED` (from real departures and waves), `MEASURED` (a scheduled path whose arrival a lane's measured transit pushed later, ADR 0014) or `NOMINAL` (`STANDARD` only, from nominal lane times). | `shared.Basis` | **Availability Basis** (`offer-availability`): about quantity, not time |
 | **Promise Book** | The capacity ledger of one node pickup cutoff on the promise side, `bookId = nodeId:pickupDepartureId`. | `book.Book` | **Departure capacity** (`linehaul-transportation`): packages on a truck. The book counts orders against the node's share |
 | **Capacity Hold** | A provisional reservation on a book, released if the order is not placed in time. | `book.Book.Hold`, field `provisional` | The confirmed count, which only a placed order creates |
 | **Share** | The orders a book may hold for the cutoff, derived when the book opens from the node's profile and the policy's `capacitySharePercent`. | `book.Book` field `share`, `search.OpeningFor` | The node's **Throughput Cap** (declared by `node-topology`) |
@@ -34,6 +34,7 @@ The first table is this context's own language, with the identifier each term ha
 | **Constraint** | Why a tier has no offer: `DESTINATION_NOT_SERVED`, `ITEM_QUANTITY_NOT_AVAILABLE`, `DELIVERY_SLA_UNAVAILABLE`, `NODE_CAPACITY_EXHAUSTED`, `PAST_ORDER_DEADLINE`. | `search` constraints, API `OfferConstraint` | An error: "no offer" is a normal 200 answer |
 | **Revision** | One re-promise: `{no, previousTerms, reason, revisedAt}`. | `promise.Revision` | |
 | **Hold expiry** | `holdExpiresAt`: the instant a provisional promise is released if no order confirmed it. | `promise.Promise.HoldExpiresAt` | The offer's `expiresAt` |
+| **Order-by instant** | `orderByAt`: the latest instant the order can be placed and still make the quoted window's witness pickup cutoff — `expiresAt`'s cutoff bound uncapped by the offer TTL. | `offer.Offer.OrderByAt` | A node **Cutoff** minus effective handling |
 | **Read model** | A local copy of another context's facts, fed only by events. | `rm_*` tables, `internal/application/readmodel` | An aggregate: no invariant is enforced on it |
 | **Outbox / Inbox** | Events written with the aggregates and published later; consumed event ids claimed with their effect. | `outbox_events`, `processed_events` | |
 

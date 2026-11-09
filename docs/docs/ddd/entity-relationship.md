@@ -91,6 +91,7 @@ Source: `internal/adapters/outbound/postgres/migrations/0001_delivery_promise_sc
 - `outbox_events.id` (a `bigserial`) is the publication order; `event_id` is the stable CloudEvents id and is `UNIQUE`; `attempts` and `last_error` record relay failures; `published_at IS NULL` means not yet published.
 - `idempotency_keys` rows are inserted by the request's own transaction and their outcome written just before it commits; rows older than 24 hours are purged on the next keyed write.
 - `0002_window_time_zone` changes no column: the window's `TimeZone` lives in the jsonb snapshot and the migration backfills old offers and promises from `rm_areas` and `rm_nodes`.
+- Each line of an offer and of a promise snapshot carries `OwnerRef`, the owner whose stock covers it (`""` = operator-owned, ADR 0017; a line persisted before it existed reads as operator-owned). The hold queries group by `(node_id, item, OwnerRef)`.
 
 ## Local read models
 
@@ -122,6 +123,7 @@ erDiagram
     text id PK
     text item_id
     text node_id
+    text owner_ref "'' = operator-owned"
     jsonb data
   }
   rm_departures {
@@ -158,6 +160,16 @@ erDiagram
     text tracking_number PK
     jsonb data
   }
+  rm_load_transit_open {
+    text load_id PK
+    text origin_node_id
+    timestamptz departed_at
+  }
+  rm_transit_actuals {
+    text origin_node_id PK
+    text dest_node_id PK
+    jsonb observations
+  }
   rm_nodes ||--o{ rm_listings : "node_id"
   rm_items ||--o{ rm_listings : "item_id"
   rm_nodes ||--o{ rm_scorecards : "node_id"
@@ -168,12 +180,13 @@ erDiagram
   rm_trackings ||--o| rm_outcomes : "tracking_number"
 ```
 
-Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `internal/application/readmodel`.
+Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_actuals.up.sql`, `0005_listing_owner.up.sql`, `internal/application/readmodel`.
 
 | Table | Fed by | Used by |
 | --- | --- | --- |
 | `rm_nodes`, `rm_regions`, `rm_areas`, `rm_lanes` | node-topology events | the search (candidate nodes, service area to delivery station, lane transit for `NOMINAL`), `ListPromiseBooks` (node time zone) |
-| `rm_items`, `rm_listings` | offer-availability events | shipment grouping and availability per node |
+| `rm_items`, `rm_listings` | offer-availability events | shipment grouping and availability per (node, item, owner): `rm_listings` is keyed by `(item_id, node_id, owner_ref)` (index `rm_listings_node_item_owner`, migration 0005) and a line is covered by ONE owner, never a sum (ADR 0017) |
 | `rm_departures`, `rm_waves` | linehaul and last-mile events | path search, `MakePromise` revalidation, cancellation risk |
 | `rm_scorecards` | node-performance events | the `ScorecardHandicap` |
 | `rm_assignments`, `rm_shipments`, `rm_trackings`, `rm_outcomes` | order-sourcing and shipping-and-tracking events | finding a promise's assignment and judging it |
+| `rm_load_transit_open`, `rm_transit_actuals` | linehaul `LoadDeparted` and `LoadArrived` | the measured transit behind a `MEASURED` basis (ADR 0014) |

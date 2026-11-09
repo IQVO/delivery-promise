@@ -28,12 +28,27 @@ type quoteRequest struct {
 	Tiers                   []string  `json:"tiers"`
 }
 
-func (q quoteRequest) command() usecases.QuoteCommand {
-	tiers := make([]shared.Tier, len(q.Tiers))
-	for i, t := range q.Tiers {
+func toTiers(in []string) []shared.Tier {
+	tiers := make([]shared.Tier, len(in))
+	for i, t := range in {
 		tiers[i] = shared.Tier(t)
 	}
-	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, Lines: toLines(q.Lines), Tiers: tiers}
+	return tiers
+}
+
+func (q quoteRequest) command() usecases.QuoteCommand {
+	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, Lines: toLines(q.Lines), Tiers: toTiers(q.Tiers)}
+}
+
+// estimateRequest is the body of POST /delivery-estimates (ADR 0019).
+type estimateRequest struct {
+	DestinationPostalPrefix string    `json:"destinationPostalPrefix"`
+	Items                   []lineDTO `json:"items"`
+	Tiers                   []string  `json:"tiers"`
+}
+
+func (e estimateRequest) command() usecases.EstimateCommand {
+	return usecases.EstimateCommand{DestinationPostalPrefix: e.DestinationPostalPrefix, Items: toLines(e.Items), Tiers: toTiers(e.Tiers)}
 }
 
 type makePromiseRequest struct {
@@ -57,11 +72,14 @@ type orderDeadlineDTO struct {
 }
 
 type publishPolicyRequest struct {
-	OfferTTLMinutes      int                `json:"offerTtlMinutes"`
-	HoldTTLMinutes       int                `json:"holdTtlMinutes"`
-	PackagesPerOrder     int                `json:"packagesPerOrder"`
-	CapacitySharePercent int                `json:"capacitySharePercent"`
-	OrderDeadlines       []orderDeadlineDTO `json:"orderDeadlines"`
+	OfferTTLMinutes            int                `json:"offerTtlMinutes"`
+	HoldTTLMinutes             int                `json:"holdTtlMinutes"`
+	PackagesPerOrder           int                `json:"packagesPerOrder"`
+	CapacitySharePercent       int                `json:"capacitySharePercent"`
+	TransitWindowDays          int                `json:"transitWindowDays"`
+	TransitServiceLevelPercent int                `json:"transitServiceLevelPercent"`
+	MinTransitObservations     int                `json:"minTransitObservations"`
+	OrderDeadlines             []orderDeadlineDTO `json:"orderDeadlines"`
 }
 
 // input maps the request to the domain input; an omitted value takes the policy default.
@@ -70,6 +88,8 @@ func (p publishPolicyRequest) input() (policy.Input, error) {
 	in := policy.Input{
 		OfferTTLMinutes: orDefault(p.OfferTTLMinutes, int(def.OfferTTL().Minutes())), HoldTTLMinutes: orDefault(p.HoldTTLMinutes, int(def.HoldTTL().Minutes())),
 		PackagesPerOrder: orDefault(p.PackagesPerOrder, def.PackagesPerOrder()), SharePercent: orDefault(p.CapacitySharePercent, def.SharePercent()),
+		TransitWindowDays: orDefault(p.TransitWindowDays, def.TransitWindowDays()), TransitServiceLevelPercent: orDefault(p.TransitServiceLevelPercent, def.TransitServiceLevelPercent()),
+		MinTransitObservations: orDefault(p.MinTransitObservations, def.MinTransitObservations()),
 	}
 	for _, d := range p.OrderDeadlines {
 		minute, err := parseLocalTime(d.LocalTime)

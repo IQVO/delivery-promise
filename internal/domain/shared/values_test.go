@@ -35,13 +35,13 @@ func TestTierRules(t *testing.T) {
 }
 
 func TestBasisValid(t *testing.T) {
-	if !BasisScheduled.Valid() || !BasisNominal.Valid() || Basis("GUESS").Valid() || Basis("").Valid() {
-		t.Fatal("only SCHEDULED and NOMINAL are bases")
+	if !BasisScheduled.Valid() || !BasisNominal.Valid() || !BasisMeasured.Valid() || Basis("GUESS").Valid() || Basis("").Valid() {
+		t.Fatal("only SCHEDULED, NOMINAL and MEASURED are bases")
 	}
 }
 
 func TestValidateLines(t *testing.T) {
-	ok := []Line{{"ci-1", 1}, {"ci-2", MaxQuantity}}
+	ok := []Line{{"ci-1", 1, ""}, {"ci-2", MaxQuantity, ""}}
 	if err := ValidateLines(ok); err != nil {
 		t.Fatalf("valid lines refused: %v", err)
 	}
@@ -54,12 +54,12 @@ func TestValidateLines(t *testing.T) {
 	}
 	bad := map[string][]Line{
 		"none":         nil,
-		"too many":     append(many, Line{"zzz", 1}),
-		"bad id":       {{"-x", 1}},
-		"duplicate":    {{"a", 1}, {"a", 2}},
-		"zero qty":     {{"a", 0}},
-		"negative qty": {{"a", -1}},
-		"qty ceiling":  {{"a", MaxQuantity + 1}},
+		"too many":     append(many, Line{"zzz", 1, ""}),
+		"bad id":       {{"-x", 1, ""}},
+		"duplicate":    {{"a", 1, ""}, {"a", 2, ""}},
+		"zero qty":     {{"a", 0, ""}},
+		"negative qty": {{"a", -1, ""}},
+		"qty ceiling":  {{"a", MaxQuantity + 1, ""}},
 	}
 	for name, lines := range bad {
 		if err := ValidateLines(lines); !errors.Is(err, ErrValidation) {
@@ -69,17 +69,17 @@ func TestValidateLines(t *testing.T) {
 }
 
 func TestSameLines(t *testing.T) {
-	a := []Line{{"a", 1}, {"b", 2}}
+	a := []Line{{"a", 1, ""}, {"b", 2, ""}}
 	cases := []struct {
 		name string
 		b    []Line
 		want bool
 	}{
-		{"same order", []Line{{"a", 1}, {"b", 2}}, true},
-		{"other order", []Line{{"b", 2}, {"a", 1}}, true},
-		{"other quantity", []Line{{"a", 1}, {"b", 3}}, false},
-		{"other item", []Line{{"a", 1}, {"c", 2}}, false},
-		{"shorter", []Line{{"a", 1}}, false},
+		{"same order", []Line{{"a", 1, ""}, {"b", 2, ""}}, true},
+		{"other order", []Line{{"b", 2, ""}, {"a", 1, ""}}, true},
+		{"other quantity", []Line{{"a", 1, ""}, {"b", 3, ""}}, false},
+		{"other item", []Line{{"a", 1, ""}, {"c", 2, ""}}, false},
+		{"shorter", []Line{{"a", 1, ""}}, false},
 	}
 	for _, c := range cases {
 		if SameLines(a, c.b) != c.want {
@@ -148,6 +148,9 @@ func TestWitnessValidate(t *testing.T) {
 	if err := sched.Validate(BasisScheduled); err != nil {
 		t.Fatalf("scheduled witness refused: %v", err)
 	}
+	if err := sched.Validate(BasisMeasured); err != nil {
+		t.Fatalf("a measured witness carries the same path as a scheduled one: %v", err)
+	}
 	if err := (Witness{NodeID: "n1"}).Validate(BasisNominal); err != nil {
 		t.Fatalf("nominal witness refused: %v", err)
 	}
@@ -160,9 +163,12 @@ func TestWitnessValidate(t *testing.T) {
 		{"nominal with pickup", Witness{NodeID: "n1", PickupDepartureID: "d1"}, BasisNominal},
 		{"nominal with wave", Witness{NodeID: "n1", DeliveryWaveID: "w1"}, BasisNominal},
 		{"nominal with legs", Witness{NodeID: "n1", Legs: []string{"d"}}, BasisNominal},
+		{"nominal cannot carry a path", sched, BasisNominal},
 		{"scheduled without pickup", Witness{NodeID: "n1", DeliveryWaveID: "w1"}, BasisScheduled},
 		{"scheduled without wave", Witness{NodeID: "n1", PickupDepartureID: "d1"}, BasisScheduled},
 		{"scheduled bad leg", Witness{NodeID: "n1", PickupDepartureID: "d1", DeliveryWaveID: "w1", Legs: []string{"!"}}, BasisScheduled},
+		{"measured without pickup", Witness{NodeID: "n1", DeliveryWaveID: "w1"}, BasisMeasured},
+		{"measured without wave", Witness{NodeID: "n1", PickupDepartureID: "d1"}, BasisMeasured},
 	}
 	for _, c := range bad {
 		if err := c.w.Validate(c.basis); !errors.Is(err, ErrValidation) {

@@ -96,7 +96,7 @@ func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Po
 		Now: now, Policy: pol, Lines: lines, Tiers: tiers, SingleGroup: opt.singleGroup, OnlyNode: opt.onlyNode,
 		ExcludeNodes: opt.excludeNodes, ExcludeDepartures: opt.excludeDepartures, ExcludeWaves: opt.excludeWaves,
 		Nodes: map[string]search.Node{}, Grades: map[string]search.Grade{}, Books: map[string]search.BookView{},
-		Available: func(string, string) int { return 0 },
+		Stock: func(string, string) []shared.OwnerStock { return nil }, MeasuredTransit: s.measuredTransitOf(ctx, pol, now),
 	}
 	area, err := s.Network.GetArea(ctx, prefix)
 	if errors.Is(err, ports.ErrNotFound) {
@@ -121,6 +121,19 @@ func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Po
 	return in, s.fill(ctx, &in, area.StationID, lines)
 }
 
+// measuredTransitOf adapts the measured-transit read model to the search's
+// closure: the current policy's service-level percentile, minimum observations
+// and window (ADR 0014). A service without the port never measures.
+func (s *Service) measuredTransitOf(ctx context.Context, pol *policy.Policy, now time.Time) func(origin, dest string) (bool, int) {
+	if s.TransitActuals == nil {
+		return nil
+	}
+	percentile, minObs, window := pol.TransitServiceLevelPercent(), pol.MinTransitObservations(), pol.TransitWindowDays()
+	return func(origin, dest string) (bool, int) {
+		return s.TransitActuals.MeasuredTransit(ctx, origin, dest, percentile, minObs, window, now)
+	}
+}
+
 func (s *Service) fill(ctx context.Context, in *search.Input, stationID string, lines []shared.Line) error {
 	items := make([]string, len(lines))
 	for i, l := range lines {
@@ -140,7 +153,12 @@ func (s *Service) fill(ctx context.Context, in *search.Input, stationID string, 
 	if err != nil {
 		return err
 	}
-	in.Available = availability(net, holds)
+	confirmed, err := s.Promises.ConfirmedHolds(ctx, nodeIDs)
+	if err != nil {
+		return err
+	}
+	addUnaccounted(holds, confirmed, latestAsOf(net.Listings))
+	in.Stock = availability(net, holds)
 	for _, sc := range net.Scorecards {
 		in.Grades[sc.NodeID] = search.Grade(sc.Grade)
 	}
@@ -153,59 +171,4 @@ func (s *Service) fill(ctx context.Context, in *search.Input, stationID string, 
 		in.Books[string(b.ID())] = search.BookView{Open: b.State() == book.StateOpen, Room: b.Room(), HoldDeadlineAt: b.HoldDeadlineAt()}
 	}
 	return nil
-}
-
-// availability is the units of an item shippable from a node: the listing's
-// availableQty, 0 when the listing is suppressed or the item discontinued,
-// minus the units provisional promises hold (ADR 0002, A3).
-func availability(net readmodel.Network, holds map[repository.HoldKey]int) func(node, item string) int {
-	discontinued := map[string]bool{}
-	for _, it := range net.Items {
-		discontinued[it.ID] = it.Discontinued
-	}
-	qty := map[repository.HoldKey]int{}
-	for _, l := range net.Listings {
-		if !l.Suppressed && !discontinued[l.ItemID] {
-			qty[repository.HoldKey{NodeID: l.NodeID, ItemID: l.ItemID}] += l.AvailableQty
-		}
-	}
-	return func(node, item string) int {
-		k := repository.HoldKey{NodeID: node, ItemID: item}
-		return max(0, qty[k]-holds[k])
-	}
-}
-
-// nodeAvailability returns the net units of the lines' items at one node, for
-// the ErrGroupSpansNodes check of MakePromise.
-func (s *Service) nodeAvailability(ctx context.Context, nodeID string, lines []shared.Line) (map[string]int, error) {
-	items := make([]string, len(lines))
-	for i, l := range lines {
-		items[i] = l.CatalogItemID
-	}
-	listings, err := s.Network.ListingsForNode(ctx, nodeID, items)
-	if err != nil {
-		return nil, err
-	}
-	holds, err := s.Promises.HeldQuantities(ctx, []string{nodeID})
-	if err != nil {
-		return nil, err
-	}
-	out := map[string]int{}
-	for _, l := range listings {
-		if l.Suppressed {
-			continue
-		}
-		if it, err := s.Network.GetItem(ctx, l.ItemID); err == nil && it.Discontinued {
-			continue
-		} else if err != nil && !errors.Is(err, ports.ErrNotFound) {
-			return nil, err
-		}
-		out[l.ItemID] += l.AvailableQty
-	}
-	for k, h := range holds {
-		if k.NodeID == nodeID {
-			out[k.ItemID] = max(0, out[k.ItemID]-h)
-		}
-	}
-	return out, nil
 }

@@ -16,7 +16,7 @@ The promise sits on the shopper's critical path and makes NO synchronous call (m
 |---|---|---|
 | `retailnetwork.node-topology.events` | `node.NodeRegistered`, `node.NodeOperationalProfileDeclared`, `node.NodeActivated`, `node.NodeSuspended`, `node.NodeRetired`, `lane.LaneOpened`, `lane.LaneClosed`, `servicearea.ServiceAreaAssigned`, `region.RegionDefined` | NodeProfileView, LaneView, RegionAndServiceAreaView |
 | `retailnetwork.offer-availability.events` | `catalogitem.CatalogItemCreated`, `catalogitem.CatalogItemDiscontinued`, `listing.ListingCreated`, `listing.ListingAvailabilityChanged`, `listing.ListingSuppressed`, `listing.ListingRestored` | AvailabilityView |
-| `retailnetwork.linehaul-transportation.events` | `departure.DepartureScheduled`, `departure.DepartureCapacityChanged`, `departure.DepartureCancelled`, `departure.BookingMoved`, `departure.BookingFailed` | DepartureView; RepromiseOnRisk (E13) |
+| `retailnetwork.linehaul-transportation.events` | `departure.DepartureScheduled`, `departure.DepartureCapacityChanged`, `departure.DepartureCancelled`, `departure.BookingMoved`, `departure.BookingFailed`, `load.LoadDeparted`, `load.LoadArrived` | DepartureView; RepromiseOnRisk (E13); TransitActuals (ADR 0014) |
 | `retailnetwork.last-mile-delivery.events` | `wave.DeliveryWaveScheduled`, `wave.DeliveryWaveCapacityChanged`, `wave.DeliveryWaveCancelled`, `packageattempthistory.PackageInductionDeferred` | DeliveryWaveView; RepromiseOnRisk (E5, E15) |
 | `retailnetwork.node-performance.events` | `scorecard.NodeScorecardUpdated` | ScorecardView (30d window only, E18) |
 | `retailnetwork.order-sourcing.events` | `assignment.FulfillmentLocked`, `assignment.FulfillmentShipped`, `assignment.FulfillmentUnsourceable` | assignment map and package set (E1); RepromiseOnRisk |
@@ -27,7 +27,7 @@ One consumer reads the eight topics under ONE stable group, `DELIVERY_PROMISE_CO
 
 ### Local read models (Postgres tables, rebuilt from events)
 
-`rm_nodes` (type, subtype, operator, region, time zone, state, profile revision and profile), `rm_lanes`, `rm_regions`, `rm_service_areas`, `rm_catalog_items`, `rm_listings`, `rm_departures`, `rm_waves`, `rm_scorecards`, `rm_assignments` (assignmentId to promiseId, orderId, groupNo, locked node), `rm_shipments` (trackingNumber to assignmentId) and `rm_package_outcomes`. Version guards make every projection idempotent and order-tolerant: a `profileRevision`, `assignmentVersion` or `asOf` not above the stored value is ignored (A25).
+`rm_nodes` (type, subtype, operator, region, time zone, state, profile revision and profile), `rm_lanes`, `rm_regions`, `rm_service_areas`, `rm_catalog_items`, `rm_listings`, `rm_departures`, `rm_waves`, `rm_scorecards`, `rm_assignments` (assignmentId to promiseId, orderId, groupNo, locked node), `rm_shipments` (trackingNumber to assignmentId), `rm_package_outcomes`, `rm_load_transit_open` and `rm_transit_actuals` (the measured-transit read model of ADR 0014: one open row per departed load, pairing by arrival into a per (origin, dest) ring of the latest 200 observed transits). Version guards make every projection idempotent and order-tolerant: a `profileRevision`, `assignmentVersion` or `asOf` not above the stored value is ignored (A25).
 
 ### Relationships
 

@@ -62,7 +62,7 @@ func (s *Service) QuoteDeliveryOffers(ctx context.Context, cmd QuoteCommand) (vi
 		out.Unavailable = append(out.Unavailable, views.Unavailable{Tier: string(t), Constraint: string(res.WholeQuote[t])})
 	}
 	for _, g := range res.Groups {
-		os, evs, un := s.offersOfGroup(g, cmd.DestinationPostalPrefix, pol, now)
+		os, evs, un := offersOfGroup(g, cmd.DestinationPostalPrefix, pol, now, s.IDs.NewOfferID)
 		offers, events, out.Unavailable = append(offers, os...), append(events, evs...), append(out.Unavailable, un...)
 	}
 	if err := s.tx(ctx, func(ctx context.Context) error {
@@ -92,8 +92,9 @@ func sortedTiers(m map[shared.Tier]search.Constraint) []shared.Tier {
 
 // offersOfGroup turns the best candidate of every tier of a group into an
 // offer; a tier without one, or whose offer would break ErrOfferExpiryTooLate,
-// is reported with its constraint.
-func (s *Service) offersOfGroup(g search.Group, prefix string, pol *policy.Policy, now time.Time) ([]*offer.Offer, []shared.Event, []views.Unavailable) {
+// is reported with its constraint. newID names each offer: the quote mints a
+// fresh id, an estimate (which never saves the offer) passes a constant.
+func offersOfGroup(g search.Group, prefix string, pol *policy.Policy, now time.Time, newID func() offer.ID) ([]*offer.Offer, []shared.Event, []views.Unavailable) {
 	var offers []*offer.Offer
 	var events []shared.Event
 	var un []views.Unavailable
@@ -113,7 +114,7 @@ func (s *Service) offersOfGroup(g search.Group, prefix string, pol *policy.Polic
 		}
 		c := cs[0]
 		o, evs, err := offer.New(offer.Quote{
-			ID: s.IDs.NewOfferID(), GroupNo: g.No, DestinationPrefix: prefix, Tier: t, Lines: g.Lines, Window: c.Window, Witness: c.Witness,
+			ID: newID(), GroupNo: g.No, DestinationPrefix: prefix, Tier: t, Lines: c.Lines, Window: c.Window, Witness: c.Witness,
 			Basis: c.Basis, PolicyVersion: pol.VersionName(), TTL: pol.OfferTTL(), ExpiresAt: c.ExpiresAt, LatestMeetableAt: c.LatestMeetableAt, PickupCutoffAt: c.ShipBy,
 		}, now)
 		if err != nil {

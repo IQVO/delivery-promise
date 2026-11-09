@@ -48,6 +48,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 	}{
 		{"offers", offerCases}, {"promises", promiseCases}, {"books", bookCases}, {"policies", policyCases},
 		{"network views", networkCases}, {"shipment views", shipmentCases}, {"unit of work", unitOfWorkCases},
+		{"owners", ownerCases},
 	}
 	for _, g := range groups {
 		for _, c := range g.cases {
@@ -123,17 +124,21 @@ func NewPromise(t *testing.T, id, offerID, node, pickup string) *promise.Promise
 			Window: shared.Window{Earliest: T0.Add(18 * time.Hour), Latest: T0.Add(30 * time.Hour), TimeZone: "America/Chicago"},
 		},
 		Witness: shared.Witness{NodeID: node, PickupDepartureID: pickup, Legs: []string{"dep-2200"}, DeliveryWaveID: "w-1"},
-		BookID:  string(book.MakeID(node, pickup)), HoldTTL: 15 * time.Minute, Available: map[string]int{"ci-1001": 2},
+		BookID:  string(book.MakeID(node, pickup)), HoldTTL: 15 * time.Minute,
+		Stock: map[string][]shared.OwnerStock{"ci-1001": {{OwnerRef: shared.OperatorOwned, Available: 2}}},
 	}, T0)
 	noErr(t, err)
 	return p
 }
 
-// NewPolicy publishes version current+1 with a NEXT_DAY deadline.
+// NewPolicy publishes version current+1 with a NEXT_DAY deadline and
+// non-default measured-transit parameters (ADR 0014), so the contract suite
+// pins every persisted field.
 func NewPolicy(t *testing.T, current int) *policy.Policy {
 	t.Helper()
 	p, _, err := policy.Publish(current, policy.Input{
 		OfferTTLMinutes: 10, HoldTTLMinutes: 15, PackagesPerOrder: 2, SharePercent: 80,
+		TransitWindowDays: 14, TransitServiceLevelPercent: 95, MinTransitObservations: 40,
 		Deadlines: []policy.Deadline{{Tier: shared.TierNextDay, RegionID: "R-SC", Minute: 23*60 + 59}},
 	}, T0)
 	noErr(t, err)

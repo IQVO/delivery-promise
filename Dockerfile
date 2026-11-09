@@ -44,6 +44,8 @@ USER 1000
 # Streamable HTTP on :8090 (docs/adr/0007); the chart runs it with
 # `command: ["/app/mcp"]`. cmd/a2a serves the read-only A2A agent (JSON-RPC)
 # on :8093 (docs/adr/0010); the chart runs it with `command: ["/app/a2a"]`.
+# cmd/dp-projector serves only its admin probes (/healthz, /readyz) on :8091
+# and cmd/dp-reports the read-only analytics reports on :8092 (docs/adr/0018).
 # Every cmd/* binary is built by the loop above.
-EXPOSE 8080 8090 8093
+EXPOSE 8080 8090 8091 8092 8093
 ENTRYPOINT ["./api"]
