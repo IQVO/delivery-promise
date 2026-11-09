@@ -47,6 +47,11 @@ func (s *Service) judge(ctx context.Context, assignmentID string) error {
 	if err != nil {
 		return ignoreStale(err)
 	}
+	// The judgement feeds the calibration read model in the same unit of work
+	// that saves it (ADR 0020).
+	if err := s.recordCalibration(ctx, p); err != nil {
+		return err
+	}
 	return s.saveAll(ctx, p, nil, events)
 }
 

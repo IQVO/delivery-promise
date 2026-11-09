@@ -59,6 +59,7 @@ type Policy struct {
 	transitWindow    int
 	transitPct       int
 	transitMinObs    int
+	cal              calibration
 	deadlines        []Deadline
 	publishedAt      time.Time
 }
@@ -73,22 +74,34 @@ type Snapshot struct {
 	TransitWindowDays          int
 	TransitServiceLevelPercent int
 	MinTransitObservations     int
-	Deadlines                  []Deadline
-	PublishedAt                time.Time
+	// The four calibration fields (ADR 0020). A snapshot persisted before the
+	// ADR restores them with their defaults: 0 for the first three, nil for
+	// the cap, whose range includes 0.
+	TargetOnTimeProbabilityPercent int
+	MinCalibrationObservations     int
+	CalibrationWindowDays          int
+	MaxCalibrationBufferMinutes    *int
+	Deadlines                      []Deadline
+	PublishedAt                    time.Time
 }
 
-// Input is the data of PublishPromisePolicy. The three transit fields are
-// optional: an omitted (0) one takes its default, a value outside its bounds
-// is refused (ADR 0014).
+// Input is the data of PublishPromisePolicy. The three transit fields and the
+// four calibration fields are optional: an omitted one (0, or nil for
+// MaxCalibrationBufferMinutes) takes its default, a value outside its bounds
+// is refused (ADR 0014, ADR 0020).
 type Input struct {
-	OfferTTLMinutes            int
-	HoldTTLMinutes             int
-	PackagesPerOrder           int
-	SharePercent               int
-	TransitWindowDays          int
-	TransitServiceLevelPercent int
-	MinTransitObservations     int
-	Deadlines                  []Deadline
+	OfferTTLMinutes                int
+	HoldTTLMinutes                 int
+	PackagesPerOrder               int
+	SharePercent                   int
+	TransitWindowDays              int
+	TransitServiceLevelPercent     int
+	MinTransitObservations         int
+	TargetOnTimeProbabilityPercent int
+	MinCalibrationObservations     int
+	CalibrationWindowDays          int
+	MaxCalibrationBufferMinutes    *int
+	Deadlines                      []Deadline
 }
 
 // Default returns version 0: the policy in force before anything is published.
@@ -97,6 +110,7 @@ func Default() *Policy {
 		version: 0, offerTTL: DefaultOfferTTL, holdTTL: DefaultHoldTTL,
 		packagesPerOrder: DefaultPackagesPerOrd, sharePercent: DefaultSharePercent,
 		transitWindow: DefaultTransitWindowDays, transitPct: DefaultTransitServiceLevel, transitMinObs: DefaultTransitObservations,
+		cal: calibrationOf(0, 0, 0, nil),
 	}
 }
 
@@ -114,6 +128,9 @@ func validate(in Input) error {
 		return shared.Invalid("capacitySharePercent must be between 1 and %d", MaxSharePercent)
 	}
 	if err := validateTransit(in); err != nil {
+		return err
+	}
+	if err := calibrationFrom(in).validate(); err != nil {
 		return err
 	}
 	return validateDeadlines(in.Deadlines)
@@ -216,13 +233,15 @@ func Publish(current int, in Input, now time.Time) (*Policy, []shared.Event, err
 	pl := &Policy{
 		version: current + 1, offerTTL: in.OfferTTLMinutes, holdTTL: in.HoldTTLMinutes,
 		packagesPerOrder: in.PackagesPerOrder, sharePercent: in.SharePercent,
-		transitWindow: w, transitPct: p, transitMinObs: o,
+		transitWindow: w, transitPct: p, transitMinObs: o, cal: calibrationFrom(in),
 		deadlines: sortedDeadlines(in.Deadlines), publishedAt: shared.UTC(now),
 	}
 	ev := PromisePolicyPublished{
 		Header: shared.Header{Version: int64(pl.version), At: pl.publishedAt}, PolicyVersion: pl.VersionName(), Number: pl.version,
 		OfferTTLMinutes: pl.offerTTL, HoldTTLMinutes: pl.holdTTL, PackagesPerOrder: pl.packagesPerOrder,
 		SharePercent: pl.sharePercent, TransitWindowDays: w, TransitServiceLevelPercent: p, MinTransitObservations: o,
+		TargetOnTimeProbabilityPercent: pl.cal.targetPercent, MinCalibrationObservations: pl.cal.minObs,
+		CalibrationWindowDays: pl.cal.windowDays, MaxCalibrationBufferMinutes: pl.cal.maxBuffer,
 		Deadlines: slices.Clone(pl.deadlines), PublishedAt: pl.publishedAt,
 	}
 	return pl, []shared.Event{ev}, nil
@@ -235,6 +254,8 @@ func Restore(s Snapshot) (*Policy, error) {
 		OfferTTLMinutes: s.OfferTTLMinutes, HoldTTLMinutes: s.HoldTTLMinutes, PackagesPerOrder: s.PackagesPerOrder,
 		SharePercent: s.SharePercent, TransitWindowDays: s.TransitWindowDays, TransitServiceLevelPercent: s.TransitServiceLevelPercent,
 		MinTransitObservations: s.MinTransitObservations, Deadlines: s.Deadlines,
+		TargetOnTimeProbabilityPercent: s.TargetOnTimeProbabilityPercent, MinCalibrationObservations: s.MinCalibrationObservations,
+		CalibrationWindowDays: s.CalibrationWindowDays, MaxCalibrationBufferMinutes: s.MaxCalibrationBufferMinutes,
 	}
 	if err := validate(in); err != nil {
 		return nil, shared.Corrupt("policy %d: %v", s.Version, err)
@@ -245,7 +266,7 @@ func Restore(s Snapshot) (*Policy, error) {
 	w, p, o := transitOrDefaults(in)
 	return &Policy{
 		version: s.Version, offerTTL: s.OfferTTLMinutes, holdTTL: s.HoldTTLMinutes, packagesPerOrder: s.PackagesPerOrder,
-		sharePercent: s.SharePercent, transitWindow: w, transitPct: p, transitMinObs: o,
+		sharePercent: s.SharePercent, transitWindow: w, transitPct: p, transitMinObs: o, cal: calibrationFromSnapshot(s),
 		deadlines: sortedDeadlines(s.Deadlines), publishedAt: shared.UTC(s.PublishedAt),
 	}, nil
 }
@@ -289,10 +310,13 @@ func (p *Policy) PublishedAt() time.Time { return p.publishedAt }
 
 // Snapshot returns the persisted form.
 func (p *Policy) Snapshot() Snapshot {
+	maxBuffer := p.cal.maxBuffer
 	return Snapshot{
 		Version: p.version, OfferTTLMinutes: p.offerTTL, HoldTTLMinutes: p.holdTTL, PackagesPerOrder: p.packagesPerOrder,
 		SharePercent: p.sharePercent, TransitWindowDays: p.transitWindow, TransitServiceLevelPercent: p.transitPct,
 		MinTransitObservations: p.transitMinObs, Deadlines: slices.Clone(p.deadlines), PublishedAt: p.publishedAt,
+		TargetOnTimeProbabilityPercent: p.cal.targetPercent, MinCalibrationObservations: p.cal.minObs,
+		CalibrationWindowDays: p.cal.windowDays, MaxCalibrationBufferMinutes: &maxBuffer,
 	}
 }
 

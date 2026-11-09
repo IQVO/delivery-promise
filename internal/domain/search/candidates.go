@@ -40,7 +40,7 @@ func (s *searcher) expiry(p *Profile, cutoff time.Time, handling int) (expires, 
 }
 
 // scheduled builds the SCHEDULED candidates of one node.
-func (s *searcher) scheduled(n Node, strict bool) []Candidate {
+func (s *searcher) scheduled(n Node, strict bool, t shared.Tier) []Candidate {
 	p := n.Profile
 	handling, skip := Handicap(s.in.Grades[n.ID], p.HandlingMinutes)
 	ready, ok := p.Schedule.AddBusinessMinutes(s.in.Now, handling)
@@ -65,14 +65,14 @@ func (s *searcher) scheduled(n Node, strict bool) []Candidate {
 	}
 	var out []Candidate
 	for _, d := range pickups {
-		if c, okC := s.candidateFrom(n, d, handling, strict); okC {
+		if c, okC := s.candidateFrom(n, d, handling, strict, t); okC {
 			out = append(out, c)
 		}
 	}
 	return out
 }
 
-func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool) (Candidate, bool) {
+func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool, t shared.Tier) (Candidate, bool) {
 	expires, meet, ok := s.expiry(n.Profile, d.CutoffAt, handling)
 	if !ok {
 		return Candidate{}, false
@@ -81,17 +81,21 @@ func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool)
 	if !found {
 		return Candidate{}, false
 	}
-	w, found := s.firstWave(arr.at, strict)
-	if !found || !d.CutoffAt.Before(w.WindowStart) {
-		return Candidate{}, false
-	}
 	basis := shared.BasisScheduled
 	if arr.measured { // at least one leg ran later than the timetable (ADR 0014)
 		basis = shared.BasisMeasured
 	}
+	// The segment's buffer is added to the final arrival BEFORE the wave snap, so
+	// the window keeps its width and the offer lands in a later one (ADR 0020).
+	cal := s.calibrate(t, basis, n.ID)
+	w, found := s.firstWave(arr.at.Add(time.Duration(cal.BufferMinutes)*time.Minute), strict)
+	if !found || !d.CutoffAt.Before(w.WindowStart) {
+		return Candidate{}, false
+	}
 	id, op, _ := s.bookFor(n, d.ID, d.CutoffAt, false)
 	return Candidate{
 		NodeID: n.ID, ShipBy: d.CutoffAt, Window: shared.Window{Earliest: w.WindowStart, Latest: w.WindowEnd, TimeZone: s.timeZone()}, Basis: basis,
+		BufferMinutes: cal.BufferMinutes, Confidence: cal.Confidence,
 		Witness: shared.Witness{NodeID: n.ID, PickupDepartureID: d.ID, Legs: arr.legs, DeliveryWaveID: w.ID}, BookID: string(id),
 		ExpiresAt: expires, LatestMeetableAt: meet, Grade: s.in.Grades[n.ID], InRegion: n.RegionID == s.in.AreaRegionID,
 		LegCount: len(arr.legs), Direct: d.Dest == s.in.Station.ID && (n.Subtype == SubtypeSubSameDay || n.Subtype == SubtypeMicro), Opening: op,

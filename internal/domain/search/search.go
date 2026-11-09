@@ -163,17 +163,12 @@ func (s *searcher) searchGroup(no int, lines []shared.Line, nodes []Node, tiers 
 			eligible = append(eligible, n)
 		}
 	}
-	strict := s.pathsOf(eligible, true)
-	var loose []Candidate
-	looseDone := false
+	paths := pathSet{s: s, nodes: eligible, byKey: map[pathKey][]Candidate{}}
 	for _, t := range tiers {
-		cs := s.forTier(strict, t, eligible, true)
+		cs := s.forTier(paths.of(t, true), t, eligible, true)
 		if len(cs) == 0 {
-			if !looseDone {
-				loose, looseDone = s.pathsOf(eligible, false), true
-			}
 			g.Unavailable[t] = DeliverySLAUnavailable
-			if len(s.forTier(loose, t, eligible, false)) > 0 {
+			if len(s.forTier(paths.of(t, false), t, eligible, false)) > 0 {
 				g.Unavailable[t] = NodeCapacityExhausted
 			}
 			continue
@@ -192,10 +187,10 @@ func (s *searcher) coversAll(n Node, lines []shared.Line) bool {
 	return true
 }
 
-func (s *searcher) pathsOf(nodes []Node, strict bool) []Candidate {
+func (s *searcher) pathsOf(nodes []Node, strict bool, t shared.Tier) []Candidate {
 	var out []Candidate
 	for _, n := range nodes {
-		out = append(out, s.scheduled(n, strict)...)
+		out = append(out, s.scheduled(n, strict, t)...)
 	}
 	return out
 }

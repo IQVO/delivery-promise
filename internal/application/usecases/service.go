@@ -35,11 +35,14 @@ type Deps struct {
 	// DepartureArrivals is the DepartureArrival read model of the late-risk
 	// sweep (ADR 0021); nil records and flags nothing.
 	DepartureArrivals ports.DepartureArrivals
-	Outbox            ports.EventOutbox
-	Inbox             ports.Inbox
-	Clock             ports.Clock
-	IDs               ports.IDGenerator
-	Logger            *slog.Logger
+	// Calibration is the PromiseCalibrationView (ADR 0020); nil never buffers
+	// a quote and records no judgement.
+	Calibration ports.PromiseCalibrationView
+	Outbox      ports.EventOutbox
+	Inbox       ports.Inbox
+	Clock       ports.Clock
+	IDs         ports.IDGenerator
+	Logger      *slog.Logger
 	// Metrics records the business outcome of each MakePromise; nil records
 	// nothing, so unit tests need no wiring.
 	Metrics ports.PromiseMetrics

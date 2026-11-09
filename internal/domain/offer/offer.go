@@ -60,6 +60,7 @@ type Offer struct {
 	window       shared.Window
 	witness      shared.Witness
 	basis        shared.Basis
+	confidence   shared.Confidence
 	policy       string
 	quotedAt     time.Time
 	expiresAt    time.Time
@@ -83,9 +84,13 @@ type Snapshot struct {
 	Window            shared.Window
 	Witness           shared.Witness
 	Basis             shared.Basis
-	PolicyVersion     string
-	QuotedAt          time.Time
-	ExpiresAt         time.Time
+	// Confidence is the calibrated on-time probability of the quote (ADR 0020);
+	// unknown (the zero value) for a snapshot persisted before the field existed
+	// or a segment below the minimum observations.
+	Confidence    shared.Confidence
+	PolicyVersion string
+	QuotedAt      time.Time
+	ExpiresAt     time.Time
 	// OrderByAt is the cutoff-bound half of expiresAt: the latest instant the
 	// order can be placed and still make the witness pickup cutoff. Unlike
 	// expiresAt it is NOT capped by the offer TTL. Snapshots persisted before
@@ -108,8 +113,11 @@ type Quote struct {
 	Window            shared.Window
 	Witness           shared.Witness
 	Basis             shared.Basis
-	PolicyVersion     string
-	TTL               time.Duration
+	// Confidence is the segment's calibrated confidence, unknown when the
+	// segment has too few observations (ADR 0020).
+	Confidence    shared.Confidence
+	PolicyVersion string
+	TTL           time.Duration
 	// ExpiresAt is the expiry the search computed: min(now + TTL, the latest
 	// instant the pickup cutoff can still be met).
 	ExpiresAt time.Time
@@ -139,13 +147,13 @@ func New(q Quote, now time.Time) (*Offer, []shared.Event, error) {
 	}
 	o := &Offer{
 		id: q.ID, groupNo: q.GroupNo, destination: q.DestinationPrefix, tier: q.Tier, lines: slices.Clone(q.Lines),
-		window: q.Window, witness: q.Witness.Clone(), basis: q.Basis, policy: q.PolicyVersion, quotedAt: now,
+		window: q.Window, witness: q.Witness.Clone(), basis: q.Basis, confidence: q.Confidence, policy: q.PolicyVersion, quotedAt: now,
 		expiresAt: shared.UTC(q.ExpiresAt), orderByAt: shared.UTC(q.LatestMeetableAt), state: StateQuoted,
 		version: 1, pickupCutoff: shared.UTC(q.PickupCutoffAt), capacityBand: q.CapacityBand,
 	}
 	ev := DeliveryOfferQuoted{
 		Header: shared.Header{Version: o.version, At: now}, OfferID: o.id, Tier: o.tier, DestinationPrefix: o.destination,
-		NodeID: o.witness.NodeID, Window: o.window, Basis: o.basis, PolicyVersion: o.policy, ExpiresAt: o.expiresAt, CapacityBand: o.capacityBand,
+		NodeID: o.witness.NodeID, Window: o.window, Basis: o.basis, Confidence: o.confidence, PolicyVersion: o.policy, ExpiresAt: o.expiresAt, CapacityBand: o.capacityBand,
 	}
 	return o, []shared.Event{ev}, nil
 }
@@ -157,7 +165,7 @@ func Restore(s Snapshot) (*Offer, error) {
 	}
 	return &Offer{
 		id: s.ID, groupNo: s.GroupNo, destination: s.DestinationPrefix, tier: s.Tier, lines: slices.Clone(s.Lines),
-		window: s.Window, witness: s.Witness.Clone(), basis: s.Basis, policy: s.PolicyVersion, quotedAt: shared.UTC(s.QuotedAt),
+		window: s.Window, witness: s.Witness.Clone(), basis: s.Basis, confidence: s.Confidence, policy: s.PolicyVersion, quotedAt: shared.UTC(s.QuotedAt),
 		expiresAt: shared.UTC(s.ExpiresAt), orderByAt: shared.UTC(s.OrderByAt), state: s.State,
 		closedAt: shared.UTC(s.ClosedAt), version: s.Version, pickupCutoff: shared.UTC(s.PickupCutoffAt),
 	}, nil
@@ -219,6 +227,10 @@ func (o *Offer) Witness() shared.Witness { return o.witness.Clone() }
 // Basis returns SCHEDULED or NOMINAL.
 func (o *Offer) Basis() shared.Basis { return o.basis }
 
+// Confidence returns the calibrated on-time probability of the quote, unknown
+// when its segment had too few observations (ADR 0020).
+func (o *Offer) Confidence() shared.Confidence { return o.confidence }
+
 // PolicyVersion returns the policy version of the quote.
 func (o *Offer) PolicyVersion() string { return o.policy }
 
@@ -255,7 +267,7 @@ func (o *Offer) Version() int64 { return o.version }
 func (o *Offer) Snapshot() Snapshot {
 	return Snapshot{
 		ID: o.id, GroupNo: o.groupNo, DestinationPrefix: o.destination, Tier: o.tier, Lines: slices.Clone(o.lines), Window: o.window,
-		Witness: o.witness.Clone(), Basis: o.basis, PolicyVersion: o.policy, QuotedAt: o.quotedAt, ExpiresAt: o.expiresAt,
+		Witness: o.witness.Clone(), Basis: o.basis, Confidence: o.confidence, PolicyVersion: o.policy, QuotedAt: o.quotedAt, ExpiresAt: o.expiresAt,
 		OrderByAt: o.orderByAt, State: o.state, ClosedAt: o.closedAt, PickupCutoffAt: o.pickupCutoff, Version: o.version,
 	}
 }

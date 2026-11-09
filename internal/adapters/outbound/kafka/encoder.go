@@ -162,7 +162,7 @@ func quotedData(ev offer.DeliveryOfferQuoted) map[string]any {
 	if ev.CapacityBand != "" {
 		d["capacityBand"] = ev.CapacityBand
 	}
-	return withZone(d, ev.Window)
+	return withConfidence(withZone(d, ev.Window), ev.Confidence)
 }
 
 func madeData(ev promise.PromiseMade) map[string]any {
@@ -174,7 +174,17 @@ func madeData(ev promise.PromiseMade) map[string]any {
 	if ev.Witness.PickupDepartureID != "" { // a NOMINAL promise has none (contracts-delta E8)
 		d["pickupDepartureId"] = ev.Witness.PickupDepartureID
 	}
-	return withZone(d, ev.Terms.Window)
+	return withConfidence(withZone(d, ev.Terms.Window), ev.Terms.Confidence)
+}
+
+// withConfidence adds the optional calibrated confidence of a quote; an unknown
+// one (a segment below the minimum observations) is omitted, never written as
+// zero (ADR 0020).
+func withConfidence(d map[string]any, c shared.Confidence) map[string]any {
+	if c.Known() {
+		d["confidence"] = c.Value()
+	}
+	return d
 }
 
 // withZone adds the optional timeZone of the window to a payload that carries
@@ -207,6 +217,8 @@ func policyData(ev policy.PromisePolicyPublished) map[string]any {
 		"policyVersion": ev.PolicyVersion, "version": ev.Number, "offerTtlMinutes": ev.OfferTTLMinutes, "holdTtlMinutes": ev.HoldTTLMinutes,
 		"packagesPerOrder": ev.PackagesPerOrder, "capacitySharePercent": ev.SharePercent, "transitWindowDays": ev.TransitWindowDays,
 		"transitServiceLevelPercent": ev.TransitServiceLevelPercent, "minTransitObservations": ev.MinTransitObservations,
+		"targetOnTimeProbabilityPercent": ev.TargetOnTimeProbabilityPercent, "minCalibrationObservations": ev.MinCalibrationObservations,
+		"calibrationWindowDays": ev.CalibrationWindowDays, "maxCalibrationBufferMinutes": ev.MaxCalibrationBufferMinutes,
 		"orderDeadlines": ds, "publishedAt": utc(ev.PublishedAt),
 	}
 }

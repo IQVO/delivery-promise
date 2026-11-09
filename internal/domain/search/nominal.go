@@ -65,7 +65,7 @@ func (s *searcher) nominalWindow(arrive time.Time) shared.Window {
 
 // nominal builds the NOMINAL candidates of one node (STANDARD only): the
 // node's next profile cutoffs plus the nominal lane transit (ADR 0002, A1).
-func (s *searcher) nominal(n Node, strict bool) []Candidate {
+func (s *searcher) nominal(n Node, strict bool, t shared.Tier) []Candidate {
 	p := n.Profile
 	handling, skip := Handicap(s.in.Grades[n.ID], p.HandlingMinutes)
 	ready, ok := p.Schedule.AddBusinessMinutes(s.in.Now, handling)
@@ -80,6 +80,7 @@ func (s *searcher) nominal(n Node, strict bool) []Candidate {
 	if skip >= len(cutoffs) {
 		return nil
 	}
+	cal := s.calibrate(t, shared.BasisNominal, n.ID)
 	var out []Candidate
 	for _, c := range cutoffs[skip:] {
 		pickupID := NominalPickupID(c.At)
@@ -88,12 +89,13 @@ func (s *searcher) nominal(n Node, strict bool) []Candidate {
 		if !okBook || !okExp {
 			continue
 		}
-		w := s.nominalWindow(c.At.Add(tr))
+		w := s.nominalWindow(c.At.Add(tr + time.Duration(cal.BufferMinutes)*time.Minute))
 		if !c.At.Before(w.Earliest) {
 			continue
 		}
 		out = append(out, Candidate{
-			NodeID: n.ID, ShipBy: c.At, Window: w, Basis: shared.BasisNominal, Witness: shared.Witness{NodeID: n.ID}, BookID: string(id),
+			NodeID: n.ID, ShipBy: c.At, Window: w, Basis: shared.BasisNominal, Witness: shared.Witness{NodeID: n.ID},
+			BufferMinutes: cal.BufferMinutes, Confidence: cal.Confidence, BookID: string(id),
 			ExpiresAt: expires, LatestMeetableAt: meet, Grade: s.in.Grades[n.ID], InRegion: n.RegionID == s.in.AreaRegionID, Opening: op,
 			CapacityBand: s.bandOf(id, op),
 		})

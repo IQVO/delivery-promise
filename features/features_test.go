@@ -44,4 +44,5 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	registerOutcomeSteps(sc, w)
 	registerFactSteps(sc, w)
 	registerRestSteps(sc, w)
+	registerCalibrationSteps(sc, w)
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -15,8 +14,6 @@ const (
 	tierCandidatesExcludedName = "deliverypromise.tier.candidates.excluded"
 	tierEventsIgnoredName      = "deliverypromise.tier.eligibility.events.ignored"
 )
-
-const tierKey = attribute.Key("tier")
 
 // tierCounters are the instruments of the fast-tier eligibility gate.
 type tierCounters struct {
