@@ -154,6 +154,7 @@ func assertRecordedCalls(t *testing.T, api *fakeAPI) {
 	}
 	want := policy.Input{OfferTTLMinutes: 5, HoldTTLMinutes: 20, PackagesPerOrder: 2, SharePercent: 50,
 		TransitWindowDays: 28, TransitServiceLevelPercent: 90, MinTransitObservations: 20,
+		TargetOnTimeProbabilityPercent: 95, MinCalibrationObservations: 50, CalibrationWindowDays: 28,
 		Deadlines: []policy.Deadline{{Tier: shared.TierNextDay, RegionID: "R-SC", Minute: 23*60 + 59}}}
 	if fmt.Sprint(api.policy) != fmt.Sprint(want) {
 		t.Errorf("policy input = %+v", api.policy)

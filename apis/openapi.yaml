@@ -711,6 +711,15 @@ components:
       - SCHEDULED
       - MEASURED
       - NOMINAL
+    Confidence:
+      type: number
+      minimum: 0
+      maximum: 1
+      multipleOf: 0.001
+      description: 'The calibrated probability, rounded to three decimals, that a quote is kept on time (ADR 0020):
+        the share of the judged promises of its segment (tier, basis, node grade) whose lateness was within the
+        buffer the quote carries. It is present only when the segment has at least minCalibrationObservations
+        judgements in the window; absent means UNKNOWN, never zero, and consumers must read absence that way.'
     CapacityBand:
       type: string
       description: 'The capacity pressure on the PromiseBook that the offer''s chosen window would charge, read when the
@@ -925,6 +934,8 @@ components:
           description: Quote-relative shipment group number (1 for a single-node cart).
         basis:
           $ref: '#/components/schemas/Basis'
+        confidence:
+          $ref: '#/components/schemas/Confidence'
         policyVersion:
           type: string
           description: The promise policy version the quote used (G8).
@@ -1007,6 +1018,8 @@ components:
           $ref: '#/components/schemas/EstimateWindow'
         basis:
           $ref: '#/components/schemas/Basis'
+        confidence:
+          $ref: '#/components/schemas/Confidence'
         orderByAt:
           type: string
           format: date-time
@@ -1118,6 +1131,8 @@ components:
             stored before it was carried (ADR 0011), in which case read the window in UTC.
         basis:
           $ref: '#/components/schemas/Basis'
+        confidence:
+          $ref: '#/components/schemas/Confidence'
         policyVersion:
           type: string
     Revision:
@@ -1364,6 +1379,29 @@ components:
           maximum: 1000
           description: Observations a lane needs inside the window before its measured transit can push a promise
             later than the timetable (ADR 0014). Default 20 when omitted or 0.
+        targetOnTimeProbabilityPercent:
+          type: integer
+          minimum: 50
+          maximum: 99
+          description: Share of the promises of a calibration segment the buffer aims to deliver on time; ONE value
+            for every tier (ADR 0020). Default 95 when omitted or 0.
+        minCalibrationObservations:
+          type: integer
+          minimum: 10
+          maximum: 10000
+          description: Judgements a segment (tier, basis, node grade) needs inside the window before its buffer
+            applies and its quotes carry a confidence (ADR 0020). Default 50 when omitted or 0.
+        calibrationWindowDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: Days of judgements a calibration segment keeps (ADR 0020). Default 28 when omitted or 0.
+        maxCalibrationBufferMinutes:
+          type: integer
+          minimum: 0
+          maximum: 2880
+          description: Cap of a segment's buffer in minutes; 0 switches the buffer off and keeps the confidence
+            (ADR 0020). Default 720 only when the field is omitted.
         orderDeadlines:
           type: array
           maxItems: 200
@@ -1397,6 +1435,10 @@ components:
       - transitWindowDays
       - transitServiceLevelPercent
       - minTransitObservations
+      - targetOnTimeProbabilityPercent
+      - minCalibrationObservations
+      - calibrationWindowDays
+      - maxCalibrationBufferMinutes
       - orderDeadlines
       - publishedAt
       properties:
@@ -1431,6 +1473,29 @@ components:
           maximum: 1000
           description: Observations a lane needs inside the window before its measured transit can push a promise
             later than the timetable (ADR 0014).
+        targetOnTimeProbabilityPercent:
+          type: integer
+          minimum: 50
+          maximum: 99
+          description: Share of the promises of a calibration segment the buffer aims to deliver on time; ONE value
+            for every tier (ADR 0020).
+        minCalibrationObservations:
+          type: integer
+          minimum: 10
+          maximum: 10000
+          description: Judgements a segment (tier, basis, node grade) needs inside the window before its buffer
+            applies and its quotes carry a confidence (ADR 0020).
+        calibrationWindowDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: Days of judgements a calibration segment keeps (ADR 0020).
+        maxCalibrationBufferMinutes:
+          type: integer
+          minimum: 0
+          maximum: 2880
+          description: Cap of a segment's buffer in minutes; 0 switches the buffer off and keeps the confidence
+            (ADR 0020).
         orderDeadlines:
           type: array
           items:

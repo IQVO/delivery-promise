@@ -54,6 +54,7 @@ func (s *Service) QuoteDeliveryOffers(ctx context.Context, cmd QuoteCommand) (vi
 		return views.QuoteResult{}, err
 	}
 	res := search.Run(in)
+	s.recordBuffers(ctx, res)
 	var offers []*offer.Offer
 	var events []shared.Event
 	out := views.QuoteResult{Offers: []views.Offer{}, Unavailable: []views.Unavailable{}}
@@ -115,7 +116,7 @@ func offersOfGroup(g search.Group, prefix string, pol *policy.Policy, now time.T
 		c := cs[0]
 		o, evs, err := offer.New(offer.Quote{
 			ID: newID(), GroupNo: g.No, DestinationPrefix: prefix, Tier: t, Lines: c.Lines, Window: c.Window, Witness: c.Witness,
-			Basis: c.Basis, PolicyVersion: pol.VersionName(), TTL: pol.OfferTTL(), ExpiresAt: c.ExpiresAt, LatestMeetableAt: c.LatestMeetableAt, PickupCutoffAt: c.ShipBy, CapacityBand: c.CapacityBand,
+			Basis: c.Basis, Confidence: c.Confidence, PolicyVersion: pol.VersionName(), TTL: pol.OfferTTL(), ExpiresAt: c.ExpiresAt, LatestMeetableAt: c.LatestMeetableAt, PickupCutoffAt: c.ShipBy, CapacityBand: c.CapacityBand,
 		}, now)
 		if err != nil {
 			if errors.Is(err, offer.ErrOfferExpiryTooLate) {

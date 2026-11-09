@@ -55,7 +55,7 @@ func (w *world) reset() {
 	w.clock = memory.NewFakeClock(at(22, 14, 5))
 	w.svc = usecases.New(usecases.Deps{
 		UoW: w.store.UnitOfWork(), Offers: w.store.Offers(), Promises: w.store.Promises(), Books: w.store.Books(),
-		Policies: w.store.Policies(), Network: w.store.Network(), Shipments: w.store.Shipments(), Outbox: w.store.Outbox(),
+		Policies: w.store.Policies(), Network: w.store.Network(), Shipments: w.store.Shipments(), Calibration: w.store.Calibration(), Outbox: w.store.Outbox(),
 		Inbox: w.store.Inbox(), Clock: w.clock, IDs: &memory.SeqIDs{},
 	})
 	// The real REST adapter over the same in-memory doubles; Idempotency stays

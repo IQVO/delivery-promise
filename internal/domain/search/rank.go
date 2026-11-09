@@ -14,7 +14,7 @@ func (s *searcher) forTier(scheduled []Candidate, t shared.Tier, eligible []Node
 	if len(cs) == 0 && t.AllowsNominal() {
 		var nom []Candidate
 		for _, n := range eligible {
-			nom = append(nom, s.nominal(n, strict)...)
+			nom = append(nom, s.nominal(n, strict, t)...)
 		}
 		cs = s.fit(nom, t)
 	}

@@ -495,6 +495,7 @@ components:
             deliverByLatest: '2026-10-24T02:00:00Z'
             timeZone: America/Chicago
             basis: SCHEDULED
+            confidence: 0.973
             policyVersion: v3
             holdExpiresAt: '2026-10-22T19:24:00Z'
             lines:
@@ -814,6 +815,7 @@ components:
             deliverByLatest: '2026-10-24T02:00:00Z'
             timeZone: America/Chicago
             basis: SCHEDULED
+            confidence: 0.973
             policyVersion: v3
             expiresAt: '2026-10-22T19:15:00Z'
             capacityBand: TIGHT
@@ -852,6 +854,10 @@ components:
             transitWindowDays: 28
             transitServiceLevelPercent: 90
             minTransitObservations: 20
+            targetOnTimeProbabilityPercent: 95
+            minCalibrationObservations: 50
+            calibrationWindowDays: 28
+            maxCalibrationBufferMinutes: 720
             orderDeadlines:
             - tier: NEXT_DAY
               regionId: R-SC
@@ -2032,6 +2038,15 @@ components:
       - SCHEDULED
       - MEASURED
       - NOMINAL
+    Confidence:
+      type: number
+      minimum: 0
+      maximum: 1
+      multipleOf: 0.001
+      description: The calibrated probability, rounded to three decimals, that the quote is kept on time (ADR 0020),
+        which is the share of the judged promises of its segment (tier, basis, node grade) whose lateness was within the buffer
+        the quote carries. Optional and additive; present only when the segment has at least minCalibrationObservations
+        judgements in the window. Absent means UNKNOWN, never zero.
     GroupLine:
       type: object
       required:
@@ -2103,6 +2118,8 @@ components:
                   omitted for a window persisted before it was carried.
               basis:
                 $ref: '#/components/schemas/Basis'
+              confidence:
+                $ref: '#/components/schemas/Confidence'
               policyVersion: *id001
               holdExpiresAt: *id002
               lines:
@@ -2332,6 +2349,8 @@ components:
                   omitted for a window persisted before it was carried.
               basis:
                 $ref: '#/components/schemas/Basis'
+              confidence:
+                $ref: '#/components/schemas/Confidence'
               policyVersion: *id001
               expiresAt: *id002
               capacityBand:
@@ -2361,6 +2380,10 @@ components:
             - transitWindowDays
             - transitServiceLevelPercent
             - minTransitObservations
+            - targetOnTimeProbabilityPercent
+            - minCalibrationObservations
+            - calibrationWindowDays
+            - maxCalibrationBufferMinutes
             - orderDeadlines
             - publishedAt
             properties:
@@ -2388,6 +2411,27 @@ components:
                 minimum: 5
                 maximum: 1000
                 description: Observations a lane needs before its measured transit beats the timetable (ADR 0014).
+              targetOnTimeProbabilityPercent:
+                type: integer
+                minimum: 50
+                maximum: 99
+                description: Share of the promises of a calibration segment the buffer aims to deliver on time; one value
+                  for every tier (ADR 0020).
+              minCalibrationObservations:
+                type: integer
+                minimum: 10
+                maximum: 10000
+                description: Judgements a segment needs inside the window before its buffer applies (ADR 0020).
+              calibrationWindowDays:
+                type: integer
+                minimum: 1
+                maximum: 365
+                description: Days of judgements a calibration segment keeps (ADR 0020).
+              maxCalibrationBufferMinutes:
+                type: integer
+                minimum: 0
+                maximum: 2880
+                description: Cap of a segment's buffer in minutes; 0 switches the buffer off (ADR 0020).
               orderDeadlines:
                 type: array
                 items:

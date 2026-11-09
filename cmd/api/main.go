@@ -156,6 +156,7 @@ func buildService(pool *pgxpool.Pool, outbox *postgres.Outbox, logger *slog.Logg
 		Shipments:         postgres.NewShipmentViews(pool),
 		TransitActuals:    postgres.NewTransitActuals(pool),
 		TierEligibility:   postgres.NewNodeTierEligibility(pool),
+		Calibration:       postgres.NewPromiseCalibrationView(pool),
 		DepartureArrivals: postgres.NewDepartureArrivals(pool),
 		Outbox:            outbox,
 		Inbox:             postgres.NewInbox(pool),

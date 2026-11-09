@@ -176,6 +176,21 @@ type TransitActuals interface {
 	MeasuredTransit(ctx context.Context, origin, dest string, percentile, minObservations, windowDays int, now time.Time) (bool, int)
 }
 
+// PromiseCalibrationView stores the calibration read model (ADR 0020): per
+// segment (tier, basis, node grade) the ring of the latest judged promises'
+// lateBy minutes. It is fed only by this service's own judgements, in the unit
+// of work that records the judgement, and read by every search. Every call
+// joins the unit of work carried by ctx when there is one.
+type PromiseCalibrationView interface {
+	// RecordJudgement appends one observation to the segment's ring (latest
+	// 500) under a row lock, pruning what is older than the longest window.
+	RecordJudgement(ctx context.Context, key readmodel.CalibrationKey, obs readmodel.CalibrationObservation) error
+	// Segments returns, per segment, the lateBy minutes of the observations
+	// inside the last windowDays days, oldest first. A segment with none is
+	// absent.
+	Segments(ctx context.Context, windowDays int, now time.Time) (map[readmodel.CalibrationKey][]int, error)
+}
+
 // EventOutbox is the write side of the transactional outbox. Called with the
 // ctx handed to UnitOfWork.Do it joins the SAME transaction as the aggregate
 // Save calls, so the aggregates and their raised events commit or roll back
@@ -209,6 +224,20 @@ type Clock interface {
 type IDGenerator interface {
 	NewOfferID() offer.ID
 	NewPromiseID() promise.ID
+}
+
+// CalibrationMetrics records what the calibration buffer did (ADR 0020). It is
+// an optional capability of PromiseMetrics: the use cases record through it
+// when the Deps' Metrics also implements it, and not at all otherwise. The
+// implementation lives in internal/adapters/outbound/telemetry.
+type CalibrationMetrics interface {
+	// CalibrationBufferApplied records the buffer in minutes folded into the
+	// offer a quote built for the tier (0 when the segment added none).
+	CalibrationBufferApplied(ctx context.Context, tier string, minutes int)
+	// CalibrationSegmentBelowMinimum counts a segment a search loaded whose
+	// observations are fewer than minCalibrationObservations: it quotes as it
+	// did before calibration.
+	CalibrationSegmentBelowMinimum(ctx context.Context, tier, basis, nodeGrade string)
 }
 
 // PromiseMetrics records the business outcome of every MakePromise attempt

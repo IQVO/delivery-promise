@@ -72,14 +72,20 @@ type orderDeadlineDTO struct {
 }
 
 type publishPolicyRequest struct {
-	OfferTTLMinutes            int                `json:"offerTtlMinutes"`
-	HoldTTLMinutes             int                `json:"holdTtlMinutes"`
-	PackagesPerOrder           int                `json:"packagesPerOrder"`
-	CapacitySharePercent       int                `json:"capacitySharePercent"`
-	TransitWindowDays          int                `json:"transitWindowDays"`
-	TransitServiceLevelPercent int                `json:"transitServiceLevelPercent"`
-	MinTransitObservations     int                `json:"minTransitObservations"`
-	OrderDeadlines             []orderDeadlineDTO `json:"orderDeadlines"`
+	OfferTTLMinutes            int `json:"offerTtlMinutes"`
+	HoldTTLMinutes             int `json:"holdTtlMinutes"`
+	PackagesPerOrder           int `json:"packagesPerOrder"`
+	CapacitySharePercent       int `json:"capacitySharePercent"`
+	TransitWindowDays          int `json:"transitWindowDays"`
+	TransitServiceLevelPercent int `json:"transitServiceLevelPercent"`
+	MinTransitObservations     int `json:"minTransitObservations"`
+	// The calibration fields (ADR 0020). maxCalibrationBufferMinutes is a
+	// pointer because 0 is a valid cap: only an absent value takes the default.
+	TargetOnTimeProbabilityPercent int                `json:"targetOnTimeProbabilityPercent"`
+	MinCalibrationObservations     int                `json:"minCalibrationObservations"`
+	CalibrationWindowDays          int                `json:"calibrationWindowDays"`
+	MaxCalibrationBufferMinutes    *int               `json:"maxCalibrationBufferMinutes"`
+	OrderDeadlines                 []orderDeadlineDTO `json:"orderDeadlines"`
 }
 
 // input maps the request to the domain input; an omitted value takes the policy default.
@@ -89,7 +95,11 @@ func (p publishPolicyRequest) input() (policy.Input, error) {
 		OfferTTLMinutes: orDefault(p.OfferTTLMinutes, int(def.OfferTTL().Minutes())), HoldTTLMinutes: orDefault(p.HoldTTLMinutes, int(def.HoldTTL().Minutes())),
 		PackagesPerOrder: orDefault(p.PackagesPerOrder, def.PackagesPerOrder()), SharePercent: orDefault(p.CapacitySharePercent, def.SharePercent()),
 		TransitWindowDays: orDefault(p.TransitWindowDays, def.TransitWindowDays()), TransitServiceLevelPercent: orDefault(p.TransitServiceLevelPercent, def.TransitServiceLevelPercent()),
-		MinTransitObservations: orDefault(p.MinTransitObservations, def.MinTransitObservations()),
+		MinTransitObservations:         orDefault(p.MinTransitObservations, def.MinTransitObservations()),
+		TargetOnTimeProbabilityPercent: orDefault(p.TargetOnTimeProbabilityPercent, def.TargetOnTimeProbabilityPercent()),
+		MinCalibrationObservations:     orDefault(p.MinCalibrationObservations, def.MinCalibrationObservations()),
+		CalibrationWindowDays:          orDefault(p.CalibrationWindowDays, def.CalibrationWindowDays()),
+		MaxCalibrationBufferMinutes:    p.MaxCalibrationBufferMinutes,
 	}
 	for _, d := range p.OrderDeadlines {
 		minute, err := parseLocalTime(d.LocalTime)

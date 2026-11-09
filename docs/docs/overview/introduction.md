@@ -25,7 +25,7 @@ A retailer that shows an early date sells more; one that shows an early date and
 
 | Aggregate | Role | Where |
 | --- | --- | --- |
-| `DeliveryOffer` | A short-lived quote per shipment group and tier, with its witness path, basis (`SCHEDULED`, `MEASURED` or `NOMINAL`) and `policyVersion`. States `QUOTED`, `EXPIRED`, `CONSUMED`. | `internal/domain/offer` |
+| `DeliveryOffer` | A short-lived quote per shipment group and tier, with its witness path, basis (`SCHEDULED`, `MEASURED` or `NOMINAL`), an optional calibrated `confidence` and `policyVersion`. States `QUOTED`, `EXPIRED`, `CONSUMED`. | `internal/domain/offer` |
 | `Promise` | The commitment for one shipment group of an order. `PROVISIONAL` holds capacity until the hold expires, `CONFIRMED` once the order is placed, then `AT_RISK`, `KEPT`, `BROKEN`, `RELEASED` or `CANCELLED`. Carries terms, witness path, revisions and the judgement. | `internal/domain/promise` |
 | `PromiseBook` | The promise-side capacity ledger of one (node, pickup departure) cutoff: `provisional + confirmed <= share`. Opened lazily by the first hold, closed at the cutoff. | `internal/domain/book` |
 | `PromisePolicy` | Versioned tier deadlines, offer and hold TTLs, packages per order, capacity share. Version 0 is the built-in default. | `internal/domain/policy` |

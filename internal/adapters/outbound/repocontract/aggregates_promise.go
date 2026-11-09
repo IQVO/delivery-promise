@@ -92,6 +92,8 @@ func promiseRoundTrip(t *testing.T, f Fixture) {
 	eq(t, "time zone", got.Terms().Window.TimeZone, "America/Denver")
 	eq(t, "previous time zone", got.Revisions()[0].PreviousTerms.Window.TimeZone, "America/Chicago")
 	eq(t, "revision reason", got.Revisions()[0].Reason, "DEPARTURE_CANCELLED")
+	eq(t, "previous confidence", got.Revisions()[0].PreviousTerms.Confidence, shared.NewConfidence(0.973))
+	eq(t, "the revised terms carry their own (unknown) confidence", got.Terms().Confidence, shared.Confidence{})
 	j := got.Judgement()
 	if j == nil {
 		t.Fatal("the judgement was lost")
