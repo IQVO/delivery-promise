@@ -16,7 +16,7 @@ The contract, verbatim:
 
 - `DeliveryOffer.capacityBand` is `AMPLE` | `TIGHT` | `SCARCE`, computed at quote time from the book that the offer's chosen window would charge: utilisation `u = (provisional + confirmed) / capacity share` of that book (the same quantities the capacity check uses: `Book.Hold` refuses when `provisional + confirmed >= share`).
   - `u < 0.60` -> AMPLE; `0.60 <= u < 0.85` -> TIGHT; `u >= 0.85` -> SCARCE.
-  - The thresholds are constants in the domain (`shared.TightFrom` 0.60, `shared.ScarceFrom` 0.85), NOT PromisePolicy fields, to keep this change free of a persisted-policy edit.
+  - The thresholds are constants in the domain (`shared.TightFromPercent` 60, `shared.ScarceFromPercent` 85), NOT PromisePolicy fields, to keep this change free of a persisted-policy edit.
   - Omit the field when the book has no finite capacity or the offer has no book. Never emit an empty string.
 - Where it appears (all additive, optional): the quote/offer REST schema, each option of `POST /delivery-estimates`, the MCP tool outputs for `quote_delivery` and `estimate_delivery` (and the MCP output schema and the golden fixtures), and the `DeliveryOfferQuoted` analytics event.
 - The network never computes a fee. The storefront `pricing` context may read the band from the quote response it already receives; that change is outside this repository.

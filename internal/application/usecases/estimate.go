@@ -113,7 +113,7 @@ func rankOf(tier string) int { return shared.Tier(tier).Rank() }
 func optionOf(o *offer.Offer) views.EstimateOption {
 	w := o.Window()
 	opt := views.EstimateOption{
-		Tier: string(o.Tier()), Basis: string(o.Basis()),
+		Tier: string(o.Tier()), Basis: string(o.Basis()), CapacityBand: string(o.CapacityBand()),
 		Window: views.EstimateWindow{Start: w.Earliest.UTC(), End: w.Latest.UTC(), TimeZone: w.TimeZone},
 	}
 	if by := o.OrderByAt(); !by.IsZero() {
