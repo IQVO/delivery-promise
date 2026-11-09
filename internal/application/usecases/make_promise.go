@@ -82,7 +82,10 @@ func (s *Service) makePromise(ctx context.Context, cmd MakePromiseCommand) (Make
 	if err := s.revalidate(ctx, o.Witness(), pol); err != nil {
 		return MakePromiseResult{}, err
 	}
-	avail, err := s.nodeAvailability(ctx, o.Witness().NodeID, o.Lines())
+	// The owners are re-chosen at the witness node by the OwnerChoice rule
+	// (ADR 0017): a quoted owner that no longer covers gives way to one that
+	// does, without a re-quote.
+	stock, err := s.nodeStock(ctx, o.Witness().NodeID, o.Lines())
 	if err != nil {
 		return MakePromiseResult{}, err
 	}
@@ -93,7 +96,7 @@ func (s *Service) makePromise(ctx context.Context, cmd MakePromiseCommand) (Make
 	p, pevents, err := promise.Make(promise.Making{
 		ID: s.IDs.NewPromiseID(), OfferID: cmd.OfferID, DestinationPrefix: o.DestinationPrefix(), Lines: o.Lines(),
 		Terms:   promise.Terms{Tier: o.Tier(), ShipBy: o.PickupCutoffAt(), Window: o.Window(), Basis: o.Basis(), PolicyVersion: o.PolicyVersion()},
-		Witness: o.Witness(), BookID: string(b.ID()), HoldTTL: pol.HoldTTL(), Available: avail,
+		Witness: o.Witness(), BookID: string(b.ID()), HoldTTL: pol.HoldTTL(), Stock: stock,
 	}, now)
 	if err != nil {
 		return MakePromiseResult{}, err

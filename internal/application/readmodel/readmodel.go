@@ -79,11 +79,15 @@ type Item struct {
 	Discontinued bool
 }
 
-// Listing is a row of AvailabilityView: one item at one node.
+// Listing is a row of AvailabilityView: one item of one owner at one node. The
+// view is keyed by (ItemID, NodeID, OwnerRef), OwnerRef "" for an
+// operator-owned listing (ADR 0017); the producer keeps one listing per key, so
+// the listing id names the row the suppression events toggle.
 type Listing struct {
 	ID           string
 	ItemID       string
 	NodeID       string
+	OwnerRef     string
 	AvailableQty int
 	AsOf         time.Time
 	Suppressed   bool

@@ -89,15 +89,18 @@ func (en *Encoder) EncodeAll(events []shared.Event) ([]outbox.Message, error) {
 	return out, nil
 }
 
+// groupLine is a line of PromiseMade; ownerRef is the seller whose stock covers
+// it, omitted when operator-owned (ADR 0017).
 type groupLine struct {
 	CatalogItemID string `json:"catalogItemId"`
 	Quantity      int    `json:"quantity"`
+	OwnerRef      string `json:"ownerRef,omitempty"`
 }
 
 func groupLines(ls []shared.Line) []groupLine {
 	out := make([]groupLine, len(ls))
 	for i, l := range ls {
-		out[i] = groupLine{CatalogItemID: l.CatalogItemID, Quantity: l.Quantity}
+		out[i] = groupLine{CatalogItemID: l.CatalogItemID, Quantity: l.Quantity, OwnerRef: l.OwnerRef}
 	}
 	return out
 }

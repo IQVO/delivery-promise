@@ -4,15 +4,18 @@ package repository
 
 import "time"
 
-// HoldKey identifies the units a provisional promise holds: one item at one
-// node.
+// HoldKey identifies the units a hold nets: one item of one owner at one node
+// (ADR 0017; OwnerRef "" is operator-owned). It is also the key of an
+// AvailabilityView figure.
 type HoldKey struct {
-	NodeID string
-	ItemID string
+	NodeID   string
+	ItemID   string
+	OwnerRef string
 }
 
 // ConfirmedHold is the units one active (CONFIRMED or AT_RISK) promise has
-// ordered of one item at the node of its witness, and when it was confirmed.
+// ordered of one item of one owner at the node of its witness, and when it was
+// confirmed.
 type ConfirmedHold struct {
 	Key         HoldKey
 	Qty         int

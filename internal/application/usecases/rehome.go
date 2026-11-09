@@ -16,8 +16,10 @@ import (
 // in the transaction of the FulfillmentLocked projection. It does nothing when
 // the lock is on the quoted node, when the event does not say which departure
 // (an older producer), when the promise is not active, or when the locked
-// node's book cannot take the charge (unknown departure, full or closed): the
-// lock is a fact that already happened, so it is logged and never retried.
+// node's book cannot take the charge (unknown departure, full or closed) or no
+// single owner at the locked node covers every line (the OwnerChoice rule, ADR
+// 0017): the lock is a fact that already happened, so it is logged and never
+// retried.
 func (s *Service) rehomeOnLock(ctx context.Context, e FulfillmentLocked) error {
 	if e.PromiseID == "" || e.NodeID == "" || e.PickupDepartureID == "" {
 		return nil
@@ -40,7 +42,30 @@ func (s *Service) rehomeOnLock(ctx context.Context, e FulfillmentLocked) error {
 		}
 		return err
 	}
-	return s.moveChargeTo(ctx, p, w)
+	lines, ok, err := s.reownAt(ctx, p, e.NodeID)
+	if err != nil || !ok {
+		return err
+	}
+	return s.moveChargeTo(ctx, p, w, lines)
+}
+
+// reownAt re-nets the promise's lines under the locked node with the
+// OwnerChoice rule (ADR 0017). The same node keeps its owners (nil lines); ok
+// is false, and a warning logged, when no single owner there covers a line.
+func (s *Service) reownAt(ctx context.Context, p *promise.Promise, nodeID string) ([]shared.Line, bool, error) {
+	if p.Witness().NodeID == nodeID {
+		return nil, true, nil
+	}
+	stock, err := s.nodeStock(ctx, nodeID, p.Lines())
+	if err != nil {
+		return nil, false, err
+	}
+	lines, err := promise.ChooseOwners(p.Lines(), stock)
+	if errors.Is(err, promise.ErrGroupSpansNodes) {
+		s.Logger.WarnContext(ctx, "no single owner at the locked node covers the lines: the charge stays on the quoted node", "promiseId", string(p.ID()), "nodeId", nodeID, "error", err)
+		return nil, false, nil
+	}
+	return lines, err == nil, err
 }
 
 func (s *Service) departureKnown(ctx context.Context, id string) (bool, error) {
@@ -52,8 +77,9 @@ func (s *Service) departureKnown(ctx context.Context, id string) (bool, error) {
 }
 
 // moveChargeTo holds the confirmed charge on the book of w, releases the
-// promise's current book and re-points the promise at w.
-func (s *Service) moveChargeTo(ctx context.Context, p *promise.Promise, w shared.Witness) error {
+// promise's current book and re-points the promise at w with the lines netted
+// there (nil keeps the owners).
+func (s *Service) moveChargeTo(ctx context.Context, p *promise.Promise, w shared.Witness, lines []shared.Line) error {
 	old, err := s.Books.Get(ctx, book.ID(p.BookID()))
 	if err != nil {
 		return err
@@ -71,7 +97,7 @@ func (s *Service) moveChargeTo(ctx context.Context, p *promise.Promise, w shared
 	if err != nil {
 		return err
 	}
-	if err := p.Rehome(w, string(newID)); err != nil {
+	if err := p.Rehome(w, string(newID), lines); err != nil {
 		return err
 	}
 	if err := s.Promises.Save(ctx, p); err != nil {

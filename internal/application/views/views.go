@@ -15,10 +15,12 @@ import (
 	"github.com/claudioed/delivery-promise/internal/domain/shared"
 )
 
-// Line is a shipment group line.
+// Line is a shipment group line. OwnerRef is the seller whose stock covers it
+// (ADR 0017), omitted when operator-owned.
 type Line struct {
 	CatalogItemID string `json:"catalogItemId"`
 	Quantity      int    `json:"quantity"`
+	OwnerRef      string `json:"ownerRef,omitempty"`
 }
 
 // Window is a delivery window. TimeZone is the IANA name of the delivery
@@ -169,7 +171,7 @@ type Policy struct {
 func lines(in []shared.Line) []Line {
 	out := make([]Line, len(in))
 	for i, l := range in {
-		out[i] = Line{CatalogItemID: l.CatalogItemID, Quantity: l.Quantity}
+		out[i] = Line{CatalogItemID: l.CatalogItemID, Quantity: l.Quantity, OwnerRef: l.OwnerRef}
 	}
 	return out
 }
