@@ -187,6 +187,7 @@ the first response (`POST /promises/{promiseId}/cancellations` requires it).
 | Route | Use case |
 | --- | --- |
 | `POST /delivery-quotes` | quote offers per group and tier (optional `Idempotency-Key`) |
+| `POST /delivery-estimates` | advisory estimates for up to 50 listing items, nothing stored, no `Idempotency-Key` (ADR 0019) |
 | `GET /delivery-offers/{offerId}` | read an offer |
 | `POST /promises` | make a PROVISIONAL promise from an offer, holding capacity |
 | `POST /promises/{promiseId}/confirmations` | confirm it for an order group (called inside checkout) |
@@ -197,7 +198,7 @@ the first response (`POST /promises/{promiseId}/cancellations` requires it).
 
 ### MCP server (read-only)
 
-`cmd/mcp` (ADR 0007) exposes the five REST reads to AI agents over the Model Context Protocol, Streamable HTTP on `:8090`:
+`cmd/mcp` (ADR 0007) exposes the five REST reads and the stored-nothing estimate (ADR 0019) to AI agents over the Model Context Protocol, Streamable HTTP on `:8090`:
 
 | Tool | Reads |
 | --- | --- |
@@ -206,6 +207,7 @@ the first response (`POST /promises/{promiseId}/cancellations` requires it).
 | `list_promises_by_order` | `GET /promises?orderId=` |
 | `list_promise_books` | `GET /promise-books?nodeId=&date=` |
 | `get_current_policy` | `GET /promise-policies/current` |
+| `estimate_delivery` | `POST /delivery-estimates` (stores nothing) |
 
 Every tool is **authority `L1`** (Agentic Standard v2, [ADR 0013](docs/adr/0013-agent-authority-levels-and-complete-mcp-surface.md)): a pure read that changes nothing, declared in `tools/list` `_meta` under `com.warehouse/authority`. The server is stateless (no `Mcp-Session-Id`; legacy `initialize` and 2026-07-28 `server/discover` both answer) and also serves the `promise://books/{nodeId}/{date}` resource and the `check_order_promises` operator prompt.
 

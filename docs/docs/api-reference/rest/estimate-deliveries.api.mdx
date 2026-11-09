@@ -1,0 +1,70 @@
+---
+id: estimate-deliveries
+title: "Estimate delivery options for up to 50 items of a listing page (nothing is stored)"
+description: "A computation over the request body for product listing pages (search results, many items per view). Each item is searched as a single-line group with exactly the quote search of POST /delivery-quotes (the same local read models, OwnerChoice of ADR 0017, netting, scorecard handicap and the SCHEDULED, MEASURED or NOMINAL basis), and each estimate lists the best option per requested tier that a one-line quote would offer, or the OfferConstraint that blocks the tier. The shared inputs are loaded once per request, not per item. The operation is SAFE: it stores nothing (no offer, no outbox event, no hold, no Idempotency-Key row) and an estimate is ADVISORY: it carries no offer id, cannot back POST /promises and never reserves capacity; a quote on the product page or at checkout is what the shopper promises against. An unknown catalogItemId is not an error: it is the ITEM_QUANTITY_NOT_AVAILABLE constraint. The Idempotency-Key is not required and, if sent, it is ignored (a safe request is idempotent by effect, as the guideline treats PUT and DELETE). Makes no synchronous call."
+sidebar_label: "Estimate delivery options for up to 50 items of a listing page (nothing is stored)"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Estimate delivery options for up to 50 items of a listing page (nothing is stored)"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/delivery-estimates"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+A computation over the request body for product listing pages (search results, many items per view). Each item is searched as a single-line group with exactly the quote search of POST /delivery-quotes (the same local read models, OwnerChoice of ADR 0017, netting, scorecard handicap and the SCHEDULED, MEASURED or NOMINAL basis), and each estimate lists the best option per requested tier that a one-line quote would offer, or the OfferConstraint that blocks the tier. The shared inputs are loaded once per request, not per item. The operation is SAFE: it stores nothing (no offer, no outbox event, no hold, no Idempotency-Key row) and an estimate is ADVISORY: it carries no offer id, cannot back POST /promises and never reserves capacity; a quote on the product page or at checkout is what the shopper promises against. An unknown catalogItemId is not an error: it is the ITEM_QUANTITY_NOT_AVAILABLE constraint. The Idempotency-Key is not required and, if sent, it is ignored (a safe request is idempotent by effect, as the guideline treats PUT and DELETE). Makes no synchronous call.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./estimate-deliveries.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./estimate-deliveries.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./estimate-deliveries.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

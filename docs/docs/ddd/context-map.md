@@ -72,7 +72,7 @@ Legend: `==>` event flow over Kafka, `-->` synchronous REST (the arrow points fr
 | Shopper / storefront (shopping-cart, storefront-bff) | this context U | Open Host | REST `POST /delivery-quotes` | quote | any client may ask for a quote; no contract is negotiated per client. Verified in both clients' allowlists |
 | node-performance (Supporting) | this context U, NP D | OHS + PL / Conformist | Kafka `retailnetwork.delivery-promise.events` | `PromiseKept`, `PromiseBroken` | NP counts kept and broken promises per node. Verified in node-performance's `handlers.go` |
 | analytics (no context) | this context U | Published Language | Kafka `retailnetwork.delivery-promise.analytics` | `PromiseMade`, `PromiseConfirmed`, `PromiseReleased`, `PromiseCancelled`, `DeliveryOfferQuoted`, `PromisePolicyPublished` | published for the record; no consumer found |
-| warehouse-ops-agent | this context U | read-only MCP | `/mcp` on `delivery-promise-mcp:8090` | five tools | configured in `warehouse-infra` |
+| warehouse-ops-agent | this context U | read-only MCP | `/mcp` on `delivery-promise-mcp:8090` | six tools | configured in `warehouse-infra` |
 | vendor-connectivity (Supporting) | none | Separate Ways | none | none | the vendor side starts after order-sourcing releases a group |
 | warehouse-systems fleet | none | Separate Ways (hard boundary) | none | none | no `warehouse.*` topic is read and no fleet service is called; the only seam is the Vendor API, which this context does not use |
 
