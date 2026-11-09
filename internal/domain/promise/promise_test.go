@@ -23,7 +23,7 @@ func making() Making {
 	return Making{
 		ID: "prm-1", OfferID: "off-1", DestinationPrefix: "787", Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}},
 		Terms: terms(), Witness: shared.Witness{NodeID: "n1", PickupDepartureID: "d1", Legs: []string{"d2", "d3"}, DeliveryWaveID: "w1"},
-		BookID: "n1:d1", HoldTTL: 15 * time.Minute, Available: map[string]int{"ci-1001": 2},
+		BookID: "n1:d1", HoldTTL: 15 * time.Minute, Stock: operator("ci-1001", 2),
 	}
 }
 
@@ -145,8 +145,8 @@ func TestMakeValidation(t *testing.T) {
 		"nominal fast tier": {func(m *Making) {
 			m.Terms.Basis, m.Witness = shared.BasisNominal, shared.Witness{NodeID: "n1"}
 		}, ErrNominalBasisNotAllowedForTier},
-		"line not at the node":   {func(m *Making) { m.Available = map[string]int{} }, ErrGroupSpansNodes},
-		"quantity over the node": {func(m *Making) { m.Available = map[string]int{"ci-1001": 1} }, ErrGroupSpansNodes},
+		"line not at the node":   {func(m *Making) { m.Stock = map[string][]shared.OwnerStock{} }, ErrGroupSpansNodes},
+		"quantity over the node": {func(m *Making) { m.Stock = operator("ci-1001", 1) }, ErrGroupSpansNodes},
 	}
 	for name, c := range cases {
 		in := making()
@@ -161,7 +161,7 @@ func TestMakeBoundaries(t *testing.T) {
 	in := making()
 	in.Terms.ShipBy = earlier.Add(-time.Nanosecond)
 	in.Terms.Window.Latest = in.Terms.Window.Earliest
-	in.Available = map[string]int{"ci-1001": 3}
+	in.Stock = operator("ci-1001", 3)
 	if _, _, err := Make(in, t0); err != nil {
 		t.Fatalf("shipBy just before earliest, earliest == latest, spare stock: %v", err)
 	}

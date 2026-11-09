@@ -131,7 +131,8 @@ func (s *searcher) candidateNodes() []Node {
 }
 
 func (s *searcher) covers(n Node, l shared.Line) bool {
-	return s.in.Available(n.ID, l.CatalogItemID) >= l.Quantity
+	_, ok := s.ownerOf(n.ID, l)
+	return ok
 }
 
 func (s *searcher) groupLines(nodes []Node) ([][]shared.Line, bool) {
@@ -178,7 +179,7 @@ func (s *searcher) searchGroup(no int, lines []shared.Line, nodes []Node, tiers 
 			}
 			continue
 		}
-		g.Candidates[t] = cs
+		g.Candidates[t] = s.owned(cs, lines)
 	}
 	return g
 }

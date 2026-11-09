@@ -41,11 +41,11 @@ func fixture() Input {
 		Now: at(22, 14, 5), Policy: policy.Default(), Station: &station, AreaRegionID: "R-SC",
 		Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}},
 		Nodes: map[string]Node{"N-DAU1": station, "N-SAU1": sort, "N-AUS3": aus3},
-		Available: func(node, item string) int {
+		Stock: func(node, item string) []shared.OwnerStock {
 			if node == "N-AUS3" && item == "ci-1001" {
-				return 37
+				return []shared.OwnerStock{{OwnerRef: shared.OperatorOwned, Available: 37}}
 			}
-			return 0
+			return nil
 		},
 		Lanes: []Lane{
 			{ID: "lane-1", Origin: "N-AUS3", Dest: "N-SAU1", NominalMinutes: 75, Open: true},
@@ -80,11 +80,17 @@ func (in Input) withWave(w Wave) Input {
 	return in
 }
 
+// stock sets the operator-owned units of an item at a node, and no other owner.
 func (in Input) stock(node, item string, qty int) Input {
-	prev := in.Available
-	in.Available = func(n, i string) int {
+	return in.owners(node, item, shared.OwnerStock{OwnerRef: shared.OperatorOwned, Available: qty})
+}
+
+// owners sets the per-owner units of an item at a node (ADR 0017).
+func (in Input) owners(node, item string, stock ...shared.OwnerStock) Input {
+	prev := in.Stock
+	in.Stock = func(n, i string) []shared.OwnerStock {
 		if n == node && i == item {
-			return qty
+			return stock
 		}
 		return prev(n, i)
 	}

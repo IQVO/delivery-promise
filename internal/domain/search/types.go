@@ -144,9 +144,12 @@ type Input struct {
 	// SingleGroup keeps all lines in one group (a re-promise of one group).
 	SingleGroup bool
 	Nodes       map[string]Node
-	// Available is the units of an item shippable from a node, net of
-	// provisional holds; 0 when the listing is unknown, suppressed or discontinued.
-	Available  func(nodeID, itemID string) int
+	// Stock is the net units each owner can ship of an item at a node, one
+	// entry per owner, net of the provisional and confirmed holds of that same
+	// owner (ADR 0017); empty when no listing is known, suppressed or
+	// discontinued. A line is covered by ONE owner (shared.ChooseOwner), never by
+	// a sum. It is called per (node, line): back it with an indexed lookup.
+	Stock      func(nodeID, itemID string) []shared.OwnerStock
 	Lanes      []Lane
 	Departures []Departure
 	Waves      []Wave
@@ -189,6 +192,10 @@ type Candidate struct {
 	Direct bool
 	// Opening is the book to open when it does not exist yet.
 	Opening book.Opening
+	// Lines are the group's lines, each with the owner whose stock at NodeID
+	// covers it (shared.ChooseOwner, ADR 0017); set on the ranked candidates of
+	// a group.
+	Lines []shared.Line
 }
 
 // Group is one shipment group and its candidates per tier.

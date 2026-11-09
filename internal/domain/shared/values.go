@@ -83,14 +83,19 @@ const (
 	MaxReason = 200
 )
 
-// Line is one line of a shipment group.
+// Line is one line of a shipment group. OwnerRef is the owner whose stock
+// covers the line at the witness node (the OwnerChoice of ADR 0017):
+// OperatorOwned ("") for an operator-owned listing, and on every line a caller
+// sends, where the owner is not the caller's to choose.
 type Line struct {
 	CatalogItemID string
 	Quantity      int
+	OwnerRef      string
 }
 
-// ValidateLines checks 1..MaxLines lines with valid, distinct item ids and a
-// quantity between 1 and MaxQuantity.
+// ValidateLines checks 1..MaxLines lines with valid, distinct item ids, a
+// quantity between 1 and MaxQuantity and an ownerRef that is empty or a valid
+// id.
 func ValidateLines(lines []Line) error {
 	if len(lines) == 0 || len(lines) > MaxLines {
 		return Invalid("a group needs between 1 and %d lines", MaxLines)
@@ -107,8 +112,26 @@ func ValidateLines(lines []Line) error {
 		if l.Quantity < 1 || l.Quantity > MaxQuantity {
 			return Invalid("quantity of %q must be between 1 and %d", l.CatalogItemID, MaxQuantity)
 		}
+		if l.OwnerRef != OperatorOwned && !ValidID(l.OwnerRef) {
+			return Invalid("ownerRef %q of %q is not a valid id", l.OwnerRef, l.CatalogItemID)
+		}
 	}
 	return nil
+}
+
+// SameItems reports whether a and b hold the same items and quantities in the
+// same order, whatever their owners: the lines of one group re-netted under
+// another owner choice (ADR 0017).
+func SameItems(a, b []Line) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].CatalogItemID != b[i].CatalogItemID || a[i].Quantity != b[i].Quantity {
+			return false
+		}
+	}
+	return true
 }
 
 // SameLines reports whether a and b hold the same items and quantities,
