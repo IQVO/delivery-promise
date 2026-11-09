@@ -13,7 +13,8 @@ func Fixture(t *testing.T) repocontract.Fixture {
 	s := memory.NewStore()
 	return repocontract.Fixture{
 		UoW: s.UnitOfWork(), Offers: s.Offers(), Promises: s.Promises(), Books: s.Books(), Policies: s.Policies(),
-		Network: s.Network(), Shipments: s.Shipments(), Calibration: s.Calibration(), Outbox: s.Outbox(), Inbox: s.Inbox(),
+		Network: s.Network(), Shipments: s.Shipments(), TierEligibility: s.TierEligibility(), Calibration: s.Calibration(), Outbox: s.Outbox(), Inbox: s.Inbox(),
+		Arrivals:    s.DepartureArrivals(),
 		OutboxCount: func() int { return s.Counts().OutboxEvents },
 	}
 }

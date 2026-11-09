@@ -720,6 +720,16 @@ components:
         the share of the judged promises of its segment (tier, basis, node grade) whose lateness was within the
         buffer the quote carries. It is present only when the segment has at least minCalibrationObservations
         judgements in the window; absent means UNKNOWN, never zero, and consumers must read absence that way.'
+    CapacityBand:
+      type: string
+      description: 'The capacity pressure on the PromiseBook that the offer''s chosen window would charge, read when the
+        offer was quoted (ADR 0023): utilisation u = (provisional + confirmed holds) / capacity share. AMPLE: u < 0.60.
+        TIGHT: 0.60 <= u < 0.85. SCARCE: u >= 0.85. The thresholds are constants of the service, not policy fields. A
+        signal only: the network never computes a fee, and it reserves nothing (only POST /promises holds capacity).'
+      enum:
+      - AMPLE
+      - TIGHT
+      - SCARCE
     OfferConstraint:
       type: string
       description: 'Why a tier has no offer. PAST_ORDER_DEADLINE: the tier''s order deadline in the destination
@@ -869,6 +879,9 @@ components:
             $ref: '#/components/schemas/TierUnavailable'
     DeliveryOffer:
       type: object
+      description: 'One delivery offer. capacityBand (ADR 0023) is optional: it is omitted when the book of the offer''s
+        window has no finite capacity, and on an offer read back with GET /delivery-quotes/{quoteId}, because the band is
+        a quote-time reading that is not stored. It changes no offer, window or order.'
       required:
       - offerId
       - state
@@ -926,6 +939,8 @@ components:
         policyVersion:
           type: string
           description: The promise policy version the quote used (G8).
+        capacityBand:
+          $ref: '#/components/schemas/CapacityBand'
     EstimateItem:
       type: object
       required:
@@ -991,7 +1006,7 @@ components:
     EstimateOption:
       type: object
       description: The best option of one tier, with the same fields and semantics as the quote's best offer of that
-        tier for the same single line.
+        tier for the same single line. capacityBand (ADR 0023) is optional and omitted when unknown.
       required:
       - tier
       - window
@@ -1010,6 +1025,8 @@ components:
           format: date-time
           description: The latest instant an order can be placed and still make this window's witness pickup cutoff, as
             on a quote's offer; omitted when unknown.
+        capacityBand:
+          $ref: '#/components/schemas/CapacityBand'
     EstimateConstraint:
       type: object
       description: Why a tier has no option, in the quote's OfferConstraint vocabulary. tier is omitted when the
@@ -1226,7 +1243,9 @@ components:
           description: Present when RELEASED.
         atRiskReason:
           type: string
-          description: Present while AT_RISK.
+          description: 'Present while AT_RISK. One of NODE_UNSOURCEABLE, PACKAGE_EXCEPTION, INDUCTION_DEFERRED, DEPARTURE_CANCELLED,
+            WAVE_CANCELLED, BOOKING_FAILED, BOOKING_MOVED or PREDICTED_LATE (a departure of the witness path is past its expected
+            arrival with no arrival seen). A PREDICTED_LATE promise stays AT_RISK until it is judged, even if the load arrives later.'
     PromisePage:
       type: object
       required:

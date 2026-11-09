@@ -94,7 +94,7 @@ Source: `cmd/api/main.go`, `cmd/api/workers.go`, `cmd/mcp/main.go`, `cmd/a2a/mai
 
 ## Data stores
 
-One PostgreSQL database, owned by `cmd/api` and shared read-only by `cmd/mcp` and `cmd/a2a`. Migrations: `internal/adapters/outbound/postgres/migrations/0001_delivery_promise_schema` to `0005_listing_owner` (the owner key of `rm_listings`, ADR 0017).
+One PostgreSQL database, owned by `cmd/api` and shared read-only by `cmd/mcp` and `cmd/a2a`. Migrations: `internal/adapters/outbound/postgres/migrations/0001_delivery_promise_schema` to `0005_listing_owner` (the owner key of `rm_listings`, ADR 0017), then `0007_node_tier_eligibility` (the fast-tier eligibility read model, ADR 0022).
 
 | Table(s) | Holds |
 | --- | --- |

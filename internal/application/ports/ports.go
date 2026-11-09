@@ -53,6 +53,13 @@ type PromiseRepository interface {
 	ListHoldsExpired(ctx context.Context, now time.Time, limit int) ([]promise.ID, error)
 	// ListAtRisk returns the ids of AT_RISK promises, oldest first, at most limit.
 	ListAtRisk(ctx context.Context, limit int) ([]promise.ID, error)
+	// ListAtRiskPage returns the ids of AT_RISK promises in the same order as
+	// ListAtRisk (oldest first), skipping the first offset, at most limit.
+	ListAtRiskPage(ctx context.Context, offset, limit int) ([]promise.ID, error)
+	// ListConfirmed returns the ids of CONFIRMED promises with an id greater
+	// than after, ordered by id, at most limit; an empty after starts at the
+	// first. The late-risk sweep pages through them (ADR 0021).
+	ListConfirmed(ctx context.Context, after promise.ID, limit int) ([]promise.ID, error)
 	// ListActiveByPath returns the ids of CONFIRMED and AT_RISK promises whose
 	// witness path uses the departure or the wave of the filter.
 	ListActiveByPath(ctx context.Context, f repository.PromiseRiskFilter) ([]promise.ID, error)
@@ -246,4 +253,11 @@ type PromiseMetrics interface {
 	// PromiseRefused counts a MakePromise that made no promise; reason is a
 	// stable, low-cardinality slug.
 	PromiseRefused(ctx context.Context, reason string)
+	// TierCandidatesExcluded counts n candidate nodes removed from a fast tier
+	// because node-performance revoked their eligibility (ADR 0022); tier is
+	// SAME_DAY or NEXT_DAY.
+	TierCandidatesExcluded(ctx context.Context, tier string, n int)
+	// TierEligibilityIgnored counts a NodeTierEligibilityChanged the consumer
+	// could not apply; reason is `unknown-tier` or `missing-field`.
+	TierEligibilityIgnored(ctx context.Context, reason string)
 }

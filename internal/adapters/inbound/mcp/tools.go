@@ -142,7 +142,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"quote is kept on time, absent when the service has too few judgements of its segment to say, which is " +
 			"unknown and not zero), the policyVersion it was quoted under, quotedAt/expiresAt, " +
 			"and orderByAt (the latest instant the order can be placed and still make the quoted window, uncapped by " +
-			"the offer TTL). Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
+			"the offer TTL). capacityBand is a quote-time reading that is not stored, so it is omitted here. Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
 			"fails with not-found.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
@@ -199,7 +199,9 @@ func (d Deps) registerTools(server *mcp.Server) {
 		Description: "Estimate the delivery options of up to 50 catalogue items for one destination postal prefix, as a " +
 			"product listing page shows them: per item, in request order, the best option of every requested tier (tier, " +
 			"window start/end with the delivery station's IANA timeZone, basis SCHEDULED, MEASURED or NOMINAL, the optional calibrated " +
-			"confidence from 0 to 1 (absent means unknown, not zero), and orderByAt, the latest instant an order still makes that window) and the constraints of the tiers without one " +
+			"confidence from 0 to 1 (absent means unknown, not zero), orderByAt, the latest instant an order still makes that window, " +
+			"and the optional capacityBand AMPLE, TIGHT or SCARCE, the pressure on the capacity book behind that window, " +
+			"omitted when unknown) and the constraints of the tiers without one " +
 			"(DESTINATION_NOT_SERVED or ITEM_QUANTITY_NOT_AVAILABLE for the whole item, otherwise DELIVERY_SLA_UNAVAILABLE, " +
 			"NODE_CAPACITY_EXHAUSTED or PAST_ORDER_DEADLINE per tier). Each item is searched like a one-line quote, but " +
 			"nothing is stored: no offer, no event, no hold. An estimate is advisory and never reserves capacity; only a " +

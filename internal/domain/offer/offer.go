@@ -69,6 +69,9 @@ type Offer struct {
 	closedAt     time.Time
 	version      int64
 	pickupCutoff time.Time
+	// capacityBand is the capacity pressure read at quote time (ADR 0023). It
+	// is NOT persisted: Restore leaves it empty.
+	capacityBand shared.CapacityBand
 }
 
 // Snapshot is the persisted form of an offer. Restore validates it.
@@ -123,6 +126,9 @@ type Quote struct {
 	LatestMeetableAt time.Time
 	// PickupCutoffAt is the witness pickup cutoff (shipBy).
 	PickupCutoffAt time.Time
+	// CapacityBand is the pressure on the book the offer's window charges
+	// (ADR 0023); empty when the book has no finite capacity.
+	CapacityBand shared.CapacityBand
 }
 
 // New creates a QUOTED offer at version 1 and raises DeliveryOfferQuoted.
@@ -143,50 +149,13 @@ func New(q Quote, now time.Time) (*Offer, []shared.Event, error) {
 		id: q.ID, groupNo: q.GroupNo, destination: q.DestinationPrefix, tier: q.Tier, lines: slices.Clone(q.Lines),
 		window: q.Window, witness: q.Witness.Clone(), basis: q.Basis, confidence: q.Confidence, policy: q.PolicyVersion, quotedAt: now,
 		expiresAt: shared.UTC(q.ExpiresAt), orderByAt: shared.UTC(q.LatestMeetableAt), state: StateQuoted,
-		version: 1, pickupCutoff: shared.UTC(q.PickupCutoffAt),
+		version: 1, pickupCutoff: shared.UTC(q.PickupCutoffAt), capacityBand: q.CapacityBand,
 	}
 	ev := DeliveryOfferQuoted{
 		Header: shared.Header{Version: o.version, At: now}, OfferID: o.id, Tier: o.tier, DestinationPrefix: o.destination,
-		NodeID: o.witness.NodeID, Window: o.window, Basis: o.basis, Confidence: o.confidence, PolicyVersion: o.policy, ExpiresAt: o.expiresAt,
+		NodeID: o.witness.NodeID, Window: o.window, Basis: o.basis, Confidence: o.confidence, PolicyVersion: o.policy, ExpiresAt: o.expiresAt, CapacityBand: o.capacityBand,
 	}
 	return o, []shared.Event{ev}, nil
-}
-
-func validateQuote(q Quote) error {
-	if !shared.ValidID(string(q.ID)) {
-		return shared.Invalid("offerId %q is not a valid id", q.ID)
-	}
-	if q.GroupNo < 1 || q.GroupNo > shared.MaxLines {
-		return shared.Invalid("groupNo must be between 1 and %d", shared.MaxLines)
-	}
-	if !shared.ValidPostalPrefix(q.DestinationPrefix) {
-		return shared.Invalid("destinationPostalPrefix %q is not valid", q.DestinationPrefix)
-	}
-	if !q.Tier.Valid() {
-		return shared.Invalid("tier %q is not a tier", q.Tier)
-	}
-	if !q.Basis.Valid() {
-		return shared.Invalid("basis %q is not SCHEDULED, NOMINAL or MEASURED", q.Basis)
-	}
-	if q.PolicyVersion == "" || len(q.PolicyVersion) > shared.MaxID {
-		return shared.Invalid("policyVersion is required")
-	}
-	if q.TTL <= 0 {
-		return shared.Invalid("the offer TTL must be positive")
-	}
-	if err := shared.ValidateLines(q.Lines); err != nil {
-		return err
-	}
-	if err := q.Window.Validate(); err != nil {
-		return err
-	}
-	if err := q.Witness.Validate(q.Basis); err != nil {
-		return err
-	}
-	if q.Basis == shared.BasisNominal && !q.Tier.AllowsNominal() {
-		return fmt.Errorf("%w: %s", ErrNominalBasisNotAllowedForTier, q.Tier)
-	}
-	return nil
 }
 
 // Restore rebuilds a persisted offer, validating every invariant.
@@ -200,31 +169,6 @@ func Restore(s Snapshot) (*Offer, error) {
 		expiresAt: shared.UTC(s.ExpiresAt), orderByAt: shared.UTC(s.OrderByAt), state: s.State,
 		closedAt: shared.UTC(s.ClosedAt), version: s.Version, pickupCutoff: shared.UTC(s.PickupCutoffAt),
 	}, nil
-}
-
-func checkSnapshot(s Snapshot) error {
-	if s.Version < 1 {
-		return errors.New("a version of at least 1 is required")
-	}
-	if !s.State.Valid() {
-		return fmt.Errorf("state %q is not QUOTED, EXPIRED or CONSUMED", s.State)
-	}
-	if s.QuotedAt.IsZero() || !s.ExpiresAt.After(s.QuotedAt) {
-		return errors.New("expiresAt must be after quotedAt")
-	}
-	if err := validateQuote(Quote{
-		ID: s.ID, GroupNo: s.GroupNo, DestinationPrefix: s.DestinationPrefix, Tier: s.Tier, Lines: s.Lines, Window: s.Window,
-		Witness: s.Witness, Basis: s.Basis, PolicyVersion: s.PolicyVersion, TTL: time.Nanosecond,
-	}); err != nil {
-		return err
-	}
-	if s.State == StateQuoted && !s.ClosedAt.IsZero() {
-		return errors.New("a QUOTED offer has no closedAt")
-	}
-	if s.State != StateQuoted && s.ClosedAt.IsZero() {
-		return errors.New("an EXPIRED or CONSUMED offer needs closedAt")
-	}
-	return nil
 }
 
 // Consume moves a QUOTED offer, not yet past expiresAt, to CONSUMED. Anything
@@ -301,6 +245,11 @@ func (o *Offer) ExpiresAt() time.Time { return o.expiresAt }
 // handling, in business time). Unlike ExpiresAt it is not capped by the offer
 // TTL: ordering before it keeps the quoted window even after a re-quote.
 func (o *Offer) OrderByAt() time.Time { return o.orderByAt }
+
+// CapacityBand returns the capacity pressure read when the offer was quoted
+// (ADR 0023): empty when the book has no finite capacity and always empty on an
+// offer restored from storage, because the band is a quote-time reading.
+func (o *Offer) CapacityBand() shared.CapacityBand { return o.capacityBand }
 
 // PickupCutoffAt returns the witness pickup cutoff (shipBy).
 func (o *Offer) PickupCutoffAt() time.Time { return o.pickupCutoff }

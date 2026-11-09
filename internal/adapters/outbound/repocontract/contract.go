@@ -28,10 +28,14 @@ type Fixture struct {
 	Policies  ports.PolicyRepository
 	Network   ports.NetworkViews
 	Shipments ports.ShipmentViews
+	// TierEligibility is the NodeTierEligibility read model (ADR 0022).
+	TierEligibility ports.NodeTierEligibility
 	// Calibration is the PromiseCalibrationView (ADR 0020).
 	Calibration ports.PromiseCalibrationView
 	Outbox      ports.EventOutbox
 	Inbox       ports.Inbox
+	// Arrivals is the DepartureArrival read model (ADR 0021).
+	Arrivals ports.DepartureArrivals
 	// OutboxCount returns the number of outbox rows committed so far.
 	OutboxCount func() int
 }
@@ -50,7 +54,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 	}{
 		{"offers", offerCases}, {"promises", promiseCases}, {"books", bookCases}, {"policies", policyCases},
 		{"network views", networkCases}, {"shipment views", shipmentCases}, {"unit of work", unitOfWorkCases},
-		{"owners", ownerCases}, {"calibration", calibrationCases},
+		{"owners", ownerCases}, {"tier eligibility", tierEligibilityCases}, {"late risk", lateRiskCases}, {"calibration", calibrationCases},
 	}
 	for _, g := range groups {
 		for _, c := range g.cases {

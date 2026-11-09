@@ -72,6 +72,8 @@ func goldenCases() map[string]shared.Event {
 			Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute)},
 		"DeliveryOfferQuoted_confident": offer.DeliveryOfferQuoted{Header: hdr, OfferID: "off-4", Tier: shared.TierNextDay, DestinationPrefix: "787", NodeID: "N-AUS3",
 			Window: win, Basis: shared.BasisMeasured, Confidence: shared.NewConfidence(0.973), PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute)},
+		"DeliveryOfferQuoted_capacityBand": offer.DeliveryOfferQuoted{Header: hdr, OfferID: "off-1", Tier: shared.TierNextDay, DestinationPrefix: "787", NodeID: "N-AUS3",
+			Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute), CapacityBand: shared.BandTight},
 		"PromisePolicyPublished": policy.PromisePolicyPublished{Header: hdr, PolicyVersion: "v2", Number: 2, OfferTTLMinutes: 10, HoldTTLMinutes: 15,
 			PackagesPerOrder: 2, SharePercent: 80, TransitWindowDays: 21, TransitServiceLevelPercent: 95, MinTransitObservations: 30, PublishedAt: t0,
 			TargetOnTimeProbabilityPercent: 90, MinCalibrationObservations: 40, CalibrationWindowDays: 14, MaxCalibrationBufferMinutes: 0,

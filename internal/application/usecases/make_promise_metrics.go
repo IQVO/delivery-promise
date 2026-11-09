@@ -34,8 +34,10 @@ const internalErrorReason = "internal-error"
 // noMetrics is the PromiseMetrics of a Deps without one.
 type noMetrics struct{}
 
-func (noMetrics) PromiseMade(context.Context)            {}
-func (noMetrics) PromiseRefused(context.Context, string) {}
+func (noMetrics) PromiseMade(context.Context)                         {}
+func (noMetrics) PromiseRefused(context.Context, string)              {}
+func (noMetrics) TierCandidatesExcluded(context.Context, string, int) {}
+func (noMetrics) TierEligibilityIgnored(context.Context, string)      {}
 
 // recordMakePromise counts one MakePromise attempt: made when a new promise was
 // created, refused with the reason of err on failure, nothing for a replay.

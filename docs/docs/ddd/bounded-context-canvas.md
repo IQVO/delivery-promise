@@ -90,10 +90,10 @@ Tell a shopper, before and at purchase, the date a package will arrive, and make
 | last-mile-delivery | `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged`, `DeliveryWaveCancelled`, `PackageInductionDeferred` | Events | `retailnetwork.last-mile-delivery.events` | Conformist |
 | node-topology | `NodeRegistered`, `NodeOperationalProfileDeclared`, `NodeActivated`, `NodeSuspended`, `NodeRetired`, `LaneOpened`, `LaneClosed`, `ServiceAreaAssigned`, `RegionDefined` | Events | `retailnetwork.node-topology.events` | Conformist |
 | offer-availability | `CatalogItemCreated`, `CatalogItemDiscontinued`, `ListingCreated`, `ListingAvailabilityChanged`, `ListingSuppressed`, `ListingRestored` | Events | `retailnetwork.offer-availability.events` | Conformist |
-| node-performance | `NodeScorecardUpdated` | Event | `retailnetwork.node-performance.events` | Conformist |
+| node-performance | `NodeScorecardUpdated`, `NodeTierEligibilityChanged` | Events | `retailnetwork.node-performance.events` | Conformist |
 | agents, console | the REST reads, five MCP tools, two A2A skills | Queries | REST GET, MCP, A2A | none negotiated |
 
-36 consumed types in total. The relationship column states the pattern the aggregator's model assigns; this repository only records that it conforms to each upstream vocabulary (tolerant local copies in `apis/asyncapi.yaml`).
+37 consumed types in total. The relationship column states the pattern the aggregator's model assigns; this repository only records that it conforms to each upstream vocabulary (tolerant local copies in `apis/asyncapi.yaml`).
 
 ## Outbound communication
 
@@ -115,7 +115,7 @@ Full glossary: [Ubiquitous language](/docs/ddd/ubiquitous-language). Core terms:
 2. **Fast tiers are never quoted from nominal times.** Only `STANDARD` may fall back to nominal lane transit and then records basis `NOMINAL`. A lane that runs late is quoted from its measured transit instead: basis `MEASURED` (ADR 0014).
 3. **A promise holds capacity** on the witness node's pickup cutoff; provisional holds expire (`holdTtlMinutes`).
 4. **One promise per shipment group.** The cart is grouped onto the fewest nodes (`ErrGroupSpansNodes` guards a group).
-5. **Handicap, never silent exclusion.** A weak node's ship-by moves later by its scorecard grade.
+5. **Handicap, never silent exclusion.** A weak node's ship-by moves later by its scorecard grade. The one exclusion is node-performance's own: a node it declares ineligible for `SAME_DAY` or `NEXT_DAY` (7-day on-time handover, with hysteresis) is dropped from those tiers' candidates of future quotes and keeps `TWO_DAY` and `STANDARD` (ADR 0022).
 6. **Kept means on time**: delivered on or before `deliverByLatest`; a lost or returned package breaks the promise.
 7. **Dates only move later**: a revision never moves `deliverByLatest` earlier.
 8. **Peak control by deadline**: per tier and region, a policy-versioned local order deadline stops quoting that tier (`PAST_ORDER_DEADLINE`).

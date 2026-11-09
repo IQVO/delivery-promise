@@ -32,6 +32,7 @@ const (
 type PromiseMetrics struct {
 	counter metric.Int64Counter
 	calibrationMetrics
+	tiers tierCounters
 }
 
 var (
@@ -58,7 +59,11 @@ func NewPromiseMetrics() (*PromiseMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PromiseMetrics{counter: counter, calibrationMetrics: calibration}, nil
+	tiers, err := newTierCounters()
+	if err != nil {
+		return nil, err
+	}
+	return &PromiseMetrics{counter: counter, calibrationMetrics: calibration, tiers: tiers}, nil
 }
 
 // PromiseMade counts a promise that was made.

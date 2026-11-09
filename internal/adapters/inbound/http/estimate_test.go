@@ -22,7 +22,7 @@ var updateGolden = flag.Bool("update", false, "rewrite the HTTP golden files")
 const estimateBody = `{"destinationPostalPrefix":"787","items":[{"catalogItemId":"ci-1001","quantity":2},{"catalogItemId":"ci-404","quantity":1}],"tiers":["NEXT_DAY","TWO_DAY","STANDARD"]}`
 
 // sampleEstimate is the fixed answer the golden pins: one item with two
-// options (one without orderByAt) and a per-tier constraint, one item with an
+// options (one without orderByAt and capacityBand) and a per-tier constraint, one item with an
 // item-wide constraint.
 func sampleEstimate() views.EstimateResult {
 	cdt := time.FixedZone("CDT", -5*3600)
@@ -34,7 +34,7 @@ func sampleEstimate() views.EstimateResult {
 			{
 				CatalogItemID: "ci-1001", Quantity: 2,
 				Options: []views.EstimateOption{
-					{Tier: "NEXT_DAY", Basis: "SCHEDULED", OrderByAt: &orderBy, Window: views.EstimateWindow{
+					{Tier: "NEXT_DAY", Basis: "SCHEDULED", OrderByAt: &orderBy, CapacityBand: "TIGHT", Window: views.EstimateWindow{
 						Start: time.Date(2026, 10, 23, 9, 0, 0, 0, cdt).UTC(), End: time.Date(2026, 10, 23, 21, 0, 0, 0, cdt).UTC(), TimeZone: "America/Chicago",
 					}},
 					{Tier: "STANDARD", Basis: "NOMINAL", Window: views.EstimateWindow{

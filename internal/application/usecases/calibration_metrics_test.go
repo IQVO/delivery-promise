@@ -24,8 +24,10 @@ type calibrationRecorder struct {
 	thin    []string
 }
 
-func (*calibrationRecorder) PromiseMade(context.Context)            {}
-func (*calibrationRecorder) PromiseRefused(context.Context, string) {}
+func (*calibrationRecorder) PromiseMade(context.Context)                         {}
+func (*calibrationRecorder) PromiseRefused(context.Context, string)              {}
+func (*calibrationRecorder) TierCandidatesExcluded(context.Context, string, int) {}
+func (*calibrationRecorder) TierEligibilityIgnored(context.Context, string)      {}
 func (r *calibrationRecorder) CalibrationBufferApplied(_ context.Context, tier string, minutes int) {
 	r.buffers[tier] = append(r.buffers[tier], minutes)
 }

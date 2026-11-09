@@ -129,6 +129,11 @@ type BookView struct {
 	Open           bool
 	Room           int
 	HoldDeadlineAt time.Time
+	// Share is the book's capacity share and Used its provisional plus
+	// confirmed holds: the quantities the capacity band reads (ADR 0023).
+	// A zero Share means the view carries no capacity figure.
+	Share int
+	Used  int
 }
 
 // Input is the snapshot a search runs on.
@@ -165,6 +170,11 @@ type Input struct {
 	// (ADR 0020). A nil closure never buffers, and the paths are then computed
 	// once for all tiers, as before calibration existed.
 	CalibrationBuffer func(tier shared.Tier, basis shared.Basis, grade Grade) Calibration
+	// TierIneligible says a fulfillment node is currently ineligible for a fast
+	// tier (node-performance revoked it, ADR 0022). Only SAME_DAY and NEXT_DAY
+	// are ever asked about; an ineligible node is removed from that tier's
+	// candidates, and every other tier keeps it. A nil closure never filters.
+	TierIneligible func(nodeID string, tier shared.Tier) bool
 	// Books holds the existing books by bookId; a missing book is opened lazily
 	// with the computed share.
 	Books             map[string]BookView
@@ -203,6 +213,10 @@ type Candidate struct {
 	Direct bool
 	// Opening is the book to open when it does not exist yet.
 	Opening book.Opening
+	// CapacityBand is the pressure on the book the hold goes on, at search
+	// time (ADR 0023); empty when the book has no finite capacity. It is not
+	// an input to ranking.
+	CapacityBand shared.CapacityBand
 	// Lines are the group's lines, each with the owner whose stock at NodeID
 	// covers it (shared.ChooseOwner, ADR 0017); set on the ranked candidates of
 	// a group.

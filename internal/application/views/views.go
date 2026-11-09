@@ -58,6 +58,10 @@ type Offer struct {
 	QuotedAt      time.Time `json:"quotedAt"`
 	ExpiresAt     time.Time `json:"expiresAt"`
 	OrderByAt     time.Time `json:"orderByAt"`
+	// CapacityBand is AMPLE, TIGHT or SCARCE, the pressure on the book of the
+	// offer's window when it was quoted (ADR 0023); omitted when unknown, and
+	// on an offer read back from storage.
+	CapacityBand string `json:"capacityBand,omitempty"`
 }
 
 // Unavailable says why a (group, tier) has no offer.
@@ -208,7 +212,7 @@ func FromOffer(o *offer.Offer) Offer {
 		OfferID: string(o.ID()), State: string(o.State()), GroupNo: o.GroupNo(), DestinationPostalPrefix: o.DestinationPrefix(),
 		Tier: string(o.Tier()), Lines: lines(o.Lines()), Window: Window{Earliest: o.Window().Earliest.UTC(), Latest: o.Window().Latest.UTC(), TimeZone: o.Window().TimeZone},
 		WitnessPath: witness(o.Witness()), Basis: string(o.Basis()), Confidence: o.Confidence().Ptr(), PolicyVersion: o.PolicyVersion(), QuotedAt: o.QuotedAt().UTC(), ExpiresAt: o.ExpiresAt().UTC(),
-		OrderByAt: o.OrderByAt().UTC(),
+		OrderByAt: o.OrderByAt().UTC(), CapacityBand: string(o.CapacityBand()),
 	}
 }
 

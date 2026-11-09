@@ -210,11 +210,13 @@ sequenceDiagram
   S->>DB: book.ReleaseProvisional, append PromiseReleased
   SW->>S: CloseBooks(100)
   S->>DB: OPEN books at cutoff to CLOSED
+  SW->>S: FlagPredictedLate(100)
+  S->>DB: CONFIRMED promises with a late departure and no arrival row to AT_RISK (PREDICTED_LATE), append PromiseAtRisk
   SW->>S: RepriceAtRisk(100)
-  S->>DB: retry re-promise of AT_RISK promises
+  S->>DB: retry re-promise of AT_RISK promises (a reachable PREDICTED_LATE one is skipped)
 ```
 
-Source: `cmd/api/workers.go` (`sweepOnce`), `internal/application/usecases/lifecycle.go`, `internal/application/usecases/risk.go`.
+Source: `cmd/api/workers.go` (`sweepOnce`), `internal/application/usecases/lifecycle.go`, `internal/application/usecases/risk.go`, `internal/application/usecases/late_risk.go`.
 
 ## Read through MCP or A2A
 
