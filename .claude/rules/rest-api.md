@@ -22,6 +22,7 @@ the wiring is `cmd/api/main.go` `run`:
 - `POST /promise-policies` -> `PublishPromisePolicy` (201)
 - `GET /promise-policies/current` -> `CurrentPolicy`
 - `GET /healthz` (liveness), `GET /readyz` (readiness): not business operations.
+- Not served by `cmd/api`: the read-only `GET /reports/...` routes (tag `reports`, `cmd/dp-reports`, `internal/adapters/inbound/reportshttp`, ADR 0018; rules in `.claude/rules/analytics.md`).
 
 ## Conventions
 

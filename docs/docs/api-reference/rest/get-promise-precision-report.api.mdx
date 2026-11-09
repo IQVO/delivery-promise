@@ -1,0 +1,70 @@
+---
+id: get-promise-precision-report
+title: "Window width, exact-day, revision and unkeepable figures of the promises made, per day and tier"
+description: "Per UTC day of PromiseMade (its CloudEvents time) and per tier. windowMinutes is the mean / p50 / p90 of deliverByLatest - deliverByEarliest in minutes; exactDayShare is the share of promises whose window starts and ends on the same LOCAL calendar day in the window's timeZone (ADR 0011); a window without a loadable zone is read in UTC and also counted in zoneUnknown. revisedShare is the share with at least one PromiseRevised; unkeepableCount counts those with a PromiseUnkeepable (both at any time). Days without a promise are omitted. Served by cmd/dp-reports (ADR 0018)."
+sidebar_label: "Window width, exact-day, revision and unkeepable figures of the promises made, per day and tier"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Window width, exact-day, revision and unkeepable figures of the promises made, per day and tier"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/reports/promise-precision"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Per UTC day of PromiseMade (its CloudEvents time) and per tier. windowMinutes is the mean / p50 / p90 of deliverByLatest - deliverByEarliest in minutes; exactDayShare is the share of promises whose window starts and ends on the same LOCAL calendar day in the window's timeZone (ADR 0011); a window without a loadable zone is read in UTC and also counted in zoneUnknown. revisedShare is the share with at least one PromiseRevised; unkeepableCount counts those with a PromiseUnkeepable (both at any time). Days without a promise are omitted. Served by cmd/dp-reports (ADR 0018).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-promise-precision-report.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-promise-precision-report.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-promise-precision-report.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

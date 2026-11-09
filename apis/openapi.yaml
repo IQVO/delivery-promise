@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Delivery Promise API
-  version: 0.2.0
+  version: 0.3.0
   description: 'REST contract of the delivery-promise bounded context (Core, commerce tier) of the retail network,
     derived from retail-network-docs model/model.yaml (contexts[delivery-promise].rest) and the FINAL cross-context
     decisions (contracts-delta E7, E8, E9; gap register G8, G9, G19, G21, G22). The quote route is an Open Host
@@ -16,7 +16,9 @@ info:
     promise-closed, revision-moves-earlier (409); group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier
     (422). Infrastructure slugs: malformed-request, idempotency-key-required, idempotency-key-invalid (400), idempotency-key-reused (409), resource-not-found (404), internal-error (500). Every
     POST requires Idempotency-Key (fleet REST API guideline); a repeat with the same key, method, path and body
-    replays the first response for 24 hours with the Idempotency-Replayed header.'
+    replays the first response for 24 hours with the Idempotency-Replayed header. The read-only analytics reports (tag
+    reports, ADR 0018) are served by cmd/dp-reports on its own port (per-path server) from the separate analytical
+    database; their range errors are invalid-report-range (400).'
   contact:
     name: delivery-promise maintainers
     url: https://github.com/IQVO/delivery-promise
@@ -32,6 +34,9 @@ tags:
 - name: PromisePolicy
   description: 'Versioned promise policy: offer TTL, hold TTL, packages per order, capacity share and per-tier order
     deadlines (aggregate PromisePolicy, G19).'
+- name: reports
+  description: Read-only analytics reports (ADR 0018), served by cmd/dp-reports from the separate analytical database
+    the projector feeds from this context's own events. Days are UTC calendar days; from and to are inclusive dates.
 paths:
   /delivery-quotes:
     post:
@@ -353,6 +358,110 @@ paths:
                 $ref: '#/components/schemas/PromisePolicy'
         '500':
           $ref: '#/components/responses/InternalError'
+  /reports/promise-reliability:
+    servers:
+    - url: http://localhost:8092
+    get:
+      tags:
+      - reports
+      operationId: getPromiseReliabilityReport
+      x-pagination-exempt: report
+      summary: Kept rate of the judged promises, per day, tier and basis
+      description: Per UTC day of judgement (the CloudEvents time of PromiseKept / PromiseBroken), per tier and per basis
+        of the promise AS MADE (UNKNOWN while its PromiseMade is not projected). judged = kept + broken; keptRate = kept
+        / judged; brokenByCause splits broken by the PromiseBroken cause (LATE, LOST, RETURNED); lateByMinutes is the
+        continuous p50 / p90 of lateByMinutes over the broken LATE promises, null when there is none. Days without a
+        judgement are omitted. Served by cmd/dp-reports (ADR 0018).
+      parameters:
+      - $ref: '#/components/parameters/ReportFrom'
+      - $ref: '#/components/parameters/ReportTo'
+      responses:
+        '200':
+          description: The report for the range.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromiseReliabilityReport'
+        '400':
+          $ref: '#/components/responses/InvalidReportRange'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /reports/promise-precision:
+    servers:
+    - url: http://localhost:8092
+    get:
+      tags:
+      - reports
+      operationId: getPromisePrecisionReport
+      x-pagination-exempt: report
+      summary: Window width, exact-day, revision and unkeepable figures of the promises made, per day and tier
+      description: Per UTC day of PromiseMade (its CloudEvents time) and per tier. windowMinutes is the mean / p50 / p90
+        of deliverByLatest - deliverByEarliest in minutes; exactDayShare is the share of promises whose window starts
+        and ends on the same LOCAL calendar day in the window's timeZone (ADR 0011); a window without a loadable zone is
+        read in UTC and also counted in zoneUnknown. revisedShare is the share with at least one PromiseRevised;
+        unkeepableCount counts those with a PromiseUnkeepable (both at any time). Days without a promise are omitted.
+        Served by cmd/dp-reports (ADR 0018).
+      parameters:
+      - $ref: '#/components/parameters/ReportFrom'
+      - $ref: '#/components/parameters/ReportTo'
+      responses:
+        '200':
+          description: The report for the range.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromisePrecisionReport'
+        '400':
+          $ref: '#/components/responses/InvalidReportRange'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /reports/quote-conversion:
+    servers:
+    - url: http://localhost:8092
+    get:
+      tags:
+      - reports
+      operationId: getQuoteConversionReport
+      x-pagination-exempt: report
+      summary: Offers quoted against promises made, per day and tier
+      description: Per UTC day and tier, offersQuoted counts DeliveryOfferQuoted and promisesMade counts PromiseMade of
+        that day (each by its own CloudEvents time); conversion = promisesMade / offersQuoted, null when no offer was
+        quoted that day and tier. Same-day counts, not an offer-to-promise cohort. Days with neither are omitted. Served
+        by cmd/dp-reports (ADR 0018).
+      parameters:
+      - $ref: '#/components/parameters/ReportFrom'
+      - $ref: '#/components/parameters/ReportTo'
+      responses:
+        '200':
+          description: The report for the range.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteConversionReport'
+        '400':
+          $ref: '#/components/responses/InvalidReportRange'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /reports/freshness:
+    servers:
+    - url: http://localhost:8092
+    get:
+      tags:
+      - reports
+      operationId: getReportFreshness
+      summary: How far the analytics projection is behind
+      description: asOf is the CloudEvents time of the newest event the projector applied; lagSeconds is now minus asOf,
+        never negative. Both are null until the first event. One endpoint for every report, which all read the same
+        projection. Served by cmd/dp-reports (ADR 0018).
+      responses:
+        '200':
+          description: The projection's freshness.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportFreshness'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   parameters:
     IdempotencyKey:
@@ -399,6 +508,22 @@ components:
       description: The Promise id.
       schema:
         type: string
+    ReportFrom:
+      name: from
+      in: query
+      required: false
+      description: First UTC day of the range, inclusive. Omitted = 29 days before `to` (a 30-day range).
+      schema:
+        type: string
+        format: date
+    ReportTo:
+      name: to
+      in: query
+      required: false
+      description: Last UTC day of the range, inclusive. Omitted = today. At most 366 days from `from`.
+      schema:
+        type: string
+        format: date
   responses:
     NotFound:
       description: 'Not found (not-found): the offer or promise does not exist; an identifier carrying a NUL character is resource-not-found.'
@@ -448,6 +573,13 @@ components:
             $ref: '#/components/schemas/Problem'
     Unprocessable:
       description: Validation failure (validation-failed, group-spans-nodes, invalid-promise-terms, nominal-basis-not-allowed-for-tier).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InvalidReportRange:
+      description: invalid-report-range. from or to is not a date (YYYY-MM-DD), from is after to, or the range exceeds
+        366 days.
       content:
         application/problem+json:
           schema:
@@ -1074,3 +1206,219 @@ components:
         publishedAt:
           type: string
           format: date-time
+    PromiseReliabilityReport:
+      type: object
+      required:
+      - from
+      - to
+      - days
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromiseReliabilityDay'
+    PromiseReliabilityDay:
+      type: object
+      required:
+      - day
+      - tier
+      - basis
+      - judged
+      - kept
+      - broken
+      - keptRate
+      - brokenByCause
+      - lateByMinutes
+      properties:
+        day:
+          type: string
+          format: date
+        tier:
+          type: string
+          description: The promise's tier as made (a Tier value), or UNKNOWN while its PromiseMade is not projected.
+        basis:
+          type: string
+          description: The promise's basis as made (SCHEDULED, MEASURED, NOMINAL), or UNKNOWN while its PromiseMade is not
+            projected.
+        judged:
+          type: integer
+          minimum: 1
+        kept:
+          type: integer
+          minimum: 0
+        broken:
+          type: integer
+          minimum: 0
+        keptRate:
+          type: number
+          minimum: 0
+          maximum: 1
+        brokenByCause:
+          $ref: '#/components/schemas/BrokenByCause'
+        lateByMinutes:
+          $ref: '#/components/schemas/LatenessMinutes'
+    BrokenByCause:
+      type: object
+      description: The broken promises per PromiseBroken cause.
+      required:
+      - late
+      - lost
+      - returned
+      properties:
+        late:
+          type: integer
+          minimum: 0
+        lost:
+          type: integer
+          minimum: 0
+        returned:
+          type: integer
+          minimum: 0
+    LatenessMinutes:
+      type: object
+      description: Continuous percentiles of lateByMinutes over the broken LATE promises; null when there is none.
+      required:
+      - p50
+      - p90
+      properties:
+        p50:
+          type: number
+          minimum: 0
+          nullable: true
+        p90:
+          type: number
+          minimum: 0
+          nullable: true
+    PromisePrecisionReport:
+      type: object
+      required:
+      - from
+      - to
+      - days
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/PromisePrecisionDay'
+    PromisePrecisionDay:
+      type: object
+      required:
+      - day
+      - tier
+      - promisesMade
+      - windowMinutes
+      - exactDayShare
+      - zoneUnknown
+      - revisedShare
+      - unkeepableCount
+      properties:
+        day:
+          type: string
+          format: date
+        tier:
+          type: string
+          description: The tier of the promise as made.
+        promisesMade:
+          type: integer
+          minimum: 1
+        windowMinutes:
+          $ref: '#/components/schemas/WindowMinutes'
+        exactDayShare:
+          type: number
+          minimum: 0
+          maximum: 1
+        zoneUnknown:
+          type: integer
+          minimum: 0
+          description: Promises whose window named no loadable time zone and was read in UTC.
+        revisedShare:
+          type: number
+          minimum: 0
+          maximum: 1
+        unkeepableCount:
+          type: integer
+          minimum: 0
+    WindowMinutes:
+      type: object
+      description: The delivery window width deliverByLatest - deliverByEarliest, in minutes.
+      required:
+      - mean
+      - p50
+      - p90
+      properties:
+        mean:
+          type: number
+          minimum: 0
+        p50:
+          type: number
+          minimum: 0
+        p90:
+          type: number
+          minimum: 0
+    QuoteConversionReport:
+      type: object
+      required:
+      - from
+      - to
+      - days
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteConversionDay'
+    QuoteConversionDay:
+      type: object
+      required:
+      - day
+      - tier
+      - offersQuoted
+      - promisesMade
+      - conversion
+      properties:
+        day:
+          type: string
+          format: date
+        tier:
+          type: string
+        offersQuoted:
+          type: integer
+          minimum: 0
+        promisesMade:
+          type: integer
+          minimum: 0
+        conversion:
+          type: number
+          minimum: 0
+          nullable: true
+    ReportFreshness:
+      type: object
+      required:
+      - asOf
+      - lagSeconds
+      properties:
+        asOf:
+          type: string
+          format: date-time
+          nullable: true
+        lagSeconds:
+          type: number
+          minimum: 0
+          nullable: true

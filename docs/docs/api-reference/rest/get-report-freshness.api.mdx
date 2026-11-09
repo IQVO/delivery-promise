@@ -1,0 +1,60 @@
+---
+id: get-report-freshness
+title: "How far the analytics projection is behind"
+description: "asOf is the CloudEvents time of the newest event the projector applied; lagSeconds is now minus asOf, never negative. Both are null until the first event. One endpoint for every report, which all read the same projection. Served by cmd/dp-reports (ADR 0018)."
+sidebar_label: "How far the analytics projection is behind"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: docs/api-reference/rest/delivery-promise-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"How far the analytics projection is behind"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/reports/freshness"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+asOf is the CloudEvents time of the newest event the projector applied; lagSeconds is now minus asOf, never negative. Both are null until the first event. One endpoint for every report, which all read the same projection. Served by cmd/dp-reports (ADR 0018).
+
+<ParamsDetails>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-report-freshness.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-report-freshness.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

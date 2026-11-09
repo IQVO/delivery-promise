@@ -24,3 +24,9 @@ retailnetwork.delivery-promise.events and retailnetwork.delivery-promise.analyti
 
 The consumer is ON: group {{ .Values.config.consumerGroup }}, one consumer over the
 integration topics of the eight producing contexts.
+{{- if .Values.analytics.enabled }}
+
+Analytics read side (ADR 0018): {{ include "delivery-promise.projectorFullname" . }} projects
+retailnetwork.delivery-promise.events and .analytics (group {{ .Values.analytics.projector.consumerGroup }}) into the
+analytical database; {{ include "delivery-promise.reportsFullname" . }} serves GET /reports/... read-only.
+{{- end }}

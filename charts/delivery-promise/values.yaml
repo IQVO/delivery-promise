@@ -207,8 +207,8 @@ tolerations: []
 affinity: {}
 
 # ---------------------------------------------------------------------------
-# Optional components (ADR 0007 MCP, ADR 0010 A2A, ADR 0008 web remote). All are OFF by
-# default: a default render is the api alone.
+# Optional components (ADR 0007 MCP, ADR 0010 A2A, ADR 0008 web remote, ADR 0018
+# analytics read side). All are OFF by default: a default render is the api alone.
 # ---------------------------------------------------------------------------
 
 # cmd/mcp (ADR 0007): the read-only MCP server (Streamable HTTP on /mcp plus
@@ -325,3 +325,59 @@ frontend:
     requests:
       cpu: 50m
       memory: 64Mi
+
+# The analytics read side (ADR 0018), OFF by default: cmd/dp-projector projects
+# this context's own two topics (.events and .analytics) into a SEPARATE
+# analytical Postgres and cmd/dp-reports serves read-only reports over it. Both
+# run from the same image.
+analytics:
+  enabled: false
+  # LOG_LEVEL of both analytics binaries.
+  logLevel: "info"
+  database:
+    # The projector's read-write analytical DSN (DIRECT Postgres, not
+    # PgBouncer: it also runs the migrations). No password in committed values.
+    projectorUrl: ""
+    # The reports reader's DSN -- a read-only role where possible; falls back
+    # to projectorUrl when empty (local/dev).
+    reportsUrl: ""
+    # Name of an existing Secret holding ANALYTICS_DATABASE_URL (projector) and
+    # ANALYTICS_READER_DATABASE_URL (reports). Takes precedence over the URLs.
+    existingSecret: ""
+  projector:
+    replicaCount: 1
+    adminAddr: ":8091"                  # ADMIN_ADDR (/healthz, /readyz)
+    adminPort: 8091
+    # ANALYTICS_CONSUMER_GROUP: the projector's FIXED consumer group on
+    # retailnetwork.delivery-promise.events and .analytics.
+    consumerGroup: "delivery-promise-analytics"
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  reports:
+    replicaCount: 1
+    httpAddr: ":8092"                   # HTTP_ADDR
+    service:
+      type: ClusterIP
+      port: 80
+      targetPort: 8092
+    # Kong exposure: /api/delivery-promise/reports -> Service :80, prefix
+    # rewritten to /reports. Needs the Gateway parentRef from warehouse-infra.
+    route:
+      enabled: false
+      path: "/api/delivery-promise/reports"
+      parentRefs:
+        - name: ""
+          namespace: ""
+          sectionName: "http"
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi

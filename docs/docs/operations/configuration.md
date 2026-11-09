@@ -68,6 +68,37 @@ Source: `cmd/a2a/main.go`, `cmd/a2a/telemetry.go`. Like `cmd/mcp`, it never touc
 | `SERVICE_VERSION` | `dev` | no | `service.version`, also the `version` on the Agent Card. |
 | `ENVIRONMENT` | `local` | no | `deployment.environment.name`; also in the boot log line. |
 
+## `cmd/dp-projector` (analytics projector, ADR 0018)
+
+Writes ONLY the separate analytical database; never opens the OLTP database. Reads this context's own `retailnetwork.delivery-promise.events` and `retailnetwork.delivery-promise.analytics`, dead-letters poison to `retailnetwork.delivery-promise.analytics.dlq`. Serves `/healthz` and `/readyz` on the admin port.
+
+| Variable | Default | Required | Meaning | Chart value |
+| --- | --- | --- | --- | --- |
+| `ANALYTICS_DATABASE_URL` | none | **yes** | Direct DSN of the analytical database (read-write; runs the embedded analytical migrations). | `analytics.database.projectorUrl` or `analytics.database.existingSecret` |
+| `KAFKA_BROKERS` | none | **yes** | Comma-separated brokers. | `kafka.brokers` |
+| `ANALYTICS_CONSUMER_GROUP` | `delivery-promise-analytics` | no | The projector's fixed consumer group. | `analytics.projector.consumerGroup` |
+| `ADMIN_ADDR` | `:8091` | no | `/healthz` and `/readyz` listen address. | `analytics.projector.adminAddr` |
+| `LOG_LEVEL` | `info` | no | `debug`, `info`, `warn`/`warning`, `error`. | `analytics.logLevel` |
+| `OTEL_SERVICE_NAME` | `delivery-promise-projector` | no | `service.name`. | `otel.serviceName` + `-projector` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | no | Collector OTLP/gRPC endpoint. | `otel.endpoint` |
+| `SERVICE_VERSION` | `dev` | no | `service.version`. | image tag |
+| `ENVIRONMENT` | `local` | no | `deployment.environment.name`. | `environment` |
+
+## `cmd/dp-reports` (read-only analytics reports, ADR 0018)
+
+`GET /reports/promise-reliability`, `/reports/promise-precision`, `/reports/quote-conversion`, `/reports/freshness`, `/healthz`, `/readyz` over a read-only pool (15s statement timeout). No Kafka, no OLTP database.
+
+| Variable | Default | Required | Meaning | Chart value |
+| --- | --- | --- | --- | --- |
+| `ANALYTICS_READER_DATABASE_URL` | value of `ANALYTICS_DATABASE_URL` | **yes** (one of the two) | DSN of a read-only role on the analytical database. | `analytics.database.reportsUrl` (falls back to `projectorUrl`) |
+| `ANALYTICS_DATABASE_URL` | none | no | Single-role local fallback; the chart never renders it for the reports pod. | not rendered |
+| `HTTP_ADDR` | `:8092` | no | Listen address. | `analytics.reports.httpAddr` |
+| `LOG_LEVEL` | `info` | no | As above. | `analytics.logLevel` |
+| `OTEL_SERVICE_NAME` | `delivery-promise-reports` | no | `service.name`. | `otel.serviceName` + `-reports` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | no | Collector OTLP/gRPC endpoint. | `otel.endpoint` |
+| `SERVICE_VERSION` | `dev` | no | `service.version`. | image tag |
+| `ENVIRONMENT` | `local` | no | `deployment.environment.name`. | `environment` |
+
 ## Notes
 
 - The OpenTelemetry SDK additionally honours the standard `OTEL_RESOURCE_ATTRIBUTES` through `resource.Default()`; the service does not read it itself.
