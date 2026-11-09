@@ -159,6 +159,11 @@ type Input struct {
 	// too few observations. A nil closure never measures: the timetable stands
 	// (ADR 0014).
 	MeasuredTransit func(origin, dest string) (ok bool, minutes int)
+	// TierIneligible says a fulfillment node is currently ineligible for a fast
+	// tier (node-performance revoked it, ADR 0022). Only SAME_DAY and NEXT_DAY
+	// are ever asked about; an ineligible node is removed from that tier's
+	// candidates, and every other tier keeps it. A nil closure never filters.
+	TierIneligible func(nodeID string, tier shared.Tier) bool
 	// Books holds the existing books by bookId; a missing book is opened lazily
 	// with the computed share.
 	Books             map[string]BookView
