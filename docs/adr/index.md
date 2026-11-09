@@ -31,3 +31,4 @@ The decisions of `delivery-promise`, in the order they were taken. The ADR bodie
 | [0017](./0017-owner-aware-availability-and-promise-netting.md) | Owner-aware availability and promise netting | Accepted (2026-11-08) |
 | [0018](./0018-analytics-read-side.md) | Analytics read side | Accepted (2026-11-09) |
 | [0019](./0019-batch-delivery-estimates-for-listing-pages.md) | Batch delivery estimates for listing pages | Accepted (2026-11-09) |
+| [0021](./0021-a-sweep-flags-promises-whose-locked-path-is-running-late.md) | a sweep flags promises whose locked path is running late | Accepted (2026-11-09) |
