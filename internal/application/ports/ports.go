@@ -219,6 +219,20 @@ type IDGenerator interface {
 	NewPromiseID() promise.ID
 }
 
+// CalibrationMetrics records what the calibration buffer did (ADR 0020). It is
+// an optional capability of PromiseMetrics: the use cases record through it
+// when the Deps' Metrics also implements it, and not at all otherwise. The
+// implementation lives in internal/adapters/outbound/telemetry.
+type CalibrationMetrics interface {
+	// CalibrationBufferApplied records the buffer in minutes folded into the
+	// offer a quote built for the tier (0 when the segment added none).
+	CalibrationBufferApplied(ctx context.Context, tier string, minutes int)
+	// CalibrationSegmentBelowMinimum counts a segment a search loaded whose
+	// observations are fewer than minCalibrationObservations: it quotes as it
+	// did before calibration.
+	CalibrationSegmentBelowMinimum(ctx context.Context, tier, basis, nodeGrade string)
+}
+
 // PromiseMetrics records the business outcome of every MakePromise attempt
 // (Tier 2 of the fleet metrics convention). The use case calls it once per
 // attempt: PromiseMade when a new promise was held, PromiseRefused otherwise,

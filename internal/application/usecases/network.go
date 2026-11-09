@@ -97,6 +97,7 @@ func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Po
 		ExcludeNodes: opt.excludeNodes, ExcludeDepartures: opt.excludeDepartures, ExcludeWaves: opt.excludeWaves,
 		Nodes: map[string]search.Node{}, Grades: map[string]search.Grade{}, Books: map[string]search.BookView{},
 		Stock: func(string, string) []shared.OwnerStock { return nil }, MeasuredTransit: s.measuredTransitOf(ctx, pol, now),
+		CalibrationBuffer: s.calibrationBufferOf(ctx, pol, now),
 	}
 	area, err := s.Network.GetArea(ctx, prefix)
 	if errors.Is(err, ports.ErrNotFound) {

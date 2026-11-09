@@ -31,9 +31,13 @@ const (
 // no-op, so recording is cheap and safe in tests and local runs.
 type PromiseMetrics struct {
 	counter metric.Int64Counter
+	calibrationMetrics
 }
 
-var _ ports.PromiseMetrics = (*PromiseMetrics)(nil)
+var (
+	_ ports.PromiseMetrics     = (*PromiseMetrics)(nil)
+	_ ports.CalibrationMetrics = (*PromiseMetrics)(nil)
+)
 
 // NewPromiseMetrics registers the counter. It only fails if the instrument
 // name is invalid, which is a programming error, not a runtime condition. Call
@@ -50,7 +54,11 @@ func NewPromiseMetrics() (*PromiseMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PromiseMetrics{counter: counter}, nil
+	calibration, err := newCalibrationMetrics()
+	if err != nil {
+		return nil, err
+	}
+	return &PromiseMetrics{counter: counter, calibrationMetrics: calibration}, nil
 }
 
 // PromiseMade counts a promise that was made.
