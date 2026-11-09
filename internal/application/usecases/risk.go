@@ -102,7 +102,7 @@ func (s *Service) ReviseAtRisk(ctx context.Context, id promise.ID) error {
 	if err != nil {
 		return err
 	}
-	opt := searchOptions{singleGroup: true}
+	opt := searchOptions{singleGroup: true, existingPromise: true}
 	if a, err := s.Shipments.FindAssignmentByPromise(ctx, string(id)); err == nil {
 		opt.excludeNodes, opt.excludeDepartures = toSet(a.ExcludedNodes), toSet(a.ExcludedDepartures)
 		if a.Locked {

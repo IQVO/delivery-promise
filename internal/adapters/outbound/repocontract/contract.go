@@ -28,8 +28,10 @@ type Fixture struct {
 	Policies  ports.PolicyRepository
 	Network   ports.NetworkViews
 	Shipments ports.ShipmentViews
-	Outbox    ports.EventOutbox
-	Inbox     ports.Inbox
+	// TierEligibility is the NodeTierEligibility read model (ADR 0022).
+	TierEligibility ports.NodeTierEligibility
+	Outbox          ports.EventOutbox
+	Inbox           ports.Inbox
 	// OutboxCount returns the number of outbox rows committed so far.
 	OutboxCount func() int
 }
@@ -48,7 +50,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 	}{
 		{"offers", offerCases}, {"promises", promiseCases}, {"books", bookCases}, {"policies", policyCases},
 		{"network views", networkCases}, {"shipment views", shipmentCases}, {"unit of work", unitOfWorkCases},
-		{"owners", ownerCases},
+		{"owners", ownerCases}, {"tier eligibility", tierEligibilityCases},
 	}
 	for _, g := range groups {
 		for _, c := range g.cases {

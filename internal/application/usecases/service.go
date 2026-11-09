@@ -29,11 +29,14 @@ type Deps struct {
 	Network        ports.NetworkViews
 	Shipments      ports.ShipmentViews
 	TransitActuals ports.TransitActuals
-	Outbox         ports.EventOutbox
-	Inbox          ports.Inbox
-	Clock          ports.Clock
-	IDs            ports.IDGenerator
-	Logger         *slog.Logger
+	// TierEligibility is the NodeTierEligibility read model (ADR 0022); nil
+	// filters nothing.
+	TierEligibility ports.NodeTierEligibility
+	Outbox          ports.EventOutbox
+	Inbox           ports.Inbox
+	Clock           ports.Clock
+	IDs             ports.IDGenerator
+	Logger          *slog.Logger
 	// Metrics records the business outcome of each MakePromise; nil records
 	// nothing, so unit tests need no wiring.
 	Metrics ports.PromiseMetrics
