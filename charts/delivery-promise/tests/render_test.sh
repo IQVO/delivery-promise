@@ -409,6 +409,7 @@ reports_route="$(render "${base[@]}" "${an[@]}" --set analytics.reports.route.en
   --set analytics.reports.route.parentRefs[0].name=gw --set analytics.reports.route.parentRefs[0].namespace=kong --show-only templates/analytics-reports-route.yaml)"
 grep -q 'replacePrefixMatch: /reports' <<<"$reports_route" || fail "the reports HTTPRoute must rewrite its prefix to /reports"
 grep -q 'value: /api/delivery-promise/reports$' <<<"$reports_route" || fail "the reports HTTPRoute must listen on /api/delivery-promise/reports"
+grep -q 'konghq.com/regex-priority: "10"$' <<<"$reports_route" || fail "the reports HTTPRoute must carry konghq.com/regex-priority \"10\" so it outranks the API prefix under Kong's traditional router"
 grep -q 'name: delivery-promise-reports$' <<<"$reports_route" || fail "the reports HTTPRoute must target the reports Service"
 an_off="$(render "${base[@]}" --set analytics.reports.route.enabled=true --set analytics.database.projectorUrl=postgres://p@h/a)"
 if grep -q 'component: analytics' <<<"$an_off"; then fail "nothing of analytics may render while analytics.enabled is false"; fi
