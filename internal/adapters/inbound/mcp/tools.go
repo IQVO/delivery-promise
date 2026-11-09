@@ -138,7 +138,9 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"destination postal prefix, lines, delivery window (earliest, latest and the delivery station's IANA timeZone, " +
 			"the local calendar of its days), the witness path that proves feasibility (node, pickup departure, legs, " +
 			"delivery wave), basis (SCHEDULED from the timetable, MEASURED when a leg's measured transit pushed the " +
-			"arrival later, or NOMINAL lane times), the policyVersion it was quoted under, quotedAt/expiresAt, " +
+			"arrival later, or NOMINAL lane times), the optional confidence (0 to 1: the calibrated probability that the " +
+			"quote is kept on time, absent when the service has too few judgements of its segment to say, which is " +
+			"unknown and not zero), the policyVersion it was quoted under, quotedAt/expiresAt, " +
 			"and orderByAt (the latest instant the order can be placed and still make the quoted window, uncapped by " +
 			"the offer TTL). Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
 			"fails with not-found.",
@@ -149,7 +151,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 	addTool(server, &mcp.Tool{
 		Name: "get_promise",
 		Description: "Read one promise in any state (PROVISIONAL, CONFIRMED, AT_RISK, KEPT, BROKEN, RELEASED or " +
-			"CANCELLED): its terms (tier, shipBy, deliverByEarliest, deliverByLatest, timeZone, basis, policyVersion), the witness " +
+			"CANCELLED): its terms (tier, shipBy, deliverByEarliest, deliverByLatest, timeZone, basis, the optional calibrated confidence, policyVersion), the witness " +
 			"path, holdExpiresAt, the revisions that moved it and the final judgement (outcome KEPT or BROKEN, cause, " +
 			"lateByMinutes). A promise is never deleted; terminal states stay readable. Read-only; an unknown promise " +
 			"fails with not-found.",
@@ -182,7 +184,10 @@ func (d Deps) registerTools(server *mcp.Server) {
 		Description: "Read the current promise policy: policyVersion (v0 is the built-in default when nothing was " +
 			"published), offerTtlMinutes and holdTtlMinutes, packagesPerOrder, capacitySharePercent, the measured-transit " +
 			"parameters (transitWindowDays of observations kept, transitServiceLevelPercent quoted against a lane's " +
-			"measured transit, minTransitObservations before a lane beats the timetable) and the per-tier " +
+			"measured transit, minTransitObservations before a lane beats the timetable), the " +
+			"calibration parameters (targetOnTimeProbabilityPercent the share of promises the buffer aims to keep, " +
+			"minCalibrationObservations before a segment is buffered, calibrationWindowDays of judgements kept, " +
+			"maxCalibrationBufferMinutes the cap of the buffer) and the per-tier " +
 			"order deadlines (localTime in the destination region's time zone). Publishing a policy is a REST " +
 			"operation. Read-only; takes no arguments.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},
@@ -193,8 +198,8 @@ func (d Deps) registerTools(server *mcp.Server) {
 		Name: "estimate_delivery",
 		Description: "Estimate the delivery options of up to 50 catalogue items for one destination postal prefix, as a " +
 			"product listing page shows them: per item, in request order, the best option of every requested tier (tier, " +
-			"window start/end with the delivery station's IANA timeZone, basis SCHEDULED, MEASURED or NOMINAL, and " +
-			"orderByAt, the latest instant an order still makes that window) and the constraints of the tiers without one " +
+			"window start/end with the delivery station's IANA timeZone, basis SCHEDULED, MEASURED or NOMINAL, the optional calibrated " +
+			"confidence from 0 to 1 (absent means unknown, not zero), and orderByAt, the latest instant an order still makes that window) and the constraints of the tiers without one " +
 			"(DESTINATION_NOT_SERVED or ITEM_QUANTITY_NOT_AVAILABLE for the whole item, otherwise DELIVERY_SLA_UNAVAILABLE, " +
 			"NODE_CAPACITY_EXHAUSTED or PAST_ORDER_DEADLINE per tier). Each item is searched like a one-line quote, but " +
 			"nothing is stored: no offer, no event, no hold. An estimate is advisory and never reserves capacity; only a " +

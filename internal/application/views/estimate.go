@@ -16,10 +16,13 @@ type EstimateWindow struct {
 // window, basis and orderByAt a quote's best offer of that tier carries
 // (ADR 0019). OrderByAt is omitted when unknown.
 type EstimateOption struct {
-	Tier      string         `json:"tier"`
-	Window    EstimateWindow `json:"window"`
-	Basis     string         `json:"basis"`
-	OrderByAt *time.Time     `json:"orderByAt,omitempty"`
+	Tier   string         `json:"tier"`
+	Window EstimateWindow `json:"window"`
+	Basis  string         `json:"basis"`
+	// Confidence is the calibrated on-time probability of the option, omitted
+	// when unknown (ADR 0020).
+	Confidence *float64   `json:"confidence,omitempty"`
+	OrderByAt  *time.Time `json:"orderByAt,omitempty"`
 }
 
 // EstimateConstraint says why a tier has no option, in the quote's

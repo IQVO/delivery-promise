@@ -50,6 +50,7 @@ type state struct {
 	outcomes     map[string]readmodel.PackageOutcome
 	transitOpen  map[string]transitOpenRow
 	transitRings map[transitPair][]readmodel.TransitObservation
+	calibration  map[readmodel.CalibrationKey][]readmodel.CalibrationObservation
 	inbox        map[string]string
 	outbox       []shared.Event
 }
@@ -72,6 +73,7 @@ func newState() state {
 		scorecards: map[string]readmodel.Scorecard{}, assignments: map[string]readmodel.Assignment{}, shipments: map[string][]string{},
 		trackingOf: map[string]string{}, outcomes: map[string]readmodel.PackageOutcome{}, transitOpen: map[string]transitOpenRow{},
 		transitRings: map[transitPair][]readmodel.TransitObservation{}, inbox: map[string]string{},
+		calibration: map[readmodel.CalibrationKey][]readmodel.CalibrationObservation{},
 	}
 }
 
@@ -90,7 +92,7 @@ func (st state) clone() state {
 		items: cloneMap(st.items), listings: cloneMap(st.listings), departures: cloneMap(st.departures), waves: cloneMap(st.waves),
 		scorecards: cloneMap(st.scorecards), assignments: cloneMap(st.assignments), shipments: cloneMap(st.shipments),
 		trackingOf: cloneMap(st.trackingOf), outcomes: cloneMap(st.outcomes), transitOpen: cloneMap(st.transitOpen),
-		transitRings: cloneTransitRings(st.transitRings), inbox: cloneMap(st.inbox),
+		transitRings: cloneTransitRings(st.transitRings), inbox: cloneMap(st.inbox), calibration: cloneMap(st.calibration),
 		outbox: append([]shared.Event(nil), st.outbox...),
 	}
 }
@@ -145,6 +147,9 @@ func (s *Store) Shipments() *ShipmentViews { return &ShipmentViews{s} }
 
 // TransitActuals returns the TransitActuals double (ADR 0014).
 func (s *Store) TransitActuals() *TransitActuals { return &TransitActuals{s} }
+
+// Calibration returns the PromiseCalibrationView double (ADR 0020).
+func (s *Store) Calibration() *PromiseCalibrationView { return &PromiseCalibrationView{s} }
 
 // Outbox returns the EventOutbox double.
 func (s *Store) Outbox() *Outbox { return &Outbox{s} }
