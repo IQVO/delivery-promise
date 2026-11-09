@@ -1,6 +1,7 @@
 # Used by `helm lint` / `ct lint`: every optional value and component set at
-# once (api + mcp + a2a + their Kong routes + the web remote + the optional templates
-# of ci/optional-templates-values.yaml).
+# once (api + mcp + a2a + their Kong routes + the web remote + the analytics
+# projector/reports and the reports route + the optional templates of
+# ci/optional-templates-values.yaml).
 database:
   existingSecret: "delivery-promise-db"
 config:
@@ -49,3 +50,15 @@ a2a:
         sectionName: http
 frontend:
   enabled: true
+analytics:
+  enabled: true
+  database:
+    projectorUrl: "postgres://projector@example.invalid:5432/analytics"
+    reportsUrl: "postgres://reports@example.invalid:5432/analytics"
+  reports:
+    route:
+      enabled: true
+      parentRefs:
+        - name: example-gateway
+          namespace: gateway
+          sectionName: http
