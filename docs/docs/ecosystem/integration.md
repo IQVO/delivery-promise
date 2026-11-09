@@ -53,7 +53,7 @@ Source: `internal/adapters/inbound/kafka/dispatch.go`, `internal/adapters/outbou
 
 ## Upstream: what Delivery Promise consumes
 
-One consumer (`cmd/api`, group `DELIVERY_PROMISE_CONSUMER_GROUP`, `delivery-promise-consumer` in the cluster) reads eight topics. Dispatch is on the full CloudEvents `type`; the 34 handled types are in `Handlers` (`internal/adapters/inbound/kafka/dispatch.go`).
+One consumer (`cmd/api`, group `DELIVERY_PROMISE_CONSUMER_GROUP`, `delivery-promise-consumer` in the cluster) reads eight topics. Dispatch is on the full CloudEvents `type`; the 37 handled types are in `Handlers` (`internal/adapters/inbound/kafka/dispatch.go`).
 
 | Producer | Topic | Event types (entity) | Built use |
 | --- | --- | --- | --- |
@@ -61,12 +61,14 @@ One consumer (`cmd/api`, group `DELIVERY_PROMISE_CONSUMER_GROUP`, `delivery-prom
 | offer-availability | `retailnetwork.offer-availability.events` | `CatalogItemCreated`, `CatalogItemDiscontinued`, `ListingCreated`, `ListingAvailabilityChanged`, `ListingSuppressed`, `ListingRestored` | `rm_items`, `rm_listings` |
 | linehaul-transportation | `retailnetwork.linehaul-transportation.events` | `DepartureScheduled`, `DepartureCapacityChanged`, `DepartureCancelled`, `BookingMoved`, `BookingFailed` | `rm_departures`; cancelled, moved and failed bookings flag promises at risk |
 | last-mile-delivery | `retailnetwork.last-mile-delivery.events` | `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged`, `DeliveryWaveCancelled`, `PackageInductionDeferred` | `rm_waves`; cancellation and deferral flag promises at risk |
-| node-performance | `retailnetwork.node-performance.events` | `NodeScorecardUpdated` | `rm_scorecards` (the handicap) |
+| node-performance | `retailnetwork.node-performance.events` | `NodeScorecardUpdated`, `NodeTierEligibilityChanged` (scorecard) | `rm_scorecards` (the handicap); `rm_node_tier_eligibility` (SAME_DAY and NEXT_DAY candidates of an ineligible node are removed from future quotes, ADR 0022) |
 | order-sourcing | `retailnetwork.order-sourcing.events` | `FulfillmentLocked`, `FulfillmentShipped`, `FulfillmentUnsourceable` | `rm_assignments`, `rm_shipments`; unsourceable flags the promise at risk |
 | shipping-and-tracking | `retailnetwork.shipping-and-tracking.events` | `PackageDelivered`, `PackageExceptionRaised`, `PackageLost`, `PackageReturned` | `rm_outcomes`; judging the promise; exceptions flag at risk |
 | customer-ordering | `retailnetwork.customer-ordering.events` | `CustomerOrderPlaced`, `CustomerOrderCancelled` | reconciling confirm; cancel |
 
 Types are `com.retailnetwork.<tier>.<producer>.<entity>.<Event>` with tier `logistics`, `commerce` or `partner`; the contracts are restated, never imported, in `apis/asyncapi.yaml` (tolerant local copies: only the fields used are listed, unknown fields are ignored). The producers' own AsyncAPI documents are not re-read by this page's build; ADR 0003 and the `CLAUDE.md` rule require re-reading the producer's spec before changing a consumed shape.
+
+**Fast-tier eligibility (ADR 0022).** node-performance judges a node on its 7-day window and publishes `NodeTierEligibilityChanged` (`com.retailnetwork.partner.node-performance.scorecard.NodeTierEligibilityChanged`, one event per tier, only when the flag flips). This service keeps the latest fact per (node, tier) in `rm_node_tier_eligibility`, applies an event only when its `changedAt` is not older than the stored one, and treats a missing row as eligible. Quotes and estimates for `SAME_DAY` and `NEXT_DAY` drop the ineligible nodes before ranking; `TWO_DAY` and `STANDARD` never do, and promises already made are not touched. An event with a `tier` other than those two, or without `nodeId`, `tier`, `eligible` or `changedAt`, is ignored and counted, not dead-lettered. No new topic, group or environment variable.
 
 **Failure behaviour of the consumer:** a transient failure (typically Postgres down) is retried up to 5 attempts (200 ms doubling to 5 s) and then published to `<topic>.dlq` with `x-dlq-*` headers; an event of a known type whose payload can never be applied is dead-lettered at once; a message that is not a CloudEvents 1.0 event or has no handler is skipped with a WARN; a redelivered CloudEvents `id` commits nothing (`processed_events`). The offset is committed only after the unit of work committed. A topic that does not exist yet (its producer has not written) only produces consumer retry logs, never unreadiness. See [Troubleshooting](/docs/operations/troubleshooting).
 

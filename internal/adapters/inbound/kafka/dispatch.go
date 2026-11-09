@@ -92,6 +92,8 @@ func Handlers(s *usecases.Service) map[string]HandlerFunc {
 
 	h[typ("partner", "node-performance", "scorecard", "NodeScorecardUpdated")] = handle(func(v usecases.ScorecardUpdated) []string { return ids(v.NodeID) }, s.OnScorecardUpdated)
 
+	h[typ("partner", "node-performance", "scorecard", "NodeTierEligibilityChanged")] = handle[usecases.NodeTierEligibilityChanged](nil, s.OnNodeTierEligibilityChanged)
+
 	h[typ("logistics", "linehaul-transportation", "departure", "DepartureScheduled")] = handle(func(v usecases.DepartureScheduled) []string { return ids(v.DepartureID) }, s.OnDepartureScheduled)
 	h[typ("logistics", "linehaul-transportation", "departure", "DepartureCapacityChanged")] = handle(func(v usecases.DepartureCapacityChanged) []string { return ids(v.DepartureID) }, s.OnDepartureCapacityChanged)
 	h[typ("logistics", "linehaul-transportation", "departure", "DepartureCancelled")] = handle(func(v usecases.DepartureCancelled) []string { return ids(v.DepartureID) }, s.OnDepartureCancelled)

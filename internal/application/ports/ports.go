@@ -224,4 +224,11 @@ type PromiseMetrics interface {
 	// PromiseRefused counts a MakePromise that made no promise; reason is a
 	// stable, low-cardinality slug.
 	PromiseRefused(ctx context.Context, reason string)
+	// TierCandidatesExcluded counts n candidate nodes removed from a fast tier
+	// because node-performance revoked their eligibility (ADR 0022); tier is
+	// SAME_DAY or NEXT_DAY.
+	TierCandidatesExcluded(ctx context.Context, tier string, n int)
+	// TierEligibilityIgnored counts a NodeTierEligibilityChanged the consumer
+	// could not apply; reason is `unknown-tier` or `missing-field`.
+	TierEligibilityIgnored(ctx context.Context, reason string)
 }

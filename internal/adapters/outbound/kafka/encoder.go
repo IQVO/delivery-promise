@@ -144,15 +144,25 @@ func payload(e shared.Event) (any, error) {
 	case book.PromiseBookExhausted:
 		return map[string]any{"bookId": ev.BookID, "nodeId": ev.NodeID, "pickupDepartureId": ev.PickupDepartureID, "share": ev.Share}, nil
 	case offer.DeliveryOfferQuoted:
-		return withZone(map[string]any{
-			"offerId": ev.OfferID, "tier": ev.Tier, "destinationPostalPrefix": ev.DestinationPrefix, "nodeId": ev.NodeID,
-			"deliverByEarliest": utc(ev.Window.Earliest), "deliverByLatest": utc(ev.Window.Latest), "basis": ev.Basis,
-			"policyVersion": ev.PolicyVersion, "expiresAt": utc(ev.ExpiresAt),
-		}, ev.Window), nil
+		return quotedData(ev), nil
 	case policy.PromisePolicyPublished:
 		return policyData(ev), nil
 	}
 	return nil, fmt.Errorf("kafka encoder: no payload mapping for %T", e)
+}
+
+// quotedData is the analytics payload of DeliveryOfferQuoted; capacityBand is
+// omitted when the book had no finite capacity (ADR 0023).
+func quotedData(ev offer.DeliveryOfferQuoted) map[string]any {
+	d := map[string]any{
+		"offerId": ev.OfferID, "tier": ev.Tier, "destinationPostalPrefix": ev.DestinationPrefix, "nodeId": ev.NodeID,
+		"deliverByEarliest": utc(ev.Window.Earliest), "deliverByLatest": utc(ev.Window.Latest), "basis": ev.Basis,
+		"policyVersion": ev.PolicyVersion, "expiresAt": utc(ev.ExpiresAt),
+	}
+	if ev.CapacityBand != "" {
+		d["capacityBand"] = ev.CapacityBand
+	}
+	return withZone(d, ev.Window)
 }
 
 func madeData(ev promise.PromiseMade) map[string]any {

@@ -29,6 +29,9 @@ type Deps struct {
 	Network        ports.NetworkViews
 	Shipments      ports.ShipmentViews
 	TransitActuals ports.TransitActuals
+	// TierEligibility is the NodeTierEligibility read model (ADR 0022); nil
+	// filters nothing.
+	TierEligibility ports.NodeTierEligibility
 	// DepartureArrivals is the DepartureArrival read model of the late-risk
 	// sweep (ADR 0021); nil records and flags nothing.
 	DepartureArrivals ports.DepartureArrivals

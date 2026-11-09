@@ -31,6 +31,7 @@ const (
 // no-op, so recording is cheap and safe in tests and local runs.
 type PromiseMetrics struct {
 	counter metric.Int64Counter
+	tiers   tierCounters
 }
 
 var _ ports.PromiseMetrics = (*PromiseMetrics)(nil)
@@ -50,7 +51,11 @@ func NewPromiseMetrics() (*PromiseMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &PromiseMetrics{counter: counter}, nil
+	tiers, err := newTierCounters()
+	if err != nil {
+		return nil, err
+	}
+	return &PromiseMetrics{counter: counter, tiers: tiers}, nil
 }
 
 // PromiseMade counts a promise that was made.

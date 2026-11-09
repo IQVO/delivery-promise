@@ -15,9 +15,8 @@ import (
 // migration so the version assertion below stays honest.
 const latestMigration = 8
 
-// listingOwnerMigration is the migration this test is about (ADR 0017); the
-// steps below are relative to it, not to the ceiling, so later migrations
-// never move them.
+// listingOwnerMigration is the migration this file proves (ADR 0017); the
+// steps below go to the version just under it, whatever the ceiling is.
 const listingOwnerMigration = 5
 
 // TestListingOwnerMigrationBackfillsOperatorOwned proves migration 0005 (ADR

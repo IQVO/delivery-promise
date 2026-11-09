@@ -16,6 +16,10 @@ type recordingMetrics struct {
 	mu      sync.Mutex
 	made    int
 	refused []string
+	// excluded counts TierCandidatesExcluded by tier, ignored the reasons of
+	// TierEligibilityIgnored (ADR 0022).
+	excluded map[string]int
+	ignored  []string
 }
 
 var _ ports.PromiseMetrics = (*recordingMetrics)(nil)
@@ -32,12 +36,27 @@ func (m *recordingMetrics) PromiseRefused(_ context.Context, reason string) {
 	m.refused = append(m.refused, reason)
 }
 
+func (m *recordingMetrics) TierCandidatesExcluded(_ context.Context, tier string, n int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.excluded == nil {
+		m.excluded = map[string]int{}
+	}
+	m.excluded[tier] += n
+}
+
+func (m *recordingMetrics) TierEligibilityIgnored(_ context.Context, reason string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ignored = append(m.ignored, reason)
+}
+
 // meteredService is e's service with m injected.
 func (e *env) meteredService(m ports.PromiseMetrics) *usecases.Service {
 	return usecases.New(usecases.Deps{
 		UoW: e.store.UnitOfWork(), Offers: e.store.Offers(), Promises: e.store.Promises(), Books: e.store.Books(), Policies: e.store.Policies(),
-		Network: e.store.Network(), Shipments: e.store.Shipments(), Outbox: e.store.Outbox(), Inbox: e.store.Inbox(),
-		Clock: e.clock, IDs: e.ids, Metrics: m,
+		Network: e.store.Network(), Shipments: e.store.Shipments(), TierEligibility: e.store.TierEligibility(), Outbox: e.store.Outbox(),
+		Inbox: e.store.Inbox(), Clock: e.clock, IDs: e.ids, Metrics: m,
 	})
 }
 
