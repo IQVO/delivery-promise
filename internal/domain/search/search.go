@@ -5,7 +5,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/claudioed/delivery-promise/internal/domain/book"
 	"github.com/claudioed/delivery-promise/internal/domain/calendar"
 	"github.com/claudioed/delivery-promise/internal/domain/policy"
 	"github.com/claudioed/delivery-promise/internal/domain/shared"
@@ -247,95 +246,4 @@ func rank(a, b Candidate) int {
 		return 1
 	}
 	return cmp.Or(a.LegCount-b.LegCount, a.Grade.Rank()-b.Grade.Rank(), cmp.Compare(a.NodeID, b.NodeID), a.ShipBy.Compare(b.ShipBy))
-}
-
-// bookFor returns the book id of a node pickup and, when the book does not
-// exist yet, the opening to create; ok is false when strict and the book cannot
-// take a hold.
-func (s *searcher) bookFor(n Node, pickupID string, cutoff time.Time, strict bool) (book.ID, book.Opening, bool) {
-	id := book.MakeID(n.ID, pickupID)
-	if bv, exists := s.in.Books[string(id)]; exists {
-		if strict && (!bv.Open || bv.Room < 1 || !s.in.Now.Before(bv.HoldDeadlineAt)) {
-			return id, book.Opening{}, false
-		}
-		return id, book.Opening{}, true
-	}
-	op, ok := OpeningFor(n, pickupID, cutoff, s.in.Policy)
-	if !ok || strict && !s.in.Now.Before(op.HoldDeadlineAt) {
-		return id, op, false
-	}
-	return id, op, true
-}
-
-// expiry returns the offer expiry for a pickup cutoff and whether the
-// candidate can still be met: now < cutoff minus the effective handling.
-func (s *searcher) expiry(p *Profile, cutoff time.Time, handling int) (expires, meet time.Time, ok bool) {
-	meet, found := p.Schedule.SubBusinessMinutes(cutoff, handling)
-	if !found || !meet.After(s.in.Now) {
-		return time.Time{}, time.Time{}, false
-	}
-	expires = s.in.Now.Add(s.in.Policy.OfferTTL())
-	if meet.Before(expires) {
-		expires = meet
-	}
-	return expires, meet, true
-}
-
-// scheduled builds the SCHEDULED candidates of one node.
-func (s *searcher) scheduled(n Node, strict bool) []Candidate {
-	p := n.Profile
-	handling, skip := Handicap(s.in.Grades[n.ID], p.HandlingMinutes)
-	ready, ok := p.Schedule.AddBusinessMinutes(s.in.Now, handling)
-	if !ok {
-		return nil
-	}
-	var pickups []Departure
-	for _, d := range s.byOrigin[n.ID] {
-		if d.Kind != KindPickup || d.CutoffAt.Before(ready) || !s.usable(d, strict) {
-			continue
-		}
-		if _, _, okBook := s.bookFor(n, d.ID, d.CutoffAt, strict); okBook {
-			pickups = append(pickups, d)
-		}
-	}
-	if skip >= len(pickups) {
-		return nil
-	}
-	pickups = pickups[skip:]
-	if len(pickups) > MaxPickups {
-		pickups = pickups[:MaxPickups]
-	}
-	var out []Candidate
-	for _, d := range pickups {
-		if c, okC := s.candidateFrom(n, d, handling, strict); okC {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
-func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool) (Candidate, bool) {
-	expires, meet, ok := s.expiry(n.Profile, d.CutoffAt, handling)
-	if !ok {
-		return Candidate{}, false
-	}
-	arr, found := s.earliestArrival(d, strict)
-	if !found {
-		return Candidate{}, false
-	}
-	w, found := s.firstWave(arr.at, strict)
-	if !found || !d.CutoffAt.Before(w.WindowStart) {
-		return Candidate{}, false
-	}
-	basis := shared.BasisScheduled
-	if arr.measured { // at least one leg ran later than the timetable (ADR 0014)
-		basis = shared.BasisMeasured
-	}
-	id, op, _ := s.bookFor(n, d.ID, d.CutoffAt, false)
-	return Candidate{
-		NodeID: n.ID, ShipBy: d.CutoffAt, Window: shared.Window{Earliest: w.WindowStart, Latest: w.WindowEnd, TimeZone: s.timeZone()}, Basis: basis,
-		Witness: shared.Witness{NodeID: n.ID, PickupDepartureID: d.ID, Legs: arr.legs, DeliveryWaveID: w.ID}, BookID: string(id),
-		ExpiresAt: expires, LatestMeetableAt: meet, Grade: s.in.Grades[n.ID], InRegion: n.RegionID == s.in.AreaRegionID,
-		LegCount: len(arr.legs), Direct: d.Dest == s.in.Station.ID && (n.Subtype == SubtypeSubSameDay || n.Subtype == SubtypeMicro), Opening: op,
-	}, true
 }

@@ -20,6 +20,9 @@ type EstimateOption struct {
 	Window    EstimateWindow `json:"window"`
 	Basis     string         `json:"basis"`
 	OrderByAt *time.Time     `json:"orderByAt,omitempty"`
+	// CapacityBand is AMPLE, TIGHT or SCARCE as on a quote's offer (ADR 0023);
+	// omitted when unknown.
+	CapacityBand string `json:"capacityBand,omitempty"`
 }
 
 // EstimateConstraint says why a tier has no option, in the quote's

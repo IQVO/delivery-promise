@@ -129,6 +129,11 @@ type BookView struct {
 	Open           bool
 	Room           int
 	HoldDeadlineAt time.Time
+	// Share is the book's capacity share and Used its provisional plus
+	// confirmed holds: the quantities the capacity band reads (ADR 0023).
+	// A zero Share means the view carries no capacity figure.
+	Share int
+	Used  int
 }
 
 // Input is the snapshot a search runs on.
@@ -192,6 +197,10 @@ type Candidate struct {
 	Direct bool
 	// Opening is the book to open when it does not exist yet.
 	Opening book.Opening
+	// CapacityBand is the pressure on the book the hold goes on, at search
+	// time (ADR 0023); empty when the book has no finite capacity. It is not
+	// an input to ranking.
+	CapacityBand shared.CapacityBand
 	// Lines are the group's lines, each with the owner whose stock at NodeID
 	// covers it (shared.ChooseOwner, ADR 0017); set on the ranked candidates of
 	// a group.

@@ -95,6 +95,7 @@ func (s *searcher) nominal(n Node, strict bool) []Candidate {
 		out = append(out, Candidate{
 			NodeID: n.ID, ShipBy: c.At, Window: w, Basis: shared.BasisNominal, Witness: shared.Witness{NodeID: n.ID}, BookID: string(id),
 			ExpiresAt: expires, LatestMeetableAt: meet, Grade: s.in.Grades[n.ID], InRegion: n.RegionID == s.in.AreaRegionID, Opening: op,
+			CapacityBand: s.bandOf(id, op),
 		})
 	}
 	return out
