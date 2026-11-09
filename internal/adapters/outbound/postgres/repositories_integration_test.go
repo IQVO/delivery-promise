@@ -20,7 +20,7 @@ func fixture(t *testing.T) repocontract.Fixture {
 	return repocontract.Fixture{
 		UoW: postgres.NewUnitOfWork(pool), Offers: postgres.NewOfferRepository(pool), Promises: postgres.NewPromiseRepository(pool),
 		Books: postgres.NewBookRepository(pool), Policies: postgres.NewPolicyRepository(pool), Network: postgres.NewNetworkViews(pool),
-		Shipments: postgres.NewShipmentViews(pool), Outbox: ob, Inbox: postgres.NewInbox(pool),
+		Shipments: postgres.NewShipmentViews(pool), Outbox: ob, Inbox: postgres.NewInbox(pool), Arrivals: postgres.NewDepartureArrivals(pool),
 		OutboxCount: func() int {
 			n, err := ob.Count(context.Background())
 			if err != nil {

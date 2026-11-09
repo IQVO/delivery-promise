@@ -50,8 +50,10 @@ type state struct {
 	outcomes     map[string]readmodel.PackageOutcome
 	transitOpen  map[string]transitOpenRow
 	transitRings map[transitPair][]readmodel.TransitObservation
-	inbox        map[string]string
-	outbox       []shared.Event
+	// arrivals is the DepartureArrival read model (ADR 0021): departureId -> arrivedAt.
+	arrivals map[string]time.Time
+	inbox    map[string]string
+	outbox   []shared.Event
 }
 
 // transitOpenRow is the open pairing row of a departed load (ADR 0014).
@@ -71,7 +73,7 @@ func newState() state {
 		listings: map[string]readmodel.Listing{}, departures: map[string]search.Departure{}, waves: map[string]search.Wave{},
 		scorecards: map[string]readmodel.Scorecard{}, assignments: map[string]readmodel.Assignment{}, shipments: map[string][]string{},
 		trackingOf: map[string]string{}, outcomes: map[string]readmodel.PackageOutcome{}, transitOpen: map[string]transitOpenRow{},
-		transitRings: map[transitPair][]readmodel.TransitObservation{}, inbox: map[string]string{},
+		transitRings: map[transitPair][]readmodel.TransitObservation{}, arrivals: map[string]time.Time{}, inbox: map[string]string{},
 	}
 }
 
@@ -90,7 +92,7 @@ func (st state) clone() state {
 		items: cloneMap(st.items), listings: cloneMap(st.listings), departures: cloneMap(st.departures), waves: cloneMap(st.waves),
 		scorecards: cloneMap(st.scorecards), assignments: cloneMap(st.assignments), shipments: cloneMap(st.shipments),
 		trackingOf: cloneMap(st.trackingOf), outcomes: cloneMap(st.outcomes), transitOpen: cloneMap(st.transitOpen),
-		transitRings: cloneTransitRings(st.transitRings), inbox: cloneMap(st.inbox),
+		transitRings: cloneTransitRings(st.transitRings), arrivals: cloneMap(st.arrivals), inbox: cloneMap(st.inbox),
 		outbox: append([]shared.Event(nil), st.outbox...),
 	}
 }
@@ -145,6 +147,9 @@ func (s *Store) Shipments() *ShipmentViews { return &ShipmentViews{s} }
 
 // TransitActuals returns the TransitActuals double (ADR 0014).
 func (s *Store) TransitActuals() *TransitActuals { return &TransitActuals{s} }
+
+// DepartureArrivals returns the DepartureArrivals double (ADR 0021).
+func (s *Store) DepartureArrivals() *DepartureArrivals { return &DepartureArrivals{s} }
 
 // Outbox returns the EventOutbox double.
 func (s *Store) Outbox() *Outbox { return &Outbox{s} }
