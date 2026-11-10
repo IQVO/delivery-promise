@@ -103,7 +103,7 @@ One PostgreSQL database, owned by `cmd/api` and shared read-only by `cmd/mcp` an
 | `processed_events` | the inbox: the CloudEvents `id` of every consumed event, claimed in the same transaction as its effect |
 | `idempotency_keys` | stored outcome of each `(route, Idempotency-Key)`, purged after 24 hours |
 | `rm_nodes`, `rm_lanes`, `rm_areas` (service areas by postal prefix), `rm_regions`, `rm_items` (catalogue items), `rm_listings`, `rm_departures`, `rm_waves`, `rm_scorecards` | local read models kept from consumed events, one jsonb row per entity: topology, availability, schedules, waves, handicaps |
-| `rm_assignments` (assignment to promise), `rm_shipments` (packages of an assignment), `rm_trackings` (tracking number to assignment), `rm_outcomes` (delivered, lost or returned per package) | the shipment facts needed to find a promise's assignment and judge it |
+| `rm_assignments` (assignment to promise), `rm_shipments` (packages of an assignment), `rm_trackings` (tracking number to its assignments: a merged package is shared, ADR 0025), `rm_outcomes` (delivered, lost or returned per package) | the shipment facts needed to find a promise's assignment and judge it |
 
 There is no cache, no search index and no other store. Kafka holds the two published topics, the eight consumed topics and the `<topic>.dlq` dead-letter topics; nothing else is written outside Postgres and Kafka.
 

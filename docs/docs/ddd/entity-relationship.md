@@ -154,7 +154,7 @@ erDiagram
   }
   rm_trackings {
     text tracking_number PK
-    text assignment_id
+    text assignment_id PK
   }
   rm_outcomes {
     text tracking_number PK
@@ -190,7 +190,7 @@ erDiagram
   rm_trackings ||--o| rm_outcomes : "tracking_number"
 ```
 
-Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_actuals.up.sql`, `0005_listing_owner.up.sql`, `0006_promise_calibration.up.sql`, `0007_node_tier_eligibility.up.sql`, `0008_departure_arrival.up.sql`, `internal/application/readmodel`.
+Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_actuals.up.sql`, `0005_listing_owner.up.sql`, `0006_promise_calibration.up.sql`, `0007_node_tier_eligibility.up.sql`, `0008_departure_arrival.up.sql`, `0009_tracking_many_assignments.up.sql`, `internal/application/readmodel`.
 
 | Table | Fed by | Used by |
 | --- | --- | --- |
@@ -199,7 +199,7 @@ Source: `0001_delivery_promise_schema.up.sql` (lines 55 to 73), `0004_transit_ac
 | `rm_departures`, `rm_waves` | linehaul and last-mile events | path search, `MakePromise` revalidation, cancellation risk |
 | `rm_scorecards` | node-performance events | the `ScorecardHandicap` |
 | `rm_node_tier_eligibility` (`node_id`, `tier`, `eligible`, `changed_at`; PK `(node_id, tier)`; migration 0007) | node-performance `NodeTierEligibilityChanged` | removing ineligible nodes from `SAME_DAY` and `NEXT_DAY` candidates (ADR 0022); a missing row means eligible |
-| `rm_assignments`, `rm_shipments`, `rm_trackings`, `rm_outcomes` | order-sourcing and shipping-and-tracking events | finding a promise's assignment and judging it |
+| `rm_assignments`, `rm_shipments`, `rm_trackings`, `rm_outcomes` | order-sourcing and shipping-and-tracking events | finding a promise's assignment and judging it. `rm_trackings` is keyed by `(tracking_number, assignment_id)` (migration 0009): a merged package is shared by several assignments and one delivery, loss or return judges every sharing promise (ADR 0025) |
 | `rm_load_transit_open`, `rm_transit_actuals` | linehaul `LoadDeparted` and `LoadArrived` | the measured transit behind a `MEASURED` basis (ADR 0014) |
 | `rm_promise_calibration` | this service's own `PromiseKept` and late `PromiseBroken` judgements | the calibration buffer and the `confidence` of a quote (ADR 0020) |
 | `rm_departure_arrival` | linehaul `LoadArrived` that carries a `departureId` | the late-risk sweep: a witness departure past its expected arrival with no row is flagged (ADR 0021); pruned past the transit window |

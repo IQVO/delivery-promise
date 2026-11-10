@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/claudioed/delivery-promise/internal/application/readmodel"
 	"github.com/claudioed/delivery-promise/internal/domain/promise"
@@ -74,28 +75,52 @@ func (s *Service) OnPackageReturned(ctx context.Context, m Meta, e PackageReturn
 	return s.recordOutcome(ctx, m, readmodel.PackageOutcome{TrackingNumber: e.TrackingNumber, Kind: readmodel.OutcomeReturned, At: e.ReturnedAt.UTC()})
 }
 
+// recordOutcome stores the package fact, then judges EVERY assignment that
+// shares the tracking number (a merged package belongs to several, ADR 0025),
+// each on its own promise window.
 func (s *Service) recordOutcome(ctx context.Context, m Meta, o readmodel.PackageOutcome) error {
 	return s.project(ctx, m, func(ctx context.Context) error {
-		if o.AssignmentID == "" {
-			id, err := s.Shipments.AssignmentOf(ctx, o.TrackingNumber)
-			if err != nil && !notFound(err) {
-				return err
-			}
-			o.AssignmentID = id
+		ids, err := s.sharingAssignments(ctx, o.AssignmentID, o.TrackingNumber)
+		if err != nil {
+			return err
+		}
+		if o.AssignmentID == "" && len(ids) > 0 {
+			o.AssignmentID = ids[0]
 		}
 		if err := s.Shipments.PutOutcome(ctx, o); err != nil {
 			return err
 		}
-		if o.AssignmentID == "" {
-			return nil
+		for _, id := range ids {
+			if err := s.judge(ctx, id); err != nil {
+				return err
+			}
 		}
-		return s.judge(ctx, o.AssignmentID)
+		return nil
 	})
+}
+
+// sharingAssignments is the union of the assignment an event names (may be
+// empty) and every assignment the tracking number was shipped under, sorted
+// and without duplicates. An unknown tracking number adds nothing.
+func (s *Service) sharingAssignments(ctx context.Context, assignmentID, trackingNumber string) ([]string, error) {
+	var ids []string
+	if assignmentID != "" {
+		ids = append(ids, assignmentID)
+	}
+	if trackingNumber != "" {
+		owners, err := s.Shipments.AssignmentsOf(ctx, trackingNumber)
+		if err != nil && !notFound(err) {
+			return nil, err
+		}
+		ids = union(ids, owners)
+	}
+	slices.Sort(ids)
+	return ids, nil
 }
 
 // OnPackageException treats a tracking exception as a risk (RepromiseOnRisk).
 func (s *Service) OnPackageException(ctx context.Context, m Meta, e PackageException) error {
-	return s.assignmentRisk(ctx, m, e.AssignmentID, ReasonPackageException, nil, nil)
+	return s.assignmentRiskVia(ctx, m, e.AssignmentID, e.TrackingNumber, ReasonPackageException, nil, nil)
 }
 
 // ---- customer-ordering -------------------------------------------------------------------------------------
