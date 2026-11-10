@@ -53,7 +53,7 @@ The first table is this context's own language, with the identifier each term ha
 | **Scorecard**, **Grade** | `node-performance` | A node's measured performance and its `A` to `D` grade, `PROVISIONAL` below the observation minimum |
 | **Customer Order**, **Checkout** | `customer-ordering` | What the shopper bought, with a promise per shipment group. Checkout calls `MakePromise` once per group |
 | **Fulfillment Assignment**, **Path Lock**, **Unsourceable** | `order-sourcing` | The decision of which node and path fulfil a group; the point after which the node never changes; no node can meet the promise any more |
-| **Package Journey**, **Tracking Number** | `shipping-and-tracking` | The timeline of one package and its network-wide id |
+| **Package Journey**, **Tracking Number** | `shipping-and-tracking` | The timeline of one package and its network-wide id. One tracking number may belong to several assignments when order-sourcing merges groups into one package; this context judges each sharing promise on its own window (ADR 0025) |
 
 ## Fleet translation
 
