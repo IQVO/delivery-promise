@@ -46,7 +46,7 @@ and the [WMS/WES integration seam](https://iqvo.github.io/warehouse-docs/network
 
 ## What it does
 
-A quote asks: when can these lines arrive at this destination, per tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`)? The answer is built from a feasible witness path: a node cutoff, scheduled departures with room, a delivery wave with stops left. Every input is a local read model kept from events; the service makes no synchronous call.
+A quote asks: when can these lines arrive at this destination, per tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`, plus the opt-in `CONSOLIDATED` tier of a chosen delivery day)? The answer is built from a feasible witness path: a node cutoff, scheduled departures with room, a delivery wave with stops left. Every input is a local read model kept from events; the service makes no synchronous call.
 
 | Aggregate | Role |
 | --- | --- |

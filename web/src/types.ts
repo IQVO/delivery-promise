@@ -6,7 +6,8 @@ export type PromiseState = (typeof PROMISE_STATES)[number];
 export const OFFER_STATES = ["QUOTED", "EXPIRED", "CONSUMED"] as const;
 export type OfferState = (typeof OFFER_STATES)[number];
 
-export const TIERS = ["SAME_DAY", "NEXT_DAY", "TWO_DAY", "STANDARD"] as const;
+/** CONSOLIDATED is the opt-in tier of a customer-chosen delivery day (ADR 0024). */
+export const TIERS = ["SAME_DAY", "NEXT_DAY", "TWO_DAY", "STANDARD", "CONSOLIDATED"] as const;
 export type Tier = (typeof TIERS)[number];
 
 /** A shipment group line; ownerRef names the seller whose stock covers it, absent when operator-owned (ADR 0017). */
@@ -39,6 +40,8 @@ export interface Offer {
   policyVersion: string;
   quotedAt: string;
   expiresAt: string;
+  /** Only for CONSOLIDATED: the chosen day leaves the network at least one local day to merge the order (ADR 0024). */
+  consolidationEligible?: boolean;
 }
 
 /** What a promise was promised to. */
@@ -51,6 +54,8 @@ export interface PromiseTerms {
   timeZone?: string;
   basis: "SCHEDULED" | "NOMINAL";
   policyVersion: string;
+  /** Only for CONSOLIDATED (ADR 0024); absent otherwise, never false by default. */
+  consolidationEligible?: boolean;
 }
 
 /** One re-promise. */
