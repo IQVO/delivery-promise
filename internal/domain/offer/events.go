@@ -21,6 +21,8 @@ type DeliveryOfferQuoted struct {
 	// CapacityBand is the pressure on the book of the offer's window at quote
 	// time (ADR 0023); empty when unknown.
 	CapacityBand shared.CapacityBand
+	// ConsolidationEligible is set only for the tier CONSOLIDATED (ADR 0024).
+	ConsolidationEligible *bool
 }
 
 // EventName returns "DeliveryOfferQuoted".
