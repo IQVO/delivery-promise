@@ -41,10 +41,14 @@ func goldenCases() map[string]shared.Event {
 	legacy.Window.TimeZone = ""
 	confident := term // a calibrated quote names its confidence (ADR 0020)
 	confident.Confidence = shared.NewConfidence(0.973)
+	consolidated, eligible := term, true // an opt-in CONSOLIDATED promise names its hold (ADR 0024)
+	consolidated.Tier, consolidated.ConsolidationEligible = shared.TierConsolidated, &eligible
 	return map[string]shared.Event{
 		"PromiseMade": promise.PromiseMade{Header: hdr, PromiseID: "prm-1", OfferID: "off-1", Terms: term, Witness: wit,
 			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}}},
 		"PromiseMade_confident": promise.PromiseMade{Header: hdr, PromiseID: "prm-4", OfferID: "off-4", Terms: confident, Witness: wit,
+			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}}},
+		"PromiseMade_consolidated": promise.PromiseMade{Header: hdr, PromiseID: "prm-5", OfferID: "off-5", Terms: consolidated, Witness: wit,
 			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 2}}},
 		"PromiseMade_nominal": promise.PromiseMade{Header: hdr, PromiseID: "prm-2", OfferID: "off-2", Terms: nominal, Witness: shared.Witness{NodeID: "N-AUS3"},
 			HoldExpiresAt: t0.Add(15 * time.Minute), Lines: []shared.Line{{CatalogItemID: "ci-1001", Quantity: 1}}},
@@ -74,6 +78,8 @@ func goldenCases() map[string]shared.Event {
 			Window: win, Basis: shared.BasisMeasured, Confidence: shared.NewConfidence(0.973), PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute)},
 		"DeliveryOfferQuoted_capacityBand": offer.DeliveryOfferQuoted{Header: hdr, OfferID: "off-1", Tier: shared.TierNextDay, DestinationPrefix: "787", NodeID: "N-AUS3",
 			Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute), CapacityBand: shared.BandTight},
+		"DeliveryOfferQuoted_consolidated": offer.DeliveryOfferQuoted{Header: hdr, OfferID: "off-5", Tier: shared.TierConsolidated, DestinationPrefix: "787", NodeID: "N-AUS3",
+			Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute), ConsolidationEligible: new(bool)},
 		"PromisePolicyPublished": policy.PromisePolicyPublished{Header: hdr, PolicyVersion: "v2", Number: 2, OfferTTLMinutes: 10, HoldTTLMinutes: 15,
 			PackagesPerOrder: 2, SharePercent: 80, TransitWindowDays: 21, TransitServiceLevelPercent: 95, MinTransitObservations: 30, PublishedAt: t0,
 			TargetOnTimeProbabilityPercent: 90, MinCalibrationObservations: 40, CalibrationWindowDays: 14, MaxCalibrationBufferMinutes: 0,

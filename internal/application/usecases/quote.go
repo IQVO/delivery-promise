@@ -17,8 +17,29 @@ import (
 type QuoteCommand struct {
 	DestinationPostalPrefix string
 	Lines                   []shared.Line
-	// Tiers defaults to all four when empty.
+	// Tiers defaults to the four classic tiers when empty. CONSOLIDATED is
+	// returned only when it is listed here or ConsolidatedDeliveryDay is set.
 	Tiers []shared.Tier
+	// ConsolidatedDeliveryDay is the local calendar date (YYYY-MM-DD, the
+	// delivery station's zone) the shopper chose for the CONSOLIDATED tier;
+	// empty means none. Naming it asks for CONSOLIDATED (ADR 0024).
+	ConsolidatedDeliveryDay string
+}
+
+// consolidatedDayLayout is the layout of ConsolidatedDeliveryDay.
+const consolidatedDayLayout = "2006-01-02"
+
+// requestedTiers is the tier set a quote asks the search for: Tiers (all four
+// classic tiers when empty) plus CONSOLIDATED when a delivery day is named.
+func (c QuoteCommand) requestedTiers() []shared.Tier {
+	if c.ConsolidatedDeliveryDay == "" || slices.Contains(c.Tiers, shared.TierConsolidated) {
+		return c.Tiers
+	}
+	base := c.Tiers
+	if len(base) == 0 {
+		base = shared.AllTiers()
+	}
+	return append(slices.Clone(base), shared.TierConsolidated)
 }
 
 func (c QuoteCommand) validate() error {
@@ -31,6 +52,11 @@ func (c QuoteCommand) validate() error {
 	for _, t := range c.Tiers {
 		if !t.Valid() {
 			return shared.Invalid("tier %q is not a tier", t)
+		}
+	}
+	if d := c.ConsolidatedDeliveryDay; d != "" {
+		if _, err := time.Parse(consolidatedDayLayout, d); err != nil {
+			return shared.Invalid("consolidatedDeliveryDay %q is not a date (YYYY-MM-DD)", d)
 		}
 	}
 	return nil
@@ -49,7 +75,7 @@ func (s *Service) QuoteDeliveryOffers(ctx context.Context, cmd QuoteCommand) (vi
 	if err != nil {
 		return views.QuoteResult{}, err
 	}
-	in, err := s.searchInput(ctx, now, pol, cmd.DestinationPostalPrefix, cmd.Lines, cmd.Tiers, searchOptions{})
+	in, err := s.searchInput(ctx, now, pol, cmd.DestinationPostalPrefix, cmd.Lines, cmd.requestedTiers(), searchOptions{consolidatedDay: cmd.ConsolidatedDeliveryDay})
 	if err != nil {
 		return views.QuoteResult{}, err
 	}
@@ -117,6 +143,7 @@ func offersOfGroup(g search.Group, prefix string, pol *policy.Policy, now time.T
 		o, evs, err := offer.New(offer.Quote{
 			ID: newID(), GroupNo: g.No, DestinationPrefix: prefix, Tier: t, Lines: c.Lines, Window: c.Window, Witness: c.Witness,
 			Basis: c.Basis, Confidence: c.Confidence, PolicyVersion: pol.VersionName(), TTL: pol.OfferTTL(), ExpiresAt: c.ExpiresAt, LatestMeetableAt: c.LatestMeetableAt, PickupCutoffAt: c.ShipBy, CapacityBand: c.CapacityBand,
+			ConsolidationEligible: c.ConsolidationEligible,
 		}, now)
 		if err != nil {
 			if errors.Is(err, offer.ErrOfferExpiryTooLate) {

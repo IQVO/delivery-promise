@@ -53,6 +53,9 @@ func (c EstimateCommand) validate() error {
 		if !t.Valid() {
 			return shared.Invalid("tier %q is not a tier", t)
 		}
+		if t == shared.TierConsolidated {
+			return shared.Invalid("tier CONSOLIDATED is quoted, not estimated: an estimate stores nothing (ADR 0024)")
+		}
 	}
 	return nil
 }

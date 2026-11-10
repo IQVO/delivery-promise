@@ -42,7 +42,7 @@
           ]
         },
         "tiers": {
-          "description": "optional subset of SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD; all four when omitted",
+          "description": "optional subset of SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD; all four when omitted; CONSOLIDATED is quoted on REST and refused here",
           "items": {
             "type": "string"
           },
@@ -295,7 +295,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Read one delivery offer in any state (QUOTED, EXPIRED or CONSUMED): its tier, groupNo, destination postal prefix, lines, delivery window (earliest, latest and the delivery station's IANA timeZone, the local calendar of its days), the witness path that proves feasibility (node, pickup departure, legs, delivery wave), basis (SCHEDULED from the timetable, MEASURED when a leg's measured transit pushed the arrival later, or NOMINAL lane times), the optional confidence (0 to 1: the calibrated probability that the quote is kept on time, absent when the service has too few judgements of its segment to say, which is unknown and not zero), the policyVersion it was quoted under, quotedAt/expiresAt, and orderByAt (the latest instant the order can be placed and still make the quoted window, uncapped by the offer TTL). capacityBand is a quote-time reading that is not stored, so it is omitted here. Offers are kept for a retention period after they expire. Read-only; an unknown offer fails with not-found.",
+    "description": "Read one delivery offer in any state (QUOTED, EXPIRED or CONSUMED): its tier, groupNo, destination postal prefix, lines, delivery window (earliest, latest and the delivery station's IANA timeZone, the local calendar of its days), the witness path that proves feasibility (node, pickup departure, legs, delivery wave), basis (SCHEDULED from the timetable, MEASURED when a leg's measured transit pushed the arrival later, or NOMINAL lane times), the optional confidence (0 to 1: the calibrated probability that the quote is kept on time, absent when the service has too few judgements of its segment to say, which is unknown and not zero), the policyVersion it was quoted under, quotedAt/expiresAt, and orderByAt (the latest instant the order can be placed and still make the quoted window, uncapped by the offer TTL). A CONSOLIDATED offer also carries consolidationEligible (a local day or more to merge; absent for other tiers). capacityBand is a quote-time reading that is not stored, so it is omitted here. Offers are kept for a retention period after they expire. Read-only; an unknown offer fails with not-found.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -323,6 +323,12 @@
           "type": [
             "null",
             "number"
+          ]
+        },
+        "consolidationEligible": {
+          "type": [
+            "null",
+            "boolean"
           ]
         },
         "destinationPostalPrefix": {
@@ -452,7 +458,7 @@
       "openWorldHint": false,
       "readOnlyHint": true
     },
-    "description": "Read one promise in any state (PROVISIONAL, CONFIRMED, AT_RISK, KEPT, BROKEN, RELEASED or CANCELLED): its terms (tier, shipBy, deliverByEarliest, deliverByLatest, timeZone, basis, the optional calibrated confidence, policyVersion), the witness path, holdExpiresAt, the revisions that moved it and the final judgement (outcome KEPT or BROKEN, cause, lateByMinutes). A promise is never deleted; terminal states stay readable. Read-only; an unknown promise fails with not-found.",
+    "description": "Read one promise in any state (PROVISIONAL, CONFIRMED, AT_RISK, KEPT, BROKEN, RELEASED or CANCELLED): its terms (tier, shipBy, deliverByEarliest, deliverByLatest, timeZone, basis, the optional calibrated confidence, policyVersion, and for a CONSOLIDATED promise the optional consolidationEligible), the witness path, holdExpiresAt, the revisions that moved it and the final judgement (outcome KEPT or BROKEN, cause, lateByMinutes). A promise is never deleted; terminal states stay readable. Read-only; an unknown promise fails with not-found.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -568,6 +574,12 @@
                       "number"
                     ]
                   },
+                  "consolidationEligible": {
+                    "type": [
+                      "null",
+                      "boolean"
+                    ]
+                  },
                   "deliverByEarliest": {
                     "type": "string"
                   },
@@ -633,6 +645,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "consolidationEligible": {
+              "type": [
+                "null",
+                "boolean"
               ]
             },
             "deliverByEarliest": {
@@ -938,6 +956,12 @@
                             "number"
                           ]
                         },
+                        "consolidationEligible": {
+                          "type": [
+                            "null",
+                            "boolean"
+                          ]
+                        },
                         "deliverByEarliest": {
                           "type": "string"
                         },
@@ -1003,6 +1027,12 @@
                     "type": [
                       "null",
                       "number"
+                    ]
+                  },
+                  "consolidationEligible": {
+                    "type": [
+                      "null",
+                      "boolean"
                     ]
                   },
                   "deliverByEarliest": {

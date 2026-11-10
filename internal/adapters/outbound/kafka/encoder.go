@@ -162,7 +162,7 @@ func quotedData(ev offer.DeliveryOfferQuoted) map[string]any {
 	if ev.CapacityBand != "" {
 		d["capacityBand"] = ev.CapacityBand
 	}
-	return withConfidence(withZone(d, ev.Window), ev.Confidence)
+	return withConsolidation(withConfidence(withZone(d, ev.Window), ev.Confidence), ev.ConsolidationEligible)
 }
 
 func madeData(ev promise.PromiseMade) map[string]any {
@@ -174,7 +174,17 @@ func madeData(ev promise.PromiseMade) map[string]any {
 	if ev.Witness.PickupDepartureID != "" { // a NOMINAL promise has none (contracts-delta E8)
 		d["pickupDepartureId"] = ev.Witness.PickupDepartureID
 	}
-	return withConfidence(withZone(d, ev.Terms.Window), ev.Terms.Confidence)
+	return withConsolidation(withConfidence(withZone(d, ev.Terms.Window), ev.Terms.Confidence), ev.Terms.ConsolidationEligible)
+}
+
+// withConsolidation adds consolidationEligible of a CONSOLIDATED offer or
+// promise; it is omitted when unknown or for any other tier, never written as
+// false by default (ADR 0024).
+func withConsolidation(d map[string]any, eligible *bool) map[string]any {
+	if eligible != nil {
+		d["consolidationEligible"] = *eligible
+	}
+	return d
 }
 
 // withConfidence adds the optional calibrated confidence of a quote; an unknown
