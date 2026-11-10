@@ -46,7 +46,7 @@ type state struct {
 	scorecards      map[string]readmodel.Scorecard
 	assignments     map[string]readmodel.Assignment
 	shipments       map[string][]string
-	trackingOf      map[string]string
+	trackingOf      map[string][]string
 	outcomes        map[string]readmodel.PackageOutcome
 	transitOpen     map[string]transitOpenRow
 	transitRings    map[transitPair][]readmodel.TransitObservation
@@ -74,7 +74,7 @@ func newState() state {
 		areas: map[string]readmodel.Area{}, lanes: map[string]search.Lane{}, items: map[string]readmodel.Item{},
 		listings: map[string]readmodel.Listing{}, departures: map[string]search.Departure{}, waves: map[string]search.Wave{},
 		scorecards: map[string]readmodel.Scorecard{}, assignments: map[string]readmodel.Assignment{}, shipments: map[string][]string{},
-		trackingOf: map[string]string{}, outcomes: map[string]readmodel.PackageOutcome{}, transitOpen: map[string]transitOpenRow{},
+		trackingOf: map[string][]string{}, outcomes: map[string]readmodel.PackageOutcome{}, transitOpen: map[string]transitOpenRow{},
 		transitRings: map[transitPair][]readmodel.TransitObservation{}, tierEligibility: map[tierKey]readmodel.NodeTierEligibility{},
 		calibration: map[readmodel.CalibrationKey][]readmodel.CalibrationObservation{},
 		arrivals:    map[string]time.Time{}, inbox: map[string]string{},

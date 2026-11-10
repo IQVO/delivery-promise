@@ -164,32 +164,47 @@ func (s *Service) assignmentRisk(ctx context.Context, m Meta, assignmentID, reas
 	return s.assignmentRiskVia(ctx, m, assignmentID, "", reason, nodes, departures)
 }
 
-// assignmentRiskVia is assignmentRisk for an event that may carry only a
-// tracking number (PackageInductionDeferred omits assignmentId when no label
-// data arrived): the assignment is then found through FulfillmentShipped.
+// assignmentRiskVia is assignmentRisk for an event that may carry a tracking
+// number. PackageInductionDeferred omits assignmentId when no label data
+// arrived, so the assignments are found through FulfillmentShipped; and a
+// package shared by several assignments (ADR 0025) puts every sharing promise
+// at risk, not only the one the event names.
 func (s *Service) assignmentRiskVia(ctx context.Context, m Meta, assignmentID, trackingNumber, reason string, nodes, departures []string) error {
 	return s.consume(ctx, m, func(ctx context.Context) ([]promise.ID, error) {
-		if assignmentID == "" && trackingNumber != "" {
-			id, err := s.Shipments.AssignmentOf(ctx, trackingNumber)
-			if err != nil && !notFound(err) {
-				return nil, err
-			}
-			assignmentID = id
-		}
-		a, err := s.Shipments.GetAssignment(ctx, assignmentID)
-		if notFound(err) {
-			s.Logger.WarnContext(ctx, "risk for an assignment whose lock was not seen", "assignmentId", assignmentID, "reason", reason)
-			return nil, nil
-		}
+		ids, err := s.sharingAssignments(ctx, assignmentID, trackingNumber)
 		if err != nil {
 			return nil, err
 		}
-		a.ExcludedNodes, a.ExcludedDepartures = union(a.ExcludedNodes, nodes), union(a.ExcludedDepartures, departures)
-		if err := s.Shipments.PutAssignment(ctx, a); err != nil {
-			return nil, err
+		if len(ids) == 0 { // an unknown tracking number and no assignment: nothing to flag
+			s.Logger.WarnContext(ctx, "risk for a package no assignment owns", "trackingNumber", trackingNumber, "reason", reason)
+			return nil, nil
 		}
-		return s.flagAtRisk(ctx, []promise.ID{promise.ID(a.PromiseID)}, reason)
+		var flagged []promise.ID
+		for _, id := range ids {
+			got, err := s.flagAssignment(ctx, id, reason, nodes, departures)
+			if err != nil {
+				return nil, err
+			}
+			flagged = append(flagged, got...)
+		}
+		return flagged, nil
 	})
+}
+
+func (s *Service) flagAssignment(ctx context.Context, assignmentID, reason string, nodes, departures []string) ([]promise.ID, error) {
+	a, err := s.Shipments.GetAssignment(ctx, assignmentID)
+	if notFound(err) {
+		s.Logger.WarnContext(ctx, "risk for an assignment whose lock was not seen", "assignmentId", assignmentID, "reason", reason)
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	a.ExcludedNodes, a.ExcludedDepartures = union(a.ExcludedNodes, nodes), union(a.ExcludedDepartures, departures)
+	if err := s.Shipments.PutAssignment(ctx, a); err != nil {
+		return nil, err
+	}
+	return s.flagAtRisk(ctx, []promise.ID{promise.ID(a.PromiseID)}, reason)
 }
 
 func union(a, b []string) []string {

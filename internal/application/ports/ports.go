@@ -137,13 +137,15 @@ type ShipmentViews interface {
 	// FindAssignmentByPromise returns the assignment locked for the promise.
 	FindAssignmentByPromise(ctx context.Context, promiseID string) (readmodel.Assignment, error)
 	// PutShipment records that the trackingNumbers belong to the assignment.
+	// A number already owned by another assignment is shared, never re-owned.
 	PutShipment(ctx context.Context, assignmentID string, trackingNumbers []string) error
 	// Shipment returns the tracking numbers of the assignment (empty when
 	// FulfillmentShipped has not been seen).
 	Shipment(ctx context.Context, assignmentID string) ([]string, error)
-	// AssignmentOf returns the assignment a tracking number was shipped under,
-	// or ErrNotFound.
-	AssignmentOf(ctx context.Context, trackingNumber string) (string, error)
+	// AssignmentsOf returns every assignment a tracking number was shipped
+	// under, sorted ascending (a merged package is shared by several, ADR
+	// 0025), or ErrNotFound when there is none.
+	AssignmentsOf(ctx context.Context, trackingNumber string) ([]string, error)
 	// PutOutcome records the first final fact of a package; a second fact for
 	// the same tracking number is ignored.
 	PutOutcome(ctx context.Context, o readmodel.PackageOutcome) error

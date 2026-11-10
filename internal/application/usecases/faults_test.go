@@ -389,11 +389,11 @@ func (fw *fShipmentViews) Shipment(ctx context.Context, assignmentID string) ([]
 	return fw.in.Shipment(ctx, assignmentID)
 }
 
-func (fw *fShipmentViews) AssignmentOf(ctx context.Context, trackingNumber string) (string, error) {
+func (fw *fShipmentViews) AssignmentsOf(ctx context.Context, trackingNumber string) ([]string, error) {
 	if err := fw.f.hit(); err != nil {
-		return "", err
+		return nil, err
 	}
-	return fw.in.AssignmentOf(ctx, trackingNumber)
+	return fw.in.AssignmentsOf(ctx, trackingNumber)
 }
 
 func (fw *fShipmentViews) PutOutcome(ctx context.Context, o readmodel.PackageOutcome) error {
