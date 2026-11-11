@@ -115,6 +115,6 @@ Not aggregates: this context enforces no invariant on them, never changes them b
 | waves (`rm_waves`) | `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged`, `DeliveryWaveCancelled` | the last leg and the promise window |
 | scorecards (`rm_scorecards`) | `NodeScorecardUpdated` | the `ScorecardHandicap` |
 | fast-tier eligibility (`rm_node_tier_eligibility`) | `NodeTierEligibilityChanged` | the `TierIneligible` filter on `SAME_DAY` and `NEXT_DAY` candidates (ADR 0022); a missing row is eligible |
-| shipment facts (`rm_assignments`, `rm_shipments`, `rm_trackings`, `rm_outcomes`) | order-sourcing and shipping-and-tracking events | finding a promise's assignment and judging it |
+| shipment facts (`rm_assignments`, `rm_shipments`, `rm_trackings`, `rm_outcomes`) | order-sourcing and shipping-and-tracking events | finding a promise's assignment and judging it; a tracking number may belong to several assignments and each is judged on its own window (ADR 0025) |
 
 `rm_departures` says how many **packages** a truck can still take; the book says how many **orders** were promised onto the node's cutoff. The two can disagree, and the search requires both to have room.
