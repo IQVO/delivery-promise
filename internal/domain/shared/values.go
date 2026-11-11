@@ -9,21 +9,34 @@ import (
 // ubiquitous language).
 type Tier string
 
-// The four tiers of the model, fastest first.
+// The tiers of the model: the four classic ones, fastest first, then the
+// opt-in CONSOLIDATED tier (ADR 0024).
 const (
-	TierSameDay  Tier = "SAME_DAY"
-	TierNextDay  Tier = "NEXT_DAY"
-	TierTwoDay   Tier = "TWO_DAY"
-	TierStandard Tier = "STANDARD"
+	TierSameDay      Tier = "SAME_DAY"
+	TierNextDay      Tier = "NEXT_DAY"
+	TierTwoDay       Tier = "TWO_DAY"
+	TierStandard     Tier = "STANDARD"
+	TierConsolidated Tier = "CONSOLIDATED"
 )
 
-var allTiers = []Tier{TierSameDay, TierNextDay, TierTwoDay, TierStandard}
+// MaxConsolidatedCalendarDays is the horizon of the CONSOLIDATED tier: its
+// window may end up to this many local days after the quote (ADR 0024).
+const MaxConsolidatedCalendarDays = 14
 
-// AllTiers returns the four tiers, fastest first.
+var (
+	allTiers   = []Tier{TierSameDay, TierNextDay, TierTwoDay, TierStandard}
+	knownTiers = []Tier{TierSameDay, TierNextDay, TierTwoDay, TierStandard, TierConsolidated}
+)
+
+// AllTiers returns the four classic tiers, fastest first: the default quote
+// set. CONSOLIDATED is never part of it; a caller opts in (ADR 0024).
 func AllTiers() []Tier { return slices.Clone(allTiers) }
 
-// Valid reports whether t is one of the four tiers.
-func (t Tier) Valid() bool { return slices.Contains(allTiers, t) }
+// KnownTiers returns the five tiers, fastest first, CONSOLIDATED last.
+func KnownTiers() []Tier { return slices.Clone(knownTiers) }
+
+// Valid reports whether t is one of the five tiers.
+func (t Tier) Valid() bool { return slices.Contains(knownTiers, t) }
 
 // MaxCalendarDays is the model's service_tiers.max_calendar_days.
 func (t Tier) MaxCalendarDays() int {
@@ -34,22 +47,29 @@ func (t Tier) MaxCalendarDays() int {
 		return 1
 	case TierTwoDay:
 		return 2
+	case TierConsolidated:
+		return MaxConsolidatedCalendarDays
 	default:
 		return 7
 	}
 }
 
 // AllowsNominal reports whether the tier may be promised from nominal lane
-// times (service_tiers.nominal_fallback): only STANDARD.
-func (t Tier) AllowsNominal() bool { return t == TierStandard }
+// times (service_tiers.nominal_fallback): STANDARD and CONSOLIDATED.
+func (t Tier) AllowsNominal() bool { return t == TierStandard || t == TierConsolidated }
 
-// Rank orders the tiers fastest (0) to slowest (3); an invalid tier ranks -1.
-func (t Tier) Rank() int { return slices.Index(allTiers, t) }
+// Rank orders the tiers fastest (0) to slowest (4); an invalid tier ranks -1.
+func (t Tier) Rank() int { return slices.Index(knownTiers, t) }
 
 // SlowerOrEqual returns t and every slower tier, fastest first: the tiers a
-// re-promise may fall back through.
+// re-promise may fall back through. STANDARD and CONSOLIDATED fall through to
+// nothing but themselves: a standard promise never becomes a consolidated one
+// (ADR 0024).
 func (t Tier) SlowerOrEqual() []Tier {
-	i := t.Rank()
+	if t == TierConsolidated {
+		return []Tier{TierConsolidated}
+	}
+	i := slices.Index(allTiers, t)
 	if i < 0 {
 		return nil
 	}

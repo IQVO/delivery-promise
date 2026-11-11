@@ -19,6 +19,9 @@ func validateTerms(q Quote) error {
 	if q.TTL <= 0 {
 		return shared.Invalid("the offer TTL must be positive")
 	}
+	if q.ConsolidationEligible != nil && q.Tier != shared.TierConsolidated {
+		return shared.Invalid("consolidationEligible belongs to the CONSOLIDATED tier, not %s", q.Tier)
+	}
 	return nil
 }
 
@@ -68,7 +71,7 @@ func checkSnapshot(s Snapshot) error {
 	}
 	if err := validateQuote(Quote{
 		ID: s.ID, GroupNo: s.GroupNo, DestinationPrefix: s.DestinationPrefix, Tier: s.Tier, Lines: s.Lines, Window: s.Window,
-		Witness: s.Witness, Basis: s.Basis, PolicyVersion: s.PolicyVersion, TTL: time.Nanosecond,
+		Witness: s.Witness, Basis: s.Basis, PolicyVersion: s.PolicyVersion, TTL: time.Nanosecond, ConsolidationEligible: s.ConsolidationEligible,
 	}); err != nil {
 		return err
 	}

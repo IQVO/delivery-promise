@@ -35,4 +35,5 @@ The decisions of `delivery-promise`, in the order they were taken. The ADR bodie
 | [0021](./0021-a-sweep-flags-promises-whose-locked-path-is-running-late.md) | a sweep flags promises whose locked path is running late | Accepted (2026-11-09) |
 | [0022](./0022-fast-tier-candidates-are-filtered-on-node-eligibility.md) | fast-tier candidates are filtered on node eligibility | Accepted (2026-11-09) |
 | [0023](./0023-offers-carry-a-capacity-band.md) | Offers carry a capacity band | Accepted (2026-11-09) |
+| [0024](./0024-an-opt-in-consolidated-tier-with-a-customer-chosen-delivery-day.md) | An opt-in CONSOLIDATED tier with a customer-chosen delivery day | Accepted (2026-11-10) |
 | [0025](./0025-a-tracking-number-may-belong-to-several-assignments.md) | A tracking number may belong to several assignments | Accepted (2026-11-10) |

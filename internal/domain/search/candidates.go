@@ -39,8 +39,13 @@ func (s *searcher) expiry(p *Profile, cutoff time.Time, handling int) (expires, 
 	return expires, meet, true
 }
 
-// scheduled builds the SCHEDULED candidates of one node.
-func (s *searcher) scheduled(n Node, strict bool, t shared.Tier) []Candidate {
+// waveFn picks the delivery wave for a final arrival: the earliest wave of the
+// station for most tiers, the earliest one on the chosen day for CONSOLIDATED.
+type waveFn func(at time.Time) (Wave, bool)
+
+// scheduled builds the SCHEDULED candidates of one node, each ending on the
+// wave that wave picks.
+func (s *searcher) scheduled(n Node, strict bool, t shared.Tier, wave waveFn) []Candidate {
 	p := n.Profile
 	handling, skip := Handicap(s.in.Grades[n.ID], p.HandlingMinutes)
 	ready, ok := p.Schedule.AddBusinessMinutes(s.in.Now, handling)
@@ -65,14 +70,14 @@ func (s *searcher) scheduled(n Node, strict bool, t shared.Tier) []Candidate {
 	}
 	var out []Candidate
 	for _, d := range pickups {
-		if c, okC := s.candidateFrom(n, d, handling, strict, t); okC {
+		if c, okC := s.candidateFrom(n, d, handling, strict, t, wave); okC {
 			out = append(out, c)
 		}
 	}
 	return out
 }
 
-func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool, t shared.Tier) (Candidate, bool) {
+func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool, t shared.Tier, wave waveFn) (Candidate, bool) {
 	expires, meet, ok := s.expiry(n.Profile, d.CutoffAt, handling)
 	if !ok {
 		return Candidate{}, false
@@ -88,7 +93,7 @@ func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool,
 	// The segment's buffer is added to the final arrival BEFORE the wave snap, so
 	// the window keeps its width and the offer lands in a later one (ADR 0020).
 	cal := s.calibrate(t, basis, n.ID)
-	w, found := s.firstWave(arr.at.Add(time.Duration(cal.BufferMinutes)*time.Minute), strict)
+	w, found := wave(arr.at.Add(time.Duration(cal.BufferMinutes) * time.Minute))
 	if !found || !d.CutoffAt.Before(w.WindowStart) {
 		return Candidate{}, false
 	}

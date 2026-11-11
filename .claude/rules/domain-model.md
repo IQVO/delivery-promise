@@ -18,7 +18,7 @@ every assumption the model left open are in `docs/adr/0002-aggregates-and-invari
 - **Witness path** — the feasible node cutoff -> scheduled departures -> delivery
   wave that makes a date true. `SCHEDULED` basis names departure and wave ids;
   `NOMINAL` (STANDARD tier only) carries none.
-- **Tier** — `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`.
+- **Tier** — `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`, and the opt-in `CONSOLIDATED` (ADR 0024; never in the default quote set).
 - **Constraint** — why a tier is not offered: `DESTINATION_NOT_SERVED`,
   `ITEM_QUANTITY_NOT_AVAILABLE`, `PAST_ORDER_DEADLINE`, `DELIVERY_SLA_UNAVAILABLE`,
   `NODE_CAPACITY_EXHAUSTED`.

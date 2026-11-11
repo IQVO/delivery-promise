@@ -52,6 +52,29 @@ func (s *searcher) measuredAt(d Departure) (time.Time, bool) {
 // Every departure, the pickup included, arrives at its measured transit when
 // that is later than its scheduled one (ADR 0014).
 func (s *searcher) earliestArrival(pickup Departure, strict bool) (arrival, bool) {
+	k := arrivalKey{pickup: pickup.ID, strict: strict}
+	if m, ok := s.arrivals[k]; ok {
+		m.a.legs = slices.Clone(m.a.legs)
+		return m.a, m.ok
+	}
+	a, ok := s.searchArrival(pickup, strict)
+	s.arrivals[k] = arrivalMemo{a: a, ok: ok}
+	return a, ok
+}
+
+// arrivalKey and arrivalMemo remember the earliest arrival of a pickup for the
+// duration of one search: the CONSOLIDATED day walk asks for it again (ADR 0024).
+type arrivalKey struct {
+	pickup string
+	strict bool
+}
+
+type arrivalMemo struct {
+	a  arrival
+	ok bool
+}
+
+func (s *searcher) searchArrival(pickup Departure, strict bool) (arrival, bool) {
 	station := s.in.Station.ID
 	start, startMeasured := s.measuredAt(pickup)
 	if pickup.Dest == station {
@@ -133,13 +156,18 @@ func (s *searcher) legIDs(via map[string]leg, to, from string) []string {
 // firstWave is the first wave at the station whose induct cutoff is not
 // before the arrival, not cancelled and with stops left.
 func (s *searcher) firstWave(at time.Time, strict bool) (Wave, bool) {
+	return s.waveWhere(at, strict, nil)
+}
+
+// waveWhere is firstWave restricted to the waves keep accepts (nil keeps all).
+func (s *searcher) waveWhere(at time.Time, strict bool, keep func(Wave) bool) (Wave, bool) {
 	var best Wave
 	found := false
 	for _, w := range s.in.Waves {
 		if !w.Scheduled || w.Cancelled || s.in.ExcludeWaves[w.ID] || w.Station != s.in.Station.ID || w.InductCutoffAt.Before(at) {
 			continue
 		}
-		if strict && w.Remaining < 1 {
+		if strict && w.Remaining < 1 || keep != nil && !keep(w) {
 			continue
 		}
 		if !found || w.InductCutoffAt.Before(best.InductCutoffAt) || w.InductCutoffAt.Equal(best.InductCutoffAt) && w.WindowEnd.Before(best.WindowEnd) {

@@ -63,9 +63,20 @@ func (s *searcher) nominalWindow(arrive time.Time) shared.Window {
 	}
 }
 
-// nominal builds the NOMINAL candidates of one node (STANDARD only): the
-// node's next profile cutoffs plus the nominal lane transit (ADR 0002, A1).
-func (s *searcher) nominal(n Node, strict bool, t shared.Tier) []Candidate {
+// nominalWindowFn turns a nominal arrival into a delivery window; false drops
+// the pickup.
+type nominalWindowFn func(arrive time.Time) (shared.Window, bool)
+
+// nextDayWindow is the window of every tier but CONSOLIDATED: the next local
+// day, 09:00 to 21:00.
+func (s *searcher) nextDayWindow(arrive time.Time) (shared.Window, bool) {
+	return s.nominalWindow(arrive), true
+}
+
+// nominal builds the NOMINAL candidates of one node (STANDARD and CONSOLIDATED):
+// the node's next profile cutoffs plus the nominal lane transit (ADR 0002, A1),
+// each ending on the window win gives it.
+func (s *searcher) nominal(n Node, strict bool, t shared.Tier, win nominalWindowFn) []Candidate {
 	p := n.Profile
 	handling, skip := Handicap(s.in.Grades[n.ID], p.HandlingMinutes)
 	ready, ok := p.Schedule.AddBusinessMinutes(s.in.Now, handling)
@@ -89,8 +100,8 @@ func (s *searcher) nominal(n Node, strict bool, t shared.Tier) []Candidate {
 		if !okBook || !okExp {
 			continue
 		}
-		w := s.nominalWindow(c.At.Add(tr + time.Duration(cal.BufferMinutes)*time.Minute))
-		if !c.At.Before(w.Earliest) {
+		w, okWin := win(c.At.Add(tr + time.Duration(cal.BufferMinutes)*time.Minute))
+		if !okWin || !c.At.Before(w.Earliest) {
 			continue
 		}
 		out = append(out, Candidate{

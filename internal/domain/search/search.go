@@ -28,6 +28,7 @@ type searcher struct {
 	byOrigin     map[string][]Departure
 	packages     int
 	stationSched calendar.Schedule
+	arrivals     map[arrivalKey]arrivalMemo
 }
 
 // Run executes the search over the snapshot.
@@ -63,7 +64,7 @@ func newSearcher(in Input) *searcher {
 	if in.Policy == nil {
 		in.Policy = policy.Default()
 	}
-	s := &searcher{in: in, lanes: map[string]Lane{}, byOrigin: map[string][]Departure{}, packages: in.Policy.PackagesPerOrder()}
+	s := &searcher{in: in, lanes: map[string]Lane{}, byOrigin: map[string][]Departure{}, packages: in.Policy.PackagesPerOrder(), arrivals: map[arrivalKey]arrivalMemo{}}
 	for _, l := range in.Lanes {
 		s.lanes[l.ID] = l
 	}
@@ -165,6 +166,10 @@ func (s *searcher) searchGroup(no int, lines []shared.Line, nodes []Node, tiers 
 	}
 	paths := pathSet{s: s, nodes: eligible, byKey: map[pathKey][]Candidate{}}
 	for _, t := range tiers {
+		if t == shared.TierConsolidated {
+			s.consolidated(&g, &paths, eligible)
+			continue
+		}
 		cs := s.forTier(paths.of(t, true), t, eligible, true)
 		if len(cs) == 0 {
 			g.Unavailable[t] = DeliverySLAUnavailable
@@ -188,9 +193,10 @@ func (s *searcher) coversAll(n Node, lines []shared.Line) bool {
 }
 
 func (s *searcher) pathsOf(nodes []Node, strict bool, t shared.Tier) []Candidate {
+	wave := func(at time.Time) (Wave, bool) { return s.firstWave(at, strict) }
 	var out []Candidate
 	for _, n := range nodes {
-		out = append(out, s.scheduled(n, strict, t)...)
+		out = append(out, s.scheduled(n, strict, t, wave)...)
 	}
 	return out
 }

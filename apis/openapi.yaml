@@ -697,16 +697,19 @@ components:
           description: The escaped request path.
     Tier:
       type: string
-      description: Service tier (promise.Tier).
+      description: 'Service tier (promise.Tier). CONSOLIDATED is the opt-in tier of a customer-chosen delivery day (ADR 0024):
+        a quote returns it only when its request lists it or names consolidatedDeliveryDay, so a caller that never asks
+        never sees it.'
       enum:
       - SAME_DAY
       - NEXT_DAY
       - TWO_DAY
       - STANDARD
+      - CONSOLIDATED
     Basis:
       type: string
       description: 'Promise basis: SCHEDULED from the timetable, MEASURED when a leg''s measured transit pushed the
-        arrival later (ADR 0014), NOMINAL from lane times (STANDARD only).'
+        arrival later (ADR 0014), NOMINAL from lane times (STANDARD and CONSOLIDATED only).'
       enum:
       - SCHEDULED
       - MEASURED
@@ -720,6 +723,12 @@ components:
         the share of the judged promises of its segment (tier, basis, node grade) whose lateness was within the
         buffer the quote carries. It is present only when the segment has at least minCalibrationObservations
         judgements in the window; absent means UNKNOWN, never zero, and consumers must read absence that way.'
+    ConsolidationEligible:
+      type: boolean
+      description: 'Present only for the tier CONSOLIDATED (ADR 0024): true when the chosen delivery day leaves the network
+        at least one local day after the fastest feasible window to merge the order with others, false when the day is
+        that window itself. It is computed from this service''s own candidate set and never asserts that another order
+        exists. Omitted for every other tier, and never false by default.'
     CapacityBand:
       type: string
       description: 'The capacity pressure on the PromiseBook that the offer''s chosen window would charge, read when the
@@ -805,7 +814,7 @@ components:
     WitnessPath:
       type: object
       description: 'The node, pickup departure, departure legs and delivery wave that prove feasibility. A NOMINAL
-        path (STANDARD only) carries no departure or wave ids: pickupDepartureId and deliveryWaveId are omitted
+        path (STANDARD and CONSOLIDATED only) carries no departure or wave ids: pickupDepartureId and deliveryWaveId are omitted
         and legs is empty (E8).'
       required:
       - nodeId
@@ -844,9 +853,20 @@ components:
             $ref: '#/components/schemas/GroupLine'
         tiers:
           type: array
-          description: Tiers to quote; all four when omitted.
+          description: 'Tiers to quote; the four classic tiers (SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD) when omitted. CONSOLIDATED
+            is returned only when it is listed here or consolidatedDeliveryDay is present (ADR 0024).'
           items:
             $ref: '#/components/schemas/Tier'
+        consolidatedDeliveryDay:
+          type: string
+          format: date
+          pattern: ^[0-9]{4}-[0-9]{2}-[0-9]{2}$
+          example: '2026-10-26'
+          description: 'The calendar date the shopper wants the order delivered on, as a local date of the destination
+            delivery station''s time zone (ADR 0024). Naming it adds the CONSOLIDATED tier to the quote. A day earlier than
+            the fastest feasible window is moved up to that window (the offer then has consolidationEligible false); with
+            tiers listing CONSOLIDATED and no day, the day is two local days after the fastest window. A day more than 14
+            local days from now, or without a wave, has no CONSOLIDATED offer: the tier is reported in unavailable.'
     TierUnavailable:
       type: object
       required:
@@ -881,7 +901,8 @@ components:
       type: object
       description: 'One delivery offer. capacityBand (ADR 0023) is optional: it is omitted when the book of the offer''s
         window has no finite capacity, and on an offer read back with GET /delivery-quotes/{quoteId}, because the band is
-        a quote-time reading that is not stored. It changes no offer, window or order.'
+        a quote-time reading that is not stored. It changes no offer, window or order. consolidationEligible (ADR 0024)
+        is present only for the tier CONSOLIDATED.'
       required:
       - offerId
       - state
@@ -941,6 +962,8 @@ components:
           description: The promise policy version the quote used (G8).
         capacityBand:
           $ref: '#/components/schemas/CapacityBand'
+        consolidationEligible:
+          $ref: '#/components/schemas/ConsolidationEligible'
     EstimateItem:
       type: object
       required:
@@ -972,9 +995,15 @@ components:
           example: '787'
         tiers:
           type: array
-          description: Tiers to estimate; all four when omitted.
+          description: 'Tiers to estimate; the four classic tiers when omitted. CONSOLIDATED is refused with 422
+            validation-failed: it is a persistent-offer tier, quoted on POST /delivery-quotes (ADR 0024).'
           items:
-            $ref: '#/components/schemas/Tier'
+            type: string
+            enum:
+            - SAME_DAY
+            - NEXT_DAY
+            - TWO_DAY
+            - STANDARD
         items:
           type: array
           minItems: 1
@@ -1135,6 +1164,8 @@ components:
           $ref: '#/components/schemas/Confidence'
         policyVersion:
           type: string
+        consolidationEligible:
+          $ref: '#/components/schemas/ConsolidationEligible'
     Revision:
       type: object
       required:

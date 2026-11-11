@@ -47,8 +47,8 @@ Source: aggregates `internal/domain/{offer,promise,book,policy}`; consumers veri
 
 | Event | Aggregate | Meaning | Raised by | Recipients |
 | --- | --- | --- | --- | --- |
-| `DeliveryOfferQuoted` | DeliveryOffer | An offer was persisted with its window and witness, and the optional `capacityBand` of its book at quote time (ADR 0023). One per offer, so one quote can raise several. | `QuoteDeliveryOffers` | none (analytics: quote-to-order conversion per tier and node) |
-| `PromiseMade` | Promise | A provisional promise holds capacity; the offer is consumed. | `MakePromise` | none (analytics) |
+| `DeliveryOfferQuoted` | DeliveryOffer | An offer was persisted with its window and witness, the optional `capacityBand` of its book at quote time (ADR 0023) and, for a `CONSOLIDATED` offer, `consolidationEligible` (ADR 0024). One per offer, so one quote can raise several. | `QuoteDeliveryOffers` | none (analytics: quote-to-order conversion per tier and node) |
+| `PromiseMade` | Promise | A provisional promise holds capacity; the offer is consumed. A `CONSOLIDATED` promise also carries `consolidationEligible` (ADR 0024). | `MakePromise` | none (analytics) |
 | `PromiseConfirmed` | Promise | The order was placed; the hold became confirmed. A repeated confirm raises nothing. | `ConfirmPromise` | none (analytics) |
 | `PromiseReleased` | Promise | A provisional promise's hold expired and was returned (`reason: HOLD_EXPIRED`). | `ReleaseExpiredHolds` | none (analytics: hold leakage) |
 | `PromiseCancelled` | Promise | A confirmed or at-risk promise was cancelled and its confirmed hold returned. | `CancelPromise`, `OnCustomerOrderCancelled` | none (analytics) |

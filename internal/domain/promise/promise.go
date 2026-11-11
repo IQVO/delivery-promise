@@ -87,6 +87,10 @@ type Terms struct {
 	// with, unknown when its segment had too few observations (ADR 0020).
 	Confidence    shared.Confidence
 	PolicyVersion string
+	// ConsolidationEligible is set only on a CONSOLIDATED promise: the option
+	// left the network at least one local day to merge it (ADR 0024). Nil when
+	// unknown or for any other tier; never false by default.
+	ConsolidationEligible *bool
 }
 
 // Revision is the Revision value object: the terms before one re-promise.
@@ -201,6 +205,9 @@ func validateTerms(t Terms) error {
 	}
 	if t.Basis == shared.BasisNominal && !t.Tier.AllowsNominal() {
 		return fmt.Errorf("%w: %s", ErrNominalBasisNotAllowedForTier, t.Tier)
+	}
+	if t.ConsolidationEligible != nil && t.Tier != shared.TierConsolidated {
+		return fmt.Errorf("%w: consolidationEligible belongs to the CONSOLIDATED tier, not %s", ErrInvalidPromiseTerms, t.Tier)
 	}
 	if t.PolicyVersion == "" || len(t.PolicyVersion) > shared.MaxID {
 		return fmt.Errorf("%w: policyVersion is required", ErrInvalidPromiseTerms)
