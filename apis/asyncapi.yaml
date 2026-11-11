@@ -2025,15 +2025,18 @@ components:
         dataschema: *id001
     Tier:
       type: string
+      description: Service tier. CONSOLIDATED is the opt-in tier of a customer-chosen delivery day (ADR 0024); it appears
+        only on an offer or promise whose quote asked for it.
       enum:
       - SAME_DAY
       - NEXT_DAY
       - TWO_DAY
       - STANDARD
+      - CONSOLIDATED
     Basis:
       type: string
       description: 'Promise basis: SCHEDULED from the timetable, MEASURED when a leg''s measured transit pushed the
-        arrival later (ADR 0014), NOMINAL from lane times (STANDARD only).'
+        arrival later (ADR 0014), NOMINAL from lane times (STANDARD and CONSOLIDATED only).'
       enum:
       - SCHEDULED
       - MEASURED
@@ -2047,6 +2050,11 @@ components:
         which is the share of the judged promises of its segment (tier, basis, node grade) whose lateness was within the buffer
         the quote carries. Optional and additive; present only when the segment has at least minCalibrationObservations
         judgements in the window. Absent means UNKNOWN, never zero.
+    ConsolidationEligible:
+      type: boolean
+      description: Present only for the tier CONSOLIDATED (ADR 0024). True when the chosen delivery day leaves the network
+        at least one local day after the fastest feasible window to merge the order with others, false when the day is that
+        window itself. Optional and additive. Absent means unknown or not a CONSOLIDATED option, never false.
     GroupLine:
       type: object
       required:
@@ -2120,6 +2128,8 @@ components:
                 $ref: '#/components/schemas/Basis'
               confidence:
                 $ref: '#/components/schemas/Confidence'
+              consolidationEligible:
+                $ref: '#/components/schemas/ConsolidationEligible'
               policyVersion: *id001
               holdExpiresAt: *id002
               lines:
@@ -2351,6 +2361,8 @@ components:
                 $ref: '#/components/schemas/Basis'
               confidence:
                 $ref: '#/components/schemas/Confidence'
+              consolidationEligible:
+                $ref: '#/components/schemas/ConsolidationEligible'
               policyVersion: *id001
               expiresAt: *id002
               capacityBand:

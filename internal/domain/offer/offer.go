@@ -72,6 +72,8 @@ type Offer struct {
 	// capacityBand is the capacity pressure read at quote time (ADR 0023). It
 	// is NOT persisted: Restore leaves it empty.
 	capacityBand shared.CapacityBand
+	// consolidationEligible is set only on a CONSOLIDATED offer (ADR 0024).
+	consolidationEligible *bool
 }
 
 // Snapshot is the persisted form of an offer. Restore validates it.
@@ -101,6 +103,8 @@ type Snapshot struct {
 	ClosedAt       time.Time
 	PickupCutoffAt time.Time
 	Version        int64
+	// ConsolidationEligible is nil unless the tier is CONSOLIDATED (ADR 0024).
+	ConsolidationEligible *bool
 }
 
 // Quote is the input of QuoteDeliveryOffers for one (group, tier).
@@ -129,6 +133,8 @@ type Quote struct {
 	// CapacityBand is the pressure on the book the offer's window charges
 	// (ADR 0023); empty when the book has no finite capacity.
 	CapacityBand shared.CapacityBand
+	// ConsolidationEligible is set only for the tier CONSOLIDATED (ADR 0024).
+	ConsolidationEligible *bool
 }
 
 // New creates a QUOTED offer at version 1 and raises DeliveryOfferQuoted.
@@ -150,10 +156,12 @@ func New(q Quote, now time.Time) (*Offer, []shared.Event, error) {
 		window: q.Window, witness: q.Witness.Clone(), basis: q.Basis, confidence: q.Confidence, policy: q.PolicyVersion, quotedAt: now,
 		expiresAt: shared.UTC(q.ExpiresAt), orderByAt: shared.UTC(q.LatestMeetableAt), state: StateQuoted,
 		version: 1, pickupCutoff: shared.UTC(q.PickupCutoffAt), capacityBand: q.CapacityBand,
+		consolidationEligible: cloneBool(q.ConsolidationEligible),
 	}
 	ev := DeliveryOfferQuoted{
 		Header: shared.Header{Version: o.version, At: now}, OfferID: o.id, Tier: o.tier, DestinationPrefix: o.destination,
 		NodeID: o.witness.NodeID, Window: o.window, Basis: o.basis, Confidence: o.confidence, PolicyVersion: o.policy, ExpiresAt: o.expiresAt, CapacityBand: o.capacityBand,
+		ConsolidationEligible: cloneBool(o.consolidationEligible),
 	}
 	return o, []shared.Event{ev}, nil
 }
@@ -168,6 +176,7 @@ func Restore(s Snapshot) (*Offer, error) {
 		window: s.Window, witness: s.Witness.Clone(), basis: s.Basis, confidence: s.Confidence, policy: s.PolicyVersion, quotedAt: shared.UTC(s.QuotedAt),
 		expiresAt: shared.UTC(s.ExpiresAt), orderByAt: shared.UTC(s.OrderByAt), state: s.State,
 		closedAt: shared.UTC(s.ClosedAt), version: s.Version, pickupCutoff: shared.UTC(s.PickupCutoffAt),
+		consolidationEligible: cloneBool(s.ConsolidationEligible),
 	}, nil
 }
 
@@ -251,6 +260,19 @@ func (o *Offer) OrderByAt() time.Time { return o.orderByAt }
 // offer restored from storage, because the band is a quote-time reading.
 func (o *Offer) CapacityBand() shared.CapacityBand { return o.capacityBand }
 
+// ConsolidationEligible says a CONSOLIDATED offer leaves the network at least
+// one local day to merge it with other orders (ADR 0024); nil for every other
+// tier.
+func (o *Offer) ConsolidationEligible() *bool { return cloneBool(o.consolidationEligible) }
+
+func cloneBool(b *bool) *bool {
+	if b == nil {
+		return nil
+	}
+	v := *b
+	return &v
+}
+
 // PickupCutoffAt returns the witness pickup cutoff (shipBy).
 func (o *Offer) PickupCutoffAt() time.Time { return o.pickupCutoff }
 
@@ -269,5 +291,6 @@ func (o *Offer) Snapshot() Snapshot {
 		ID: o.id, GroupNo: o.groupNo, DestinationPrefix: o.destination, Tier: o.tier, Lines: slices.Clone(o.lines), Window: o.window,
 		Witness: o.witness.Clone(), Basis: o.basis, Confidence: o.confidence, PolicyVersion: o.policy, QuotedAt: o.quotedAt, ExpiresAt: o.expiresAt,
 		OrderByAt: o.orderByAt, State: o.state, ClosedAt: o.closedAt, PickupCutoffAt: o.pickupCutoff, Version: o.version,
+		ConsolidationEligible: cloneBool(o.consolidationEligible),
 	}
 }

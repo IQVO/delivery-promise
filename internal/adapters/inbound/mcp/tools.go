@@ -60,7 +60,7 @@ type estimateItemInput struct {
 type estimateInput struct {
 	DestinationPostalPrefix string              `json:"destinationPostalPrefix" jsonschema:"the destination postal prefix (never a full address), e.g. 787"`
 	Items                   []estimateItemInput `json:"items" jsonschema:"the items to estimate, 1 to 50, each catalogItemId once"`
-	Tiers                   []string            `json:"tiers,omitempty" jsonschema:"optional subset of SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD; all four when omitted"`
+	Tiers                   []string            `json:"tiers,omitempty" jsonschema:"optional subset of SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD; all four when omitted; CONSOLIDATED is quoted on REST and refused here"`
 }
 
 func (in estimateInput) command() usecases.EstimateCommand {
@@ -142,7 +142,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 			"quote is kept on time, absent when the service has too few judgements of its segment to say, which is " +
 			"unknown and not zero), the policyVersion it was quoted under, quotedAt/expiresAt, " +
 			"and orderByAt (the latest instant the order can be placed and still make the quoted window, uncapped by " +
-			"the offer TTL). capacityBand is a quote-time reading that is not stored, so it is omitted here. Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
+			"the offer TTL). A CONSOLIDATED offer also carries consolidationEligible (a local day or more to merge; absent for other tiers). capacityBand is a quote-time reading that is not stored, so it is omitted here. Offers are kept for a retention period after they expire. Read-only; an unknown offer " +
 			"fails with not-found.",
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: &closedWorld},
 		Meta:        authorityMeta(authorityL1),
@@ -151,7 +151,7 @@ func (d Deps) registerTools(server *mcp.Server) {
 	addTool(server, &mcp.Tool{
 		Name: "get_promise",
 		Description: "Read one promise in any state (PROVISIONAL, CONFIRMED, AT_RISK, KEPT, BROKEN, RELEASED or " +
-			"CANCELLED): its terms (tier, shipBy, deliverByEarliest, deliverByLatest, timeZone, basis, the optional calibrated confidence, policyVersion), the witness " +
+			"CANCELLED): its terms (tier, shipBy, deliverByEarliest, deliverByLatest, timeZone, basis, the optional calibrated confidence, policyVersion, and for a CONSOLIDATED promise the optional consolidationEligible), the witness " +
 			"path, holdExpiresAt, the revisions that moved it and the final judgement (outcome KEPT or BROKEN, cause, " +
 			"lateByMinutes). A promise is never deleted; terminal states stay readable. Read-only; an unknown promise " +
 			"fails with not-found.",

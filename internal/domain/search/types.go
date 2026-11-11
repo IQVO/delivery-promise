@@ -183,6 +183,15 @@ type Input struct {
 	ExcludeWaves      map[string]bool
 	// OnlyNode restricts the candidates to one node (a locked assignment).
 	OnlyNode string
+	// ConsolidatedDay is the local calendar date (YYYY-MM-DD, the delivery
+	// station's zone) a shopper chose for the CONSOLIDATED tier; empty asks for
+	// the default (ADR 0024). It is clamped up to the fastest feasible day.
+	ConsolidatedDay string
+	// ConsolidatedNotBefore, when set, makes the CONSOLIDATED day a MINIMUM: the
+	// local date of this instant, and the search walks forward day by day to the
+	// horizon, collecting the candidates of every day that has one (a
+	// re-promise, ADR 0024). It overrides ConsolidatedDay.
+	ConsolidatedNotBefore time.Time
 }
 
 // Candidate is one feasible witness path with the numbers an offer needs.
@@ -217,6 +226,10 @@ type Candidate struct {
 	// time (ADR 0023); empty when the book has no finite capacity. It is not
 	// an input to ranking.
 	CapacityBand shared.CapacityBand
+	// ConsolidationEligible is set only on a CONSOLIDATED candidate: its day
+	// leaves the network at least MinConsolidationHoldDays local days after the
+	// fastest feasible window (ADR 0024).
+	ConsolidationEligible *bool
 	// Lines are the group's lines, each with the owner whose stock at NodeID
 	// covers it (shared.ChooseOwner, ADR 0017); set on the ranked candidates of
 	// a group.

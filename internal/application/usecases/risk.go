@@ -121,13 +121,8 @@ func (s *Service) ReviseAtRisk(ctx context.Context, id promise.ID) error {
 	if err != nil {
 		return err
 	}
-	opt := searchOptions{singleGroup: true, existingPromise: true}
-	if a, err := s.Shipments.FindAssignmentByPromise(ctx, string(id)); err == nil {
-		opt.excludeNodes, opt.excludeDepartures = toSet(a.ExcludedNodes), toSet(a.ExcludedDepartures)
-		if a.Locked {
-			opt.onlyNode = a.NodeID
-		}
-	} else if !errors.Is(err, ports.ErrNotFound) {
+	opt, err := s.reviseOptions(ctx, p)
+	if err != nil {
 		return err
 	}
 	tiers := p.Terms().Tier.SlowerOrEqual()
@@ -159,6 +154,29 @@ func (s *Service) ReviseAtRisk(ctx context.Context, id promise.ID) error {
 		}
 		return s.saveAll(ctx, cur, nil, events)
 	})
+}
+
+// reviseOptions are the search options of a re-promise: one group, no
+// eligibility filter, the exclusions of the promise's assignment, its locked
+// node, and, for a CONSOLIDATED promise, the local day of its window as the
+// minimum day (ADR 0024).
+func (s *Service) reviseOptions(ctx context.Context, p *promise.Promise) (searchOptions, error) {
+	opt := searchOptions{singleGroup: true, existingPromise: true}
+	if p.Terms().Tier == shared.TierConsolidated {
+		opt.consolidatedNotBefore = p.Terms().Window.Latest
+	}
+	a, err := s.Shipments.FindAssignmentByPromise(ctx, string(p.ID()))
+	if errors.Is(err, ports.ErrNotFound) {
+		return opt, nil
+	}
+	if err != nil {
+		return opt, err
+	}
+	opt.excludeNodes, opt.excludeDepartures = toSet(a.ExcludedNodes), toSet(a.ExcludedDepartures)
+	if a.Locked {
+		opt.onlyNode = a.NodeID
+	}
+	return opt, nil
 }
 
 // ignoreStale drops the errors that only say the promise is no longer AT_RISK.
@@ -199,7 +217,7 @@ func (s *Service) tryRevise(ctx context.Context, id promise.ID, c search.Candida
 			return err
 		}
 		revEvents, err := p.Revise(promise.Revising{
-			Terms:   promise.Terms{Tier: c.Tier, ShipBy: c.ShipBy, Window: c.Window, Basis: c.Basis, Confidence: c.Confidence, PolicyVersion: pol.VersionName()},
+			Terms:   promise.Terms{Tier: c.Tier, ShipBy: c.ShipBy, Window: c.Window, Basis: c.Basis, Confidence: c.Confidence, PolicyVersion: pol.VersionName(), ConsolidationEligible: c.ConsolidationEligible},
 			Witness: c.Witness, BookID: c.BookID, Reason: p.AtRiskReason(), Lines: c.Lines,
 		}, s.Clock.Now())
 		if err != nil {

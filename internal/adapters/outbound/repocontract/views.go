@@ -192,6 +192,7 @@ func ids[T any](rows []T, id func(T) string) string {
 var shipmentCases = []named{
 	{"an assignment round-trips with its exclusions and is found by promise", shipmentAssignment},
 	{"shipments map tracking numbers to assignments", shipmentTrackings},
+	{"a tracking number may belong to several assignments", shipmentSharedTracking},
 	{"the first outcome of a package wins", shipmentOutcomes},
 }
 
@@ -228,17 +229,39 @@ func shipmentTrackings(t *testing.T, f Fixture) {
 	got, err := f.Shipments.Shipment(ctx, "asg-1")
 	noErr(t, err)
 	eq(t, "no shipment yet", len(got), 0)
-	_, err = f.Shipments.AssignmentOf(ctx, "TRK-1")
+	_, err = f.Shipments.AssignmentsOf(ctx, "TRK-1")
 	wantErr(t, err, ports.ErrNotFound)
 	noErr(t, f.Shipments.PutShipment(ctx, "asg-1", []string{"TRK-2", "TRK-1"}))
 	got, _ = f.Shipments.Shipment(ctx, "asg-1")
 	eq(t, "tracking numbers", ids(got, func(s string) string { return s }), "TRK-1,TRK-2")
-	owner, err := f.Shipments.AssignmentOf(ctx, "TRK-2")
+	owners, err := f.Shipments.AssignmentsOf(ctx, "TRK-2")
 	noErr(t, err)
-	eq(t, "owner", owner, "asg-1")
+	eq(t, "owner", ids(owners, func(s string) string { return s }), "asg-1")
 	noErr(t, f.Shipments.PutShipment(ctx, "asg-1", []string{"TRK-1"}))
 	got, _ = f.Shipments.Shipment(ctx, "asg-1")
 	eq(t, "a repeated shipment is replaced", len(got), 1)
+}
+
+// shipmentSharedTracking is ADR 0025: a merged package is shipped under the
+// tracking number of every member, and no member re-owns it.
+func shipmentSharedTracking(t *testing.T, f Fixture) {
+	asIs := func(s string) string { return s }
+	noErr(t, f.Shipments.PutShipment(ctx, "asg-2", []string{"TRK-S", "TRK-2B"}))
+	noErr(t, f.Shipments.PutShipment(ctx, "asg-1", []string{"TRK-S"}))
+	noErr(t, f.Shipments.PutShipment(ctx, "asg-3", []string{"TRK-S"}))
+	noErr(t, f.Shipments.PutShipment(ctx, "asg-1", []string{"TRK-S"})) // a replay adds nothing
+	owners, err := f.Shipments.AssignmentsOf(ctx, "TRK-S")
+	noErr(t, err)
+	eq(t, "every member, ascending", ids(owners, asIs), "asg-1,asg-2,asg-3")
+	owners, err = f.Shipments.AssignmentsOf(ctx, "TRK-2B")
+	noErr(t, err)
+	eq(t, "an unshared number keeps its owner", ids(owners, asIs), "asg-2")
+	for a, want := range map[string]string{"asg-1": "TRK-S", "asg-2": "TRK-2B,TRK-S", "asg-3": "TRK-S"} {
+		got, _ := f.Shipments.Shipment(ctx, a)
+		eq(t, "own package set of "+a, ids(got, asIs), want)
+	}
+	_, err = f.Shipments.AssignmentsOf(ctx, "TRK-NONE")
+	wantErr(t, err, ports.ErrNotFound)
 }
 
 func shipmentOutcomes(t *testing.T, f Fixture) {

@@ -95,7 +95,7 @@ func (s *Service) makePromise(ctx context.Context, cmd MakePromiseCommand) (Make
 	}
 	p, pevents, err := promise.Make(promise.Making{
 		ID: s.IDs.NewPromiseID(), OfferID: cmd.OfferID, DestinationPrefix: o.DestinationPrefix(), Lines: o.Lines(),
-		Terms:   promise.Terms{Tier: o.Tier(), ShipBy: o.PickupCutoffAt(), Window: o.Window(), Basis: o.Basis(), Confidence: o.Confidence(), PolicyVersion: o.PolicyVersion()},
+		Terms:   promise.Terms{Tier: o.Tier(), ShipBy: o.PickupCutoffAt(), Window: o.Window(), Basis: o.Basis(), Confidence: o.Confidence(), PolicyVersion: o.PolicyVersion(), ConsolidationEligible: o.ConsolidationEligible()},
 		Witness: o.Witness(), BookID: string(b.ID()), HoldTTL: pol.HoldTTL(), Stock: stock,
 	}, now)
 	if err != nil {

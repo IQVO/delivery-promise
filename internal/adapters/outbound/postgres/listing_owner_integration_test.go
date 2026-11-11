@@ -13,7 +13,7 @@ import (
 
 // latestMigration is the ceiling of the embedded set: bump it with every new
 // migration so the version assertion below stays honest.
-const latestMigration = 8
+const latestMigration = 9
 
 // listingOwnerMigration is the migration this file proves (ADR 0017); the
 // steps below go to the version just under it, whatever the ceiling is.

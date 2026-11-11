@@ -62,6 +62,10 @@ type Offer struct {
 	// offer's window when it was quoted (ADR 0023); omitted when unknown, and
 	// on an offer read back from storage.
 	CapacityBand string `json:"capacityBand,omitempty"`
+	// ConsolidationEligible is present only for the tier CONSOLIDATED: the
+	// option leaves the network at least one local day to merge it with other
+	// orders (ADR 0024). Omitted otherwise, never false by default.
+	ConsolidationEligible *bool `json:"consolidationEligible,omitempty"`
 }
 
 // Unavailable says why a (group, tier) has no offer.
@@ -90,6 +94,8 @@ type Terms struct {
 	// with, omitted when unknown (ADR 0020).
 	Confidence    *float64 `json:"confidence,omitempty"`
 	PolicyVersion string   `json:"policyVersion"`
+	// ConsolidationEligible is present only on a CONSOLIDATED promise (ADR 0024).
+	ConsolidationEligible *bool `json:"consolidationEligible,omitempty"`
 }
 
 // Revision is one re-promise.
@@ -203,6 +209,7 @@ func terms(t promise.Terms) Terms {
 	return Terms{
 		Tier: string(t.Tier), ShipBy: t.ShipBy.UTC(), DeliverByEarliest: t.Window.Earliest.UTC(), DeliverByLatest: t.Window.Latest.UTC(),
 		TimeZone: t.Window.TimeZone, Basis: string(t.Basis), Confidence: t.Confidence.Ptr(), PolicyVersion: t.PolicyVersion,
+		ConsolidationEligible: t.ConsolidationEligible,
 	}
 }
 
@@ -212,7 +219,7 @@ func FromOffer(o *offer.Offer) Offer {
 		OfferID: string(o.ID()), State: string(o.State()), GroupNo: o.GroupNo(), DestinationPostalPrefix: o.DestinationPrefix(),
 		Tier: string(o.Tier()), Lines: lines(o.Lines()), Window: Window{Earliest: o.Window().Earliest.UTC(), Latest: o.Window().Latest.UTC(), TimeZone: o.Window().TimeZone},
 		WitnessPath: witness(o.Witness()), Basis: string(o.Basis()), Confidence: o.Confidence().Ptr(), PolicyVersion: o.PolicyVersion(), QuotedAt: o.QuotedAt().UTC(), ExpiresAt: o.ExpiresAt().UTC(),
-		OrderByAt: o.OrderByAt().UTC(), CapacityBand: string(o.CapacityBand()),
+		OrderByAt: o.OrderByAt().UTC(), CapacityBand: string(o.CapacityBand()), ConsolidationEligible: o.ConsolidationEligible(),
 	}
 }
 

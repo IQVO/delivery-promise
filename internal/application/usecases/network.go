@@ -28,6 +28,20 @@ type searchOptions struct {
 	// existingPromise marks the re-promising of a promise already made: the
 	// fast-tier eligibility filter applies to future quotes only (ADR 0022).
 	existingPromise bool
+	// consolidatedDay and consolidatedNotBefore are the CONSOLIDATED tier's
+	// chosen local day, and the instant whose local day is its minimum when a
+	// promise is re-promised (ADR 0024).
+	consolidatedDay       string
+	consolidatedNotBefore time.Time
+}
+
+// horizonFor is how far ahead of now the read models are loaded for a search:
+// the CONSOLIDATED tier reaches MaxConsolidatedCalendarDays local days out.
+func horizonFor(tiers []shared.Tier) time.Duration {
+	if slices.Contains(tiers, shared.TierConsolidated) {
+		return max(SearchHorizon, time.Duration(shared.MaxConsolidatedCalendarDays+1)*24*time.Hour)
+	}
+	return SearchHorizon
 }
 
 // ToSearchNode converts a NodeProfileView row to the search's node. A row whose
@@ -101,6 +115,7 @@ func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Po
 		Nodes: map[string]search.Node{}, Grades: map[string]search.Grade{}, Books: map[string]search.BookView{},
 		Stock: func(string, string) []shared.OwnerStock { return nil }, MeasuredTransit: s.measuredTransitOf(ctx, pol, now),
 		CalibrationBuffer: s.calibrationBufferOf(ctx, pol, now),
+		ConsolidatedDay:   opt.consolidatedDay, ConsolidatedNotBefore: opt.consolidatedNotBefore,
 	}
 	var err error
 	if !opt.existingPromise {
@@ -149,7 +164,7 @@ func (s *Service) fill(ctx context.Context, in *search.Input, stationID string, 
 	for i, l := range lines {
 		items[i] = l.CatalogItemID
 	}
-	net, err := s.Network.Load(ctx, readmodel.Query{StationID: stationID, ItemIDs: items, From: in.Now, Until: in.Now.Add(SearchHorizon)})
+	net, err := s.Network.Load(ctx, readmodel.Query{StationID: stationID, ItemIDs: items, From: in.Now, Until: in.Now.Add(horizonFor(in.Tiers))})
 	if err != nil {
 		return err
 	}

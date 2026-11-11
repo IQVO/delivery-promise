@@ -26,6 +26,9 @@ type quoteRequest struct {
 	DestinationPostalPrefix string    `json:"destinationPostalPrefix"`
 	Lines                   []lineDTO `json:"lines"`
 	Tiers                   []string  `json:"tiers"`
+	// ConsolidatedDeliveryDay is the optional local date chosen for the
+	// CONSOLIDATED tier (YYYY-MM-DD, ADR 0024).
+	ConsolidatedDeliveryDay string `json:"consolidatedDeliveryDay"`
 }
 
 func toTiers(in []string) []shared.Tier {
@@ -37,7 +40,7 @@ func toTiers(in []string) []shared.Tier {
 }
 
 func (q quoteRequest) command() usecases.QuoteCommand {
-	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, Lines: toLines(q.Lines), Tiers: toTiers(q.Tiers)}
+	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, Lines: toLines(q.Lines), Tiers: toTiers(q.Tiers), ConsolidatedDeliveryDay: q.ConsolidatedDeliveryDay}
 }
 
 // estimateRequest is the body of POST /delivery-estimates (ADR 0019).

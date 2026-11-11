@@ -54,7 +54,7 @@ func Run(t *testing.T, newFixture func(t *testing.T) Fixture) {
 	}{
 		{"offers", offerCases}, {"promises", promiseCases}, {"books", bookCases}, {"policies", policyCases},
 		{"network views", networkCases}, {"shipment views", shipmentCases}, {"unit of work", unitOfWorkCases},
-		{"owners", ownerCases}, {"tier eligibility", tierEligibilityCases}, {"late risk", lateRiskCases}, {"calibration", calibrationCases},
+		{"owners", ownerCases}, {"tier eligibility", tierEligibilityCases}, {"late risk", lateRiskCases}, {"calibration", calibrationCases}, {"consolidated tier", consolidatedCases},
 	}
 	for _, g := range groups {
 		for _, c := range g.cases {
