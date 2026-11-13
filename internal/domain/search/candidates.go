@@ -86,6 +86,9 @@ func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool,
 	if !found {
 		return Candidate{}, false
 	}
+	if s.in.Carrier != nil { // the area is CARRIER_HANDOFF: no wave to snap to (ADR 0026)
+		return s.carrierCandidate(n, d, arr, handling, t)
+	}
 	basis := shared.BasisScheduled
 	if arr.measured { // at least one leg ran later than the timetable (ADR 0014)
 		basis = shared.BasisMeasured
@@ -103,7 +106,7 @@ func (s *searcher) candidateFrom(n Node, d Departure, handling int, strict bool,
 		BufferMinutes: cal.BufferMinutes, Confidence: cal.Confidence,
 		Witness: shared.Witness{NodeID: n.ID, PickupDepartureID: d.ID, Legs: arr.legs, DeliveryWaveID: w.ID}, BookID: string(id),
 		ExpiresAt: expires, LatestMeetableAt: meet, Grade: s.in.Grades[n.ID], InRegion: n.RegionID == s.in.AreaRegionID,
-		LegCount: len(arr.legs), Direct: d.Dest == s.in.Station.ID && (n.Subtype == SubtypeSubSameDay || n.Subtype == SubtypeMicro), Opening: op,
+		LegCount: len(arr.legs), Direct: d.Dest == s.finalTarget() && (n.Subtype == SubtypeSubSameDay || n.Subtype == SubtypeMicro), Opening: op,
 		CapacityBand: s.bandOf(id, op),
 	}, true
 }

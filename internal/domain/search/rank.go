@@ -8,10 +8,13 @@ import (
 )
 
 // forTier ranks the candidates that fit the tier; for STANDARD without any
-// scheduled candidate it falls back to the nominal paths (basis NOMINAL).
+// scheduled candidate it falls back to the nominal paths (basis NOMINAL) - a
+// CARRIER_HANDOFF area never falls back: its final leg is the carrier, so a
+// nominal lane path to the station is not a promise this network can keep
+// (ADR 0026).
 func (s *searcher) forTier(scheduled []Candidate, t shared.Tier, eligible []Node, strict bool) []Candidate {
 	cs := s.fit(scheduled, t)
-	if len(cs) == 0 && t.AllowsNominal() {
+	if len(cs) == 0 && t.AllowsNominal() && s.in.Carrier == nil {
 		var nom []Candidate
 		for _, n := range eligible {
 			nom = append(nom, s.nominal(n, strict, t, s.nextDayWindow)...)

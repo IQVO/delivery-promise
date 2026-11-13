@@ -18,6 +18,7 @@ type PromisePolicyPublished struct {
 	TransitWindowDays              int
 	TransitServiceLevelPercent     int
 	MinTransitObservations         int
+	CarrierWindowHours             int
 	TargetOnTimeProbabilityPercent int
 	MinCalibrationObservations     int
 	CalibrationWindowDays          int

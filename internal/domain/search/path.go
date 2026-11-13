@@ -75,7 +75,7 @@ type arrivalMemo struct {
 }
 
 func (s *searcher) searchArrival(pickup Departure, strict bool) (arrival, bool) {
-	station := s.in.Station.ID
+	station := s.finalTarget()
 	start, startMeasured := s.measuredAt(pickup)
 	if pickup.Dest == station {
 		return arrival{at: start, measured: startMeasured}, true
@@ -151,6 +151,18 @@ func (s *searcher) legIDs(via map[string]leg, to, from string) []string {
 	}
 	slices.Reverse(ids)
 	return ids
+}
+
+// finalTarget is the node the arrival search ends at: the delivery station,
+// or the chosen carrier option's handoff node when the destination area is
+// CARRIER_HANDOFF - the Dijkstra itself is unchanged (ADR 0026).
+func (s *searcher) finalTarget() string {
+	if s.in.Carrier != nil {
+		if opt, ok := ChooseCarrier(s.in.Carrier.Options); ok {
+			return opt.HandoffNodeID
+		}
+	}
+	return s.in.Station.ID
 }
 
 // firstWave is the first wave at the station whose induct cutoff is not
