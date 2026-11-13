@@ -71,7 +71,20 @@ type Area struct {
 	StationID    string
 	RegionID     string
 	Version      int
+	// DeliveryMode is the planner's declaration for the area (ADR 0026): the
+	// empty string and NETWORK_ROUTE mean waves as before; CARRIER_HANDOFF
+	// promises on the carrier options below. Carriers is empty unless the mode
+	// is CARRIER_HANDOFF.
+	DeliveryMode string
+	Carriers     []search.CarrierOption
 }
+
+// The service-area delivery modes (ADR 0026). An area assigned before the
+// mode existed decodes as NETWORK_ROUTE.
+const (
+	AreaNetworkRoute   = "NETWORK_ROUTE"
+	AreaCarrierHandoff = "CARRIER_HANDOFF"
+)
 
 // Item is a catalogue item of AvailabilityView.
 type Item struct {

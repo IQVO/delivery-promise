@@ -135,7 +135,8 @@ func (s *Service) OnLaneClosed(ctx context.Context, m Meta, e LaneClosed) error 
 }
 
 // OnServiceAreaAssigned projects ServiceAreaAssigned; an assignmentVersion not
-// above the stored one is ignored.
+// above the stored one is ignored. The ADR 0026 delivery mode and carrier
+// options ride along: absent fields mean NETWORK_ROUTE with no options.
 func (s *Service) OnServiceAreaAssigned(ctx context.Context, m Meta, e ServiceAreaAssigned) error {
 	return s.project(ctx, m, func(ctx context.Context) error {
 		cur, err := s.Network.GetArea(ctx, e.PostalPrefix)
@@ -145,7 +146,15 @@ func (s *Service) OnServiceAreaAssigned(ctx context.Context, m Meta, e ServiceAr
 		if err == nil && e.AssignmentVersion <= cur.Version {
 			return nil
 		}
-		return s.Network.PutArea(ctx, readmodel.Area{PostalPrefix: e.PostalPrefix, StationID: e.DeliveryStationNodeID, RegionID: e.RegionID, Version: e.AssignmentVersion})
+		options := make([]search.CarrierOption, 0, len(e.Carriers))
+		for _, c := range e.Carriers {
+			options = append(options, search.CarrierOption{CarrierID: c.CarrierID, HandoffNodeID: c.HandoffNodeID, CostPerPackageCents: c.CostPerPackageCents, TransitMinutes: c.TransitMinutes})
+		}
+		mode := e.DeliveryMode
+		if mode == "" {
+			mode = readmodel.AreaNetworkRoute
+		}
+		return s.Network.PutArea(ctx, readmodel.Area{PostalPrefix: e.PostalPrefix, StationID: e.DeliveryStationNodeID, RegionID: e.RegionID, Version: e.AssignmentVersion, DeliveryMode: mode, Carriers: options})
 	})
 }
 

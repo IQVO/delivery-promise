@@ -46,6 +46,48 @@ func (t *TransitActuals) RecordLoadArrived(ctx context.Context, loadID, destNode
 	return nil
 }
 
+// carrierOpenRow is the open pairing row of a package handed to a carrier
+// (ADR 0026): the tracking number keys it, and the row knows the ring pair it
+// will close under.
+type carrierOpenRow struct {
+	HandoffNodeID string
+	Dest          string
+	HandedAt      time.Time
+}
+
+// RecordCarrierHandoff opens the carrier pairing row of a package and prunes
+// the open rows older than the longest transit window (ADR 0026).
+func (t *TransitActuals) RecordCarrierHandoff(ctx context.Context, trackingNumber, handoffNodeID, postalPrefix string, handedAt time.Time) error {
+	defer t.s.enter(ctx)()
+	t.s.st.carrierOpen[trackingNumber] = carrierOpenRow{HandoffNodeID: handoffNodeID, Dest: "area:" + postalPrefix, HandedAt: handedAt}
+	cutoff := handedAt.AddDate(0, 0, -policy.MaxTransitWindowDays)
+	for id, row := range t.s.st.carrierOpen {
+		if row.HandedAt.Before(cutoff) {
+			delete(t.s.st.carrierOpen, id)
+		}
+	}
+	return nil
+}
+
+// RecordCarrierDelivered pairs the package's open carrier row into one
+// observation of its (handoffNodeID, "area:"+prefix) pair and deletes the row;
+// a package with no open row changes nothing (ADR 0026).
+func (t *TransitActuals) RecordCarrierDelivered(ctx context.Context, trackingNumber string, deliveredAt time.Time) error {
+	defer t.s.enter(ctx)()
+	open, ok := t.s.st.carrierOpen[trackingNumber]
+	if !ok {
+		return nil
+	}
+	delete(t.s.st.carrierOpen, trackingNumber)
+	k := transitPair{origin: open.HandoffNodeID, dest: open.Dest}
+	ring := append([]readmodel.TransitObservation(nil), t.s.st.transitRings[k]...)
+	ring = readmodel.AppendTransitObservation(ring,
+		readmodel.TransitObservation{Minutes: int(deliveredAt.Sub(open.HandedAt).Minutes()), ObservedAt: deliveredAt.UTC()},
+		policy.MaxTransitWindowDays, deliveredAt)
+	t.s.st.transitRings[k] = ring
+	return nil
+}
+
 // MeasuredTransit answers the nearest-rank percentile transit of the pair's
 // in-window observations; ok is false below minObservations.
 func (t *TransitActuals) MeasuredTransit(ctx context.Context, origin, dest string, percentile, minObservations, windowDays int, now time.Time) (bool, int) {

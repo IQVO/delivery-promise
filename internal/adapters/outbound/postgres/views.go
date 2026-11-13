@@ -83,9 +83,21 @@ func (v *NetworkViews) GetArea(ctx context.Context, prefix string) (readmodel.Ar
 	return getJSON[readmodel.Area](ctx, v.q(ctx), `SELECT data FROM rm_areas WHERE postal_prefix = $1`, prefix)
 }
 
-// PutArea stores the service-area row.
+// PutArea stores the service-area row. The delivery-mode columns mirror the
+// jsonb row so the ADR 0026 declaration stays queryable in SQL; the adapter
+// always reads the row back from data.
 func (v *NetworkViews) PutArea(ctx context.Context, a readmodel.Area) error {
-	return v.put(ctx, `INSERT INTO rm_areas (postal_prefix, data) VALUES ($1, $2) ON CONFLICT (postal_prefix) DO UPDATE SET data = EXCLUDED.data`, a.PostalPrefix, mustJSON(a))
+	mode := a.DeliveryMode
+	if mode == "" {
+		mode = readmodel.AreaNetworkRoute
+	}
+	options := a.Carriers
+	if options == nil {
+		options = []search.CarrierOption{}
+	}
+	return v.put(ctx, `INSERT INTO rm_areas (postal_prefix, delivery_mode, carrier_options, data) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (postal_prefix) DO UPDATE SET delivery_mode = EXCLUDED.delivery_mode, carrier_options = EXCLUDED.carrier_options, data = EXCLUDED.data`,
+		a.PostalPrefix, mode, mustJSON(options), mustJSON(a))
 }
 
 // GetLane returns the lane row or ports.ErrNotFound.
