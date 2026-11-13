@@ -156,6 +156,8 @@ channels:
         $ref: '#/components/messages/PackageDelivered'
       PackageHandedToCarrier:
         $ref: '#/components/messages/PackageHandedToCarrier'
+      PackageReadyForCollection:
+        $ref: '#/components/messages/PackageReadyForCollection'
       PackageExceptionRaised:
         $ref: '#/components/messages/PackageExceptionRaised'
       PackageLost:
@@ -354,8 +356,8 @@ operations:
     channel:
       $ref: '#/channels/shippingAndTrackingEvents'
     title: Consume shipping-and-tracking events
-    summary: Consume PackageDelivered, PackageHandedToCarrier, PackageExceptionRaised, PackageLost, PackageReturned from shipping-and-tracking.
-    description: The service consumes PackageDelivered, PackageHandedToCarrier, PackageExceptionRaised, PackageLost, PackageReturned from `retailnetwork.shipping-and-tracking.events`
+    summary: Consume PackageDelivered, PackageHandedToCarrier, PackageReadyForCollection, PackageExceptionRaised, PackageLost, PackageReturned from shipping-and-tracking.
+    description: The service consumes PackageDelivered, PackageHandedToCarrier, PackageReadyForCollection, PackageExceptionRaised, PackageLost, PackageReturned from `retailnetwork.shipping-and-tracking.events`
       to keep its local read models and to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls shipping-and-tracking
       synchronously.
     tags:
@@ -363,6 +365,7 @@ operations:
     messages:
     - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageDelivered'
     - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageHandedToCarrier'
+    - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageReadyForCollection'
     - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageExceptionRaised'
     - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageLost'
     - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageReturned'
@@ -1084,6 +1087,37 @@ components:
             handoffNodeId: N-DAU1
             destinationPostalPrefix: '787'
             handedAt: '2026-10-23T08:00:00Z'
+    PackageReadyForCollection:
+      name: PackageReadyForCollection
+      title: A package reached its pickup point
+      summary: A pickup-point package became collectable; the promise of a pickup order is judged on it.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.shipping-and-tracking.events`; `type` = `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageReadyForCollection`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: the kept outcome of a pickup-point promise - judged exactly as a ship-to promise is judged
+        on PackageDelivered (ADR 0027).'
+      tags:
+      - name: consumed-shipping-and-tracking
+      payload:
+        $ref: '#/components/schemas/PackageReadyForCollectionConsumed'
+      examples:
+      - name: packageReadyForCollection
+        summary: A pickup-point package became collectable.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0029
+          source: /retailnetwork/shipping-and-tracking
+          type: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageReadyForCollection
+          subject: TRK-1001
+          time: '2026-10-23T08:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shipping-and-tracking:events:PackageReadyForCollection:v1
+          data:
+            trackingNumber: TRK-1001
+            assignmentId: asg-1001
+            orderId: ord-2001
+            pickupPointId: node-pnt-7
+            readyForCollectionAt: '2026-10-23T08:00:00Z'
     PackageExceptionRaised:
       name: PackageExceptionRaised
       title: A package raised a tracking exception
@@ -2614,6 +2648,21 @@ components:
               handoffNodeId: *id001
               destinationPostalPrefix: *id001
               handedAt: *id002
+    PackageReadyForCollectionConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - trackingNumber
+            properties:
+              trackingNumber: *id001
+              assignmentId: *id001
+              orderId: *id001
+              pickupPointId: *id001
+              readyForCollectionAt: *id002
     PackageExceptionRaisedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2876,8 +2925,18 @@ components:
                 - string
                 - 'null'
               operator: *id001
+              servingStationNodeId:
+                type:
+                - string
+                - 'null'
+                description: The serving delivery station of a PICKUP_POINT; null for every other node type (ADR 0027).
               regionId: *id001
               timezone: *id001
+              postalCode:
+                type:
+                - string
+                - 'null'
+                description: The node's own postal code; a pickup point's code is its prefix (ADR 0027).
     NodeOperationalProfileDeclaredConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'

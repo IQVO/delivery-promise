@@ -23,9 +23,11 @@ func toLines(in []lineDTO) []shared.Line {
 }
 
 type quoteRequest struct {
-	DestinationPostalPrefix string    `json:"destinationPostalPrefix"`
-	Lines                   []lineDTO `json:"lines"`
-	Tiers                   []string  `json:"tiers"`
+	DestinationPostalPrefix string `json:"destinationPostalPrefix"`
+	// PickupPointID is the alternative destination (ADR 0027).
+	PickupPointID string    `json:"pickupPointId"`
+	Lines         []lineDTO `json:"lines"`
+	Tiers         []string  `json:"tiers"`
 	// ConsolidatedDeliveryDay is the optional local date chosen for the
 	// CONSOLIDATED tier (YYYY-MM-DD, ADR 0024).
 	ConsolidatedDeliveryDay string `json:"consolidatedDeliveryDay"`
@@ -40,18 +42,20 @@ func toTiers(in []string) []shared.Tier {
 }
 
 func (q quoteRequest) command() usecases.QuoteCommand {
-	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, Lines: toLines(q.Lines), Tiers: toTiers(q.Tiers), ConsolidatedDeliveryDay: q.ConsolidatedDeliveryDay}
+	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, PickupPointID: q.PickupPointID, Lines: toLines(q.Lines), Tiers: toTiers(q.Tiers), ConsolidatedDeliveryDay: q.ConsolidatedDeliveryDay}
 }
 
 // estimateRequest is the body of POST /delivery-estimates (ADR 0019).
 type estimateRequest struct {
-	DestinationPostalPrefix string    `json:"destinationPostalPrefix"`
-	Items                   []lineDTO `json:"items"`
-	Tiers                   []string  `json:"tiers"`
+	DestinationPostalPrefix string `json:"destinationPostalPrefix"`
+	// PickupPointID is the alternative destination (ADR 0027).
+	PickupPointID string    `json:"pickupPointId"`
+	Items         []lineDTO `json:"items"`
+	Tiers         []string  `json:"tiers"`
 }
 
 func (e estimateRequest) command() usecases.EstimateCommand {
-	return usecases.EstimateCommand{DestinationPostalPrefix: e.DestinationPostalPrefix, Items: toLines(e.Items), Tiers: toTiers(e.Tiers)}
+	return usecases.EstimateCommand{DestinationPostalPrefix: e.DestinationPostalPrefix, PickupPointID: e.PickupPointID, Items: toLines(e.Items), Tiers: toTiers(e.Tiers)}
 }
 
 type makePromiseRequest struct {

@@ -56,6 +56,10 @@ type Node struct {
 	Timezone string
 	State    string
 	Profile  *Profile
+	// ServingStationNodeID is set only on a PICKUP_POINT: its serving
+	// delivery station (ADR 0027). PostalPrefix is the point's own prefix.
+	ServingStationNodeID string
+	PostalPrefix         string
 }
 
 // Region is a row of the region part of RegionAndServiceAreaView.

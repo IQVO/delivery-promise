@@ -22,6 +22,15 @@ func (s *Service) OnPackageHandedToCarrier(ctx context.Context, m Meta, e Packag
 	})
 }
 
+// OnPackageReadyForCollection records the collection-readiness as the kept
+// outcome of a pickup-point promise and judges the group when it was the last
+// package (ADR 0027).
+func (s *Service) OnPackageReadyForCollection(ctx context.Context, m Meta, e PackageReadyForCollection) error {
+	return s.recordOutcome(ctx, m, readmodel.PackageOutcome{TrackingNumber: e.TrackingNumber, AssignmentID: e.AssignmentID, Kind: readmodel.OutcomeDelivered, At: e.ReadyAt.UTC()}, func(ctx context.Context) error {
+		return nil
+	})
+}
+
 // OnPackageDelivered records the delivery, judges the group when it was the
 // last package (F9), and pairs the carrier's open row into one measured
 // carrier observation when the package rode a carrier (ADR 0026): the same

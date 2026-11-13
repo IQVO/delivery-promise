@@ -28,6 +28,8 @@ const estimateOfferID offer.ID = "estimate"
 // EstimateCommand is the input of EstimateDeliveries.
 type EstimateCommand struct {
 	DestinationPostalPrefix string
+	// PickupPointID is the alternative destination (ADR 0027).
+	PickupPointID string
 	// Items are estimated one by one, each as a single-line group.
 	Items []shared.Line
 	// Tiers defaults to all four when empty.
@@ -35,7 +37,14 @@ type EstimateCommand struct {
 }
 
 func (c EstimateCommand) validate() error {
-	if !shared.ValidPostalPrefix(c.DestinationPostalPrefix) {
+	if (c.DestinationPostalPrefix == "") == (c.PickupPointID == "") {
+		return shared.Invalid("exactly one of destinationPostalPrefix and pickupPointId is required")
+	}
+	if c.PickupPointID != "" {
+		if !shared.ValidID(c.PickupPointID) {
+			return shared.Invalid("pickupPointId %q is not a valid id", c.PickupPointID)
+		}
+	} else if !shared.ValidPostalPrefix(c.DestinationPostalPrefix) {
 		return shared.Invalid("destinationPostalPrefix %q is not valid", c.DestinationPostalPrefix)
 	}
 	if len(c.Items) == 0 || len(c.Items) > MaxEstimateItems {
@@ -76,16 +85,23 @@ func (s *Service) EstimateDeliveries(ctx context.Context, cmd EstimateCommand) (
 	if err != nil {
 		return views.EstimateResult{}, err
 	}
-	in, err := s.searchInput(ctx, now, pol, cmd.DestinationPostalPrefix, cmd.Items, cmd.Tiers, searchOptions{})
+	prefix, station, err := s.resolvePickup(ctx, cmd.PickupPointID)
+	if err != nil {
+		return views.EstimateResult{}, err
+	}
+	if prefix == "" {
+		prefix = cmd.DestinationPostalPrefix
+	}
+	in, err := s.searchInput(ctx, now, pol, prefix, cmd.Items, cmd.Tiers, searchOptions{pickupStation: station})
 	if err != nil {
 		return views.EstimateResult{}, err
 	}
 	in.MeasuredTransit = memoTransit(in.MeasuredTransit)
-	out := views.EstimateResult{ComputedAt: now, DestinationPostalPrefix: cmd.DestinationPostalPrefix, Estimates: make([]views.Estimate, 0, len(cmd.Items))}
+	out := views.EstimateResult{ComputedAt: now, DestinationPostalPrefix: prefix, Estimates: make([]views.Estimate, 0, len(cmd.Items))}
 	for _, it := range cmd.Items {
 		one := in
 		one.Lines = []shared.Line{it}
-		out.Estimates = append(out.Estimates, estimateOf(it, search.Run(one), cmd.DestinationPostalPrefix, pol, now))
+		out.Estimates = append(out.Estimates, estimateOf(it, search.Run(one), prefix, pol, now))
 	}
 	return out, nil
 }

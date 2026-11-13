@@ -37,12 +37,14 @@ type ThroughputCapDTO struct {
 
 // NodeRegistered is node-topology NodeRegistered.
 type NodeRegistered struct {
-	NodeID   string `json:"nodeId"`
-	NodeType string `json:"nodeType"`
-	Subtype  string `json:"subtype"`
-	Operator string `json:"operator"`
-	RegionID string `json:"regionId"`
-	Timezone string `json:"timezone"`
+	NodeID               string `json:"nodeId"`
+	NodeType             string `json:"nodeType"`
+	Subtype              string `json:"subtype"`
+	Operator             string `json:"operator"`
+	ServingStationNodeID string `json:"servingStationNodeId"`
+	RegionID             string `json:"regionId"`
+	Timezone             string `json:"timezone"`
+	PostalCode           string `json:"postalCode"`
 }
 
 // NodeProfileDeclared is node-topology NodeOperationalProfileDeclared.
@@ -203,6 +205,17 @@ type PackageDelivered struct {
 	TrackingNumber string    `json:"trackingNumber"`
 	AssignmentID   string    `json:"assignmentId"`
 	DeliveredAt    time.Time `json:"deliveredAt"`
+}
+
+// PackageReadyForCollection is shipping-and-tracking PackageReadyForCollection
+// (ADR 0027): a pickup-point package reached its point - the promise of a
+// pickup order is judged on it, as a ship-to promise is judged on delivery.
+type PackageReadyForCollection struct {
+	TrackingNumber string    `json:"trackingNumber"`
+	AssignmentID   string    `json:"assignmentId"`
+	OrderID        string    `json:"orderId"`
+	PickupPointID  string    `json:"pickupPointId"`
+	ReadyAt        time.Time `json:"readyForCollectionAt"`
 }
 
 // PackageHandedToCarrier is shipping-and-tracking PackageHandedToCarrier
