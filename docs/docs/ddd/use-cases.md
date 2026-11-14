@@ -29,7 +29,7 @@ All three binaries drive the **same** `Service`: REST (`cmd/api`) exposes the co
 | `CloseBooks` | clock | sweeper | none |
 | `FlagPredictedLate` | clock | sweeper | `PromiseAtRisk` (`PREDICTED_LATE`) |
 | `RepriceAtRisk` | clock | sweeper | as `ReviseAtRisk` |
-| Read-model projections | 36 consumed event types | consumer | none |
+| Read-model projections | 39 consumed event types | consumer | none |
 | Reads | any | REST GET routes, MCP tools, A2A skills | none |
 
 ## QuoteDeliveryOffers

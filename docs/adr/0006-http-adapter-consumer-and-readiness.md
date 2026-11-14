@@ -21,3 +21,7 @@ Accepted (2026-10-23).
 
 - A cold or partitioned service answers fewer offers, never a false one, and says it is not ready when Kafka is gone.
 - Chart values: `terminationGracePeriodSeconds` > 35 s, a stable consumer group, and `MIGRATIONS_DATABASE_URL` pointing at a direct connection when Postgres sits behind a transaction pooler.
+
+## Addendum 2026-11-13: current state
+
+The sweeper now runs five passes, not four. `sweepOnce` in `cmd/api/workers.go` runs `ExpireOffers`, `ReleaseExpiredHolds`, `CloseBooks`, `FlagPredictedLate` and `RepriceAtRisk`, in that order. `FlagPredictedLate` was added by ADR 0021 and runs before `RepriceAtRisk` so a promise it flags as unreachable is re-promised in the same sweep. A failing pass still never stops the others.

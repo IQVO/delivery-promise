@@ -108,7 +108,7 @@ entity `promise`, `promisebook`, `deliveryoffer` or `promisepolicy`
 | `retailnetwork.delivery-promise.events` (integration) | `PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseUnkeepable`, `PromiseBookExhausted` |
 | `retailnetwork.delivery-promise.analytics` (analytics only) | `PromiseMade`, `PromiseConfirmed`, `PromiseReleased`, `PromiseCancelled`, `DeliveryOfferQuoted`, `PromisePolicyPublished` |
 
-**Consumed** — 36 event types from eight producer topics (ADR 0003), kept as
+**Consumed** — 39 event types from eight producer topics (ADR 0003), kept as
 event-fed local read models or driving RepromiseOnRisk, JudgeOnDelivery and
 CancelPromise; every consumer is idempotent on the CloudEvents `id` (inbox
 table) and dispatches on the full `type`:
@@ -151,7 +151,7 @@ need only `DATABASE_URL` — they never dial Kafka.
 | `DELIVERY_PROMISE_CONSUMER_GROUP` | **required** | Stable group id of the consumer of the eight producer topics (a chart value, never derived from the pod name) |
 | `EVENT_PUBLISHER` | `kafka` | Only `kafka` is accepted; any other value is a boot error |
 | `HTTP_ADDR` | `:8080` | Listen address |
-| `SWEEP_INTERVAL` | `15s` | How often the sweeper runs its four passes (Go duration or seconds) |
+| `SWEEP_INTERVAL` | `15s` | How often the sweeper runs its five passes (Go duration or seconds) |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Poll interval of the relay (Go duration or seconds) |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row; `0` = unlimited (ADR 0005) |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait between flipping `/readyz` to 503 and closing the listener; `0` disables |

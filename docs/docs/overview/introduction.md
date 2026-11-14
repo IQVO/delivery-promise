@@ -53,7 +53,7 @@ Every input of the search is a **local read model** (`rm_*` tables) kept from ev
 - **Quote** delivery offers per tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`) for a cart and a destination prefix; "no offer" comes with the constraint that blocked it.
 - **Promise** a chosen offer: consume it, create the `PROVISIONAL` promise and hold capacity on the witness book in one transaction; confirm it when the order is placed; cancel it on request (checkout compensation) or when the order is cancelled.
 - **Keep** the promise: flag it at risk when a departure, wave or package fails, re-promise it from the current network state (never earlier than before) and judge it `KEPT` or `BROKEN` (cause `LATE`, `LOST` or `RETURNED`) on delivery.
-- **Publish** twelve event types (six integration, six analytics) through a transactional outbox, and consume 36 event types from eight producers.
+- **Publish** twelve event types (six integration, six analytics) through a transactional outbox, and consume 39 event types from eight producers.
 - **Expose** a REST API, a read-only MCP server (six tools), a read-only A2A agent (two skills) and a console remote (`web/`, four read-only screens).
 - **Operate** as a stateful consumer, sweeper and relay in one pod, on real Postgres and Kafka only.
 

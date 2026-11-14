@@ -53,7 +53,7 @@ The Kafka key is the `subject`, so all events of one promise share a partition a
 
 ## Consumed
 
-Dispatch is on the full `type`; payloads are decoded tolerantly (unknown fields ignored). 37 types from eight producer topics, each handled idempotently on the CloudEvents `id`. The full type is `com.retailnetwork.<tier>.<producer>.<entity>.<Event>`; `Handlers` in `internal/adapters/inbound/kafka/dispatch.go` is the registry.
+Dispatch is on the full `type`; payloads are decoded tolerantly (unknown fields ignored). 39 types from eight producer topics, each handled idempotently on the CloudEvents `id`. The full type is `com.retailnetwork.<tier>.<producer>.<entity>.<Event>`; `Handlers` in `internal/adapters/inbound/kafka/dispatch.go` is the registry.
 
 | Topic | Tier and entity | Events | Effect |
 | --- | --- | --- | --- |
