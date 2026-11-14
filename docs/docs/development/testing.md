@@ -24,7 +24,7 @@ About 80 test files. The domain packages (`book`, `calendar`, `offer`, `policy`,
 
 ## Godog features
 
-Four files, 42 scenarios (`features/*.feature`, counted by `Scenario` and `Scenario Outline`):
+Six files, 52 scenarios (`features/*.feature`, counted by `Scenario` and `Scenario Outline`):
 
 | File | Scenarios | Covers |
 | --- | --- | --- |
@@ -32,6 +32,8 @@ Four files, 42 scenarios (`features/*.feature`, counted by `Scenario` and `Scena
 | `promises.feature` | 13 | make, confirm, hold expiry, capacity, revisions |
 | `keeping.feature` | 9 | judging kept or broken, re-promising on risk |
 | `rest.feature` | 11 | the REST contract through the real router |
+| `calibration.feature` | 5 | promise calibration (ADR 0020) |
+| `consolidated.feature` | 5 | the opt-in consolidated tier (ADR 0024) |
 
 The runner is `features/features_test.go` (`TestFeatures`, `Paths: "."`, `Strict: true`, so an undefined step fails); steps live in `features/steps_*_test.go`. No Go file may sit at the repository root (`TestNoGoFilesAtRepoRoot`).
 
