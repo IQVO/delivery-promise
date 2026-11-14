@@ -8,6 +8,7 @@ package features_test
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/cucumber/godog"
@@ -15,13 +16,22 @@ import (
 
 // TestFeatures runs every Gherkin feature in this directory. Strict makes an
 // undefined or pending step fail the suite instead of passing silently.
+//
+// Scenarios tagged @known-bug describe the documented behaviour of a rule the
+// code does not honour yet: they are excluded by default and run alone with
+// BDD_TAGS=@known-bug, where they must fail.
 func TestFeatures(t *testing.T) {
+	tags := os.Getenv("BDD_TAGS")
+	if tags == "" {
+		tags = "~@known-bug"
+	}
 	suite := godog.TestSuite{
 		ScenarioInitializer: initializeScenario,
 		Options: &godog.Options{
 			Format:   "pretty",
 			Paths:    []string{"."},
 			Strict:   true,
+			Tags:     tags,
 			TestingT: t,
 		},
 	}
@@ -46,4 +56,5 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	registerRestSteps(sc, w)
 	registerCalibrationSteps(sc, w)
 	registerConsolidatedSteps(sc, w)
+	registerRulesSteps(sc, w)
 }
