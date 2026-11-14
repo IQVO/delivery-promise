@@ -262,6 +262,15 @@ func (s *Service) OnScorecardUpdated(ctx context.Context, m Meta, e ScorecardUpd
 		if e.Window != ScorecardWindow {
 			return nil
 		}
+		// Applied only if computedAt is not older than the stored one (an equal
+		// instant is the later delivery of the same fact).
+		cur, err := s.Network.GetScorecard(ctx, e.NodeID)
+		if err != nil && !notFound(err) {
+			return err
+		}
+		if err == nil && !cur.ComputedAt.IsZero() && e.ComputedAt.Before(cur.ComputedAt) {
+			return nil
+		}
 		return s.Network.PutScorecard(ctx, readmodel.Scorecard{NodeID: e.NodeID, Grade: e.Grade, Observations: e.Observations, ComputedAt: e.ComputedAt.UTC()})
 	})
 }

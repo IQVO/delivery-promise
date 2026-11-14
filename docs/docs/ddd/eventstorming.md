@@ -47,9 +47,9 @@ flowchart LR
 
 ## Board 1: feed the read models
 
-Every consumed topic has one handler per type (`Handlers`). A handler claims the CloudEvents `id` in `processed_events` and writes one `rm_*` row in the same transaction. There is no command and no aggregate here: the owner of the data can overwrite any row.
+Every consumed topic has one handler per type (`Handlers`). A handler claims the CloudEvents `id` in `processed_events` and writes one `rm_*` row in the same transaction. There is no command and no aggregate here: the owner of the data can overwrite any row, with a newer fact always winning over an older one (ADR 0028).
 
-**Hotspot H1: freshness.** A stale departure or wave row can be quoted; `MakePromise` revalidates the witness path against the current rows and refuses a path that is no longer feasible as `promise-capacity-exhausted`. **Hotspot H2: out-of-order events.** A capacity event can arrive before its schedule event; the projection keeps the remaining count already stored when the schedule event arrives later.
+**Hotspot H1: freshness.** A stale departure or wave row can be quoted; `MakePromise` revalidates the witness path against the current rows and refuses a path that is no longer feasible as `promise-capacity-exhausted`. **Hotspot H2: out-of-order events.** A capacity event can arrive before its schedule event; the projection keeps the remaining count already stored when the schedule event arrives later. A capacity or scorecard fact older than the one stored is dropped, so a replayed figure never reopens a full departure or wave (ADR 0028).
 
 ## Board 2: quote, promise, confirm
 

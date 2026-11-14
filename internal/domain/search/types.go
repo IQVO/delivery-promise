@@ -108,8 +108,12 @@ type Departure struct {
 	DepartsAt time.Time
 	ArrivesAt time.Time
 	Remaining int
-	Cancelled bool
-	Scheduled bool
+	// CapacityAt is the CloudEvents time of the newest fact that set Remaining:
+	// an older capacity event delivered late never overwrites it. Zero on rows
+	// written before the field existed (any event applies).
+	CapacityAt time.Time
+	Cancelled  bool
+	Scheduled  bool
 }
 
 // Wave is a row of DeliveryWaveView.
@@ -120,8 +124,10 @@ type Wave struct {
 	WindowStart    time.Time
 	WindowEnd      time.Time
 	Remaining      int
-	Cancelled      bool
-	Scheduled      bool
+	// CapacityAt: see Departure.CapacityAt.
+	CapacityAt time.Time
+	Cancelled  bool
+	Scheduled  bool
 }
 
 // BookView is what the search needs of a PromiseBook row.
