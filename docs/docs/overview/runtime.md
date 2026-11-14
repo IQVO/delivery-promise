@@ -21,7 +21,7 @@ alternative runtime and no log sink. Next to the REST API, `cmd/api` runs one Ka
 | `DELIVERY_PROMISE_CONSUMER_GROUP` | required | Stable group id of the consumer of the eight producer topics (a chart value, never derived from the pod name). |
 | `EVENT_PUBLISHER` | `kafka` | Only `kafka` is accepted; any other value is a boot error. |
 | `HTTP_ADDR` | `:8080` | Listen address. |
-| `SWEEP_INTERVAL` | `15s` | How often the sweeper runs its four passes (Go duration or seconds). |
+| `SWEEP_INTERVAL` | `15s` | How often the sweeper runs its five passes (Go duration or seconds). |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Poll interval of the relay (Go duration or seconds). |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row; `0` = unlimited (ADR 0005). |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait between flipping `/readyz` to 503 and closing the listener; `0` disables. |

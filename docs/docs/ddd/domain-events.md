@@ -52,7 +52,7 @@ Source: aggregates `internal/domain/{offer,promise,book,policy}`; consumers veri
 | `PromiseConfirmed` | Promise | The order was placed; the hold became confirmed. A repeated confirm raises nothing. | `ConfirmPromise` | none (analytics) |
 | `PromiseReleased` | Promise | A provisional promise's hold expired and was returned (`reason: HOLD_EXPIRED`). | `ReleaseExpiredHolds` | none (analytics: hold leakage) |
 | `PromiseCancelled` | Promise | A confirmed or at-risk promise was cancelled and its confirmed hold returned. | `CancelPromise`, `OnCustomerOrderCancelled` | none (analytics) |
-| `PromiseAtRisk` | Promise | The witness path is no longer feasible (`reason` names why). A signal, not a verdict. | `FlagAtRisk` in `OnDepartureCancelled`, `OnWaveCancelled`, `OnBookingFailed`, `OnBookingMoved`, `OnPackageExceptionRaised`, `OnPackageInductionDeferred`, `OnFulfillmentUnsourceable` | customer-ordering |
+| `PromiseAtRisk` | Promise | The witness path is no longer feasible (`reason` names why). A signal, not a verdict. | `FlagAtRisk` in `OnDepartureCancelled`, `OnWaveCancelled`, `OnBookingFailed`, `OnBookingMoved`, `OnPackageExceptionRaised`, `OnPackageInductionDeferred`, `OnFulfillmentUnsourceable`; also `FlagPredictedLate`, the clock-driven late-risk sweep, with reason `PREDICTED_LATE` ([ADR 0021](/docs/adr/0021-a-sweep-flags-promises-whose-locked-path-is-running-late)) | customer-ordering |
 | `PromiseRevised` | Promise | The window moved later because the old path broke; carries the previous latest bound and the new terms, node and reason. | `ReviseAtRisk` | customer-ordering, order-sourcing |
 | `PromiseUnkeepable` | Promise | Re-promising found no path at any tier. At most once per promise. | `ReviseAtRisk` | customer-ordering |
 | `PromiseKept` | Promise | Delivered on or before `deliverByLatest`. | `JudgePromise` | customer-ordering, node-performance |
@@ -72,6 +72,7 @@ Each consumed event updates a read model (never an aggregate directly) or runs a
 | `LaneOpened`, `LaneClosed`, `ServiceAreaAssigned`, `RegionDefined` (node-topology) | upsert lane, service area, region | projections |
 | `CatalogItemCreated`, `CatalogItemDiscontinued`, `ListingCreated`, `ListingAvailabilityChanged`, `ListingSuppressed`, `ListingRestored` (offer-availability) | upsert item and listing | projections |
 | `DepartureScheduled`, `DepartureCapacityChanged` (linehaul) | upsert the departure and its remaining packages | projection `rm_departures` |
+| `LoadDeparted`, `LoadArrived` (linehaul) | `LoadDeparted` opens the load's pairing row and `LoadArrived` pairs it into one measured-transit observation; `LoadArrived` also records the arrival of the load's departure (needs a `departureId`) | projections `rm_load_transit_open`, `rm_transit_actuals` ([ADR 0014](/docs/adr/0014-measured-transit-basis)), `rm_departure_arrival` for the late-risk sweep ([ADR 0021](/docs/adr/0021-a-sweep-flags-promises-whose-locked-path-is-running-late)) |
 | `DepartureCancelled` (linehaul) | mark the departure unscheduled; flag promises whose witness uses it | `RepromiseOnRisk` |
 | `BookingMoved`, `BookingFailed` (linehaul) | flag promises that rode the booking | `RepromiseOnRisk` |
 | `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged` (last-mile) | upsert the wave | projection `rm_waves` |
