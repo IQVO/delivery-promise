@@ -60,12 +60,10 @@ func (r *rules) registerClockAndQuote(sc *godog.ScenarioContext) {
 	sc.Step(`^the clock is set to "([^"]*)"$`, r.setClock)
 	sc.Step(`^the (`+tierNames+`) offer expires at "([^"]*)"$`, r.offerExpires)
 	sc.Step(`^the (`+tierNames+`) offer is remembered as "([^"]*)"$`, r.rememberOffer)
-	sc.Step(`^I make a promise from the remembered offer "([^"]*)"$`, func(label string) error { return r.makeFromRemembered(label, false) })
-	sc.Step(`^a promise exists from the remembered offer "([^"]*)"$`, func(label string) error { return r.makeFromRemembered(label, true) })
+	sc.Step(`^a promise exists from the remembered offer "([^"]*)"$`, r.givenFromRemembered)
 	sc.Step(`^I quote the cart "([^"]*)" for postal prefix "([^"]*)"$`, r.quoteCart)
 	sc.Step(`^the quote has (\d+) groups?$`, r.quoteGroups)
 	sc.Step(`^the group (\d+) NEXT_DAY offer ships from the node "([^"]*)" and covers "([^"]*)"$`, r.groupOffer)
-	sc.Step(`^the unavailable (`+tierNames+`) tier answers "([^"]*)"$`, func(tier, constraint string) error { return r.w.tierUnavailable(tier, constraint) })
 }
 
 func (r *rules) setClock(at string) error {
@@ -101,9 +99,9 @@ func (r *rules) rememberOffer(tier, label string) error {
 	return nil
 }
 
-// makeFromRemembered makes a promise from a kept offer. A precondition (given)
-// must succeed; a When keeps the refusal for the Then steps to assert.
-func (r *rules) makeFromRemembered(label string, given bool) error {
+// givenFromRemembered makes a promise from a kept offer, as a precondition: it
+// must succeed, or the scenario is broken.
+func (r *rules) givenFromRemembered(label string) error {
 	o, ok := r.offers[label]
 	if !ok {
 		return fmt.Errorf("the scenario has not remembered an offer as %q", label)
@@ -119,10 +117,7 @@ func (r *rules) makeFromRemembered(label string, given bool) error {
 		}
 		return err
 	})
-	if given {
-		return r.w.given("make a promise from the remembered offer "+label, func() error { return r.w.lastErr })
-	}
-	return nil
+	return r.w.given("make a promise from the remembered offer "+label, func() error { return r.w.lastErr })
 }
 
 // parseCart reads "ci-1001:2,ci-2002:1" into lines.
@@ -246,12 +241,10 @@ func (r *rules) promisePolicy(want string) error {
 
 func (r *rules) registerNetwork(sc *godog.ScenarioContext) {
 	sc.Step(`^the node "([^"]*)" is graded "(A|B|C|D|PROVISIONAL)" in the (30d|7d) window(?: computed at "([^"]*)")?$`, r.grade)
-	sc.Step(`^the pickup "([^"]*)" of the node "N-AUS3" is scheduled with the cutoff "([^"]*)"$`, r.pickup)
 	sc.Step(`^a linehaul departure "([^"]*)" is scheduled with the cutoff "([^"]*)" and the arrival "([^"]*)" for (\d+) packages$`, r.linehaul)
 	sc.Step(`^the departure "([^"]*)" has (\d+) packages? left$`, r.departureLeft)
 	sc.Step(`^the delivery wave "([^"]*)" has (\d+) stops? left$`, r.waveLeft)
 	sc.Step(`^the delivery wave "([^"]*)" is cancelled$`, r.cancelWave)
-	sc.Step(`^the lane "([^"]*)" is closed$`, r.closeLane)
 	sc.Step(`^the node "([^"]*)" is retired$`, r.retire)
 	sc.Step(`^the node "([^"]*)" declares profile revision (\d+) with a cutoff slot of (\d+) orders$`, r.declareRevision)
 	sc.Step(`^the node "([^"]*)" declares profile revision (\d+) with no order limit and a throughput cap of (\d+) per (HOUR|DAY)$`, r.declareThroughput)
@@ -275,14 +268,6 @@ func (r *rules) grade(node, grade, window, computedAt string) error {
 	return r.w.svc.OnScorecardUpdated(r.w.ctx(), r.w.meta("NodeScorecardUpdated"), usecases.ScorecardUpdated{
 		NodeID: node, Window: window, Grade: grade, Observations: 200, ComputedAt: at,
 	})
-}
-
-func (r *rules) pickup(id, cutoff string) error {
-	t, err := parseInstant(cutoff)
-	if err != nil {
-		return err
-	}
-	return r.w.departure(id, "lane-1", "PICKUP", "N-AUS3", "N-SAU1", t, t.Add(75*time.Minute), 40)
 }
 
 func (r *rules) linehaul(id, cutoff, arrival string, capacity int) error {
@@ -312,10 +297,6 @@ func (r *rules) cancelWave(id string) error {
 		return r.w.svc.OnWaveCancelled(r.w.ctx(), r.w.meta("DeliveryWaveCancelled"), usecases.WaveCancelled{WaveID: id})
 	})
 	return r.w.lastErr
-}
-
-func (r *rules) closeLane(id string) error {
-	return r.w.svc.OnLaneClosed(r.w.ctx(), r.w.meta("LaneClosed"), usecases.LaneClosed{LaneID: id})
 }
 
 func (r *rules) retire(node string) error {
@@ -353,7 +334,9 @@ func (r *rules) directNode(subtype string) error {
 		func() error {
 			return w.svc.OnLaneOpened(w.ctx(), w.meta("LaneOpened"), usecases.LaneOpened{LaneID: "lane-3", OriginNodeID: "N-MIC1", DestinationNodeID: "N-DAU1", NominalTransitMinutes: 30})
 		},
-		func() error { return w.departure("dep-MIC1-1630", "lane-3", "PICKUP", "N-MIC1", "N-DAU1", at(22, 16, 30), at(22, 17, 0), 40) },
+		func() error {
+			return w.departure("dep-MIC1-1630", "lane-3", "PICKUP", "N-MIC1", "N-DAU1", at(22, 16, 30), at(22, 17, 0), 40)
+		},
 		func() error {
 			return w.svc.OnWaveScheduled(w.ctx(), w.meta("DeliveryWaveScheduled"), usecases.WaveScheduled{
 				WaveID: "W-DAU1-1022-E", StationNodeID: "N-DAU1", InductCutoffAt: at(22, 18, 0), WindowStart: at(22, 19, 0), WindowEnd: at(22, 21, 0), StopCapacity: 100,
@@ -379,7 +362,9 @@ func (r *rules) secondNode() error {
 		func() error {
 			return w.svc.OnLaneOpened(w.ctx(), w.meta("LaneOpened"), usecases.LaneOpened{LaneID: "lane-4", OriginNodeID: "N-DFW7", DestinationNodeID: "N-SAU1", NominalTransitMinutes: 75})
 		},
-		func() error { return w.departure("dep-DFW7-1800", "lane-4", "PICKUP", "N-DFW7", "N-SAU1", at(22, 18, 0), at(22, 19, 15), 40) },
+		func() error {
+			return w.departure("dep-DFW7-1800", "lane-4", "PICKUP", "N-DFW7", "N-SAU1", at(22, 18, 0), at(22, 19, 15), 40)
+		},
 		func() error { return w.stock("N-DFW7", "ci-2002", "lst-dfw-2002", 5) },
 	}
 	for _, step := range steps {
@@ -410,8 +395,6 @@ func (r *rules) registerFeeds(sc *godog.ScenarioContext) {
 	sc.Step(`^the listing "([^"]*)" is (suppressed|restored)$`, r.listingToggled)
 	sc.Step(`^the departure "([^"]*)" cancellation is delivered twice with the same CloudEvents id$`, r.cancelTwice)
 	sc.Step(`^the delivery of the package "([^"]*)" at "([^"]*)" is delivered twice with the same CloudEvents id$`, r.deliverTwice)
-	sc.Step(`^a stale capacity figure of (\d+) packages for the departure "([^"]*)" is delivered with the older time "([^"]*)"$`, r.staleCapacity)
-	sc.Step(`^the book "([^"]*)" is listed by the node "([^"]*)"$`, r.bookListed)
 }
 
 func (r *rules) listingReports(id string, qty int, asOf string) error {
@@ -464,29 +447,4 @@ func (r *rules) deliverTwice(tracking, at string) error {
 	}
 	r.w.run(func() error { return r.w.svc.OnPackageDelivered(r.w.ctx(), m, e) })
 	return nil
-}
-
-// staleCapacity delivers a DepartureCapacityChanged whose CloudEvents time is
-// older than the figure already projected.
-func (r *rules) staleCapacity(remaining int, id, older string) error {
-	t, err := parseInstant(older)
-	if err != nil {
-		return err
-	}
-	m := r.w.meta("DepartureCapacityChanged")
-	m.Time = t
-	return r.w.svc.OnDepartureCapacityChanged(r.w.ctx(), m, usecases.DepartureCapacityChanged{DepartureID: id, RemainingPackages: remaining})
-}
-
-func (r *rules) bookListed(id, node string) error {
-	res, err := r.w.svc.ListPromiseBooks(r.w.ctx(), node, "2026-10-22")
-	if err != nil {
-		return err
-	}
-	for _, b := range res.Items {
-		if b.BookID == id {
-			return nil
-		}
-	}
-	return fmt.Errorf("node %s lists no book %s on 2026-10-22 (%d books)", node, id, len(res.Items))
 }

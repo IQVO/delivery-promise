@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cucumber/godog"
 
@@ -20,8 +19,6 @@ func (r *rules) registerLifecycle(sc *godog.ScenarioContext) {
 	sc.Step(`^the order "([^"]*)" is placed with the promise "([^"]*)" as group (\d+) and the promise "([^"]*)" as group (\d+)$`, r.placeTwoGroups)
 	sc.Step(`^the order "([^"]*)" is cancelled for the groups "([^"]*)" with the reason "([^"]*)"$`, r.cancelGroups)
 	sc.Step(`^the promise was cancelled with the reason "([^"]*)"$`, r.cancelReason)
-	sc.Step(`^the promise is on the (`+tierNames+`) tier$`, r.promiseTier)
-	sc.Step(`^the promise promises delivery between "([^"]*)" and "([^"]*)"$`, r.promiseWindow)
 }
 
 func (r *rules) rememberPromise(label string) error {
@@ -101,58 +98,11 @@ func (r *rules) cancelReason(want string) error {
 	return nil
 }
 
-func (r *rules) promiseTier(want string) error {
-	p, err := r.w.promise()
-	if err != nil {
-		return err
-	}
-	if p.Terms.Tier != want {
-		return fmt.Errorf("the promise is on the %s tier, want %s", p.Terms.Tier, want)
-	}
-	return nil
-}
-
-func (r *rules) promiseWindow(from, to string) error {
-	p, err := r.w.promise()
-	if err != nil {
-		return err
-	}
-	earliest, err := parseInstant(from)
-	if err != nil {
-		return err
-	}
-	latest, err := parseInstant(to)
-	if err != nil {
-		return err
-	}
-	if !p.Terms.DeliverByEarliest.Equal(earliest) || !p.Terms.DeliverByLatest.Equal(latest) {
-		return fmt.Errorf("the promise window is %s..%s, want %s..%s", p.Terms.DeliverByEarliest.Format(time.RFC3339), p.Terms.DeliverByLatest.Format(time.RFC3339), from, to)
-	}
-	return nil
-}
-
 func (r *rules) registerJudgement(sc *godog.ScenarioContext) {
-	sc.Step(`^the assignment "([^"]*)" of the order "([^"]*)" is locked$`, r.lock)
-	sc.Step(`^the assignment "([^"]*)" ships the packages "([^"]*)"$`, r.ship)
 	sc.Step(`^the package "([^"]*)" is lost at "([^"]*)"$`, r.lostAt)
 	sc.Step(`^the sweeper flags the promises predicted late$`, r.flagLate)
 	sc.Step(`^the sweep flagged (\d+) promises?$`, r.flagged)
 	sc.Step(`^the load of the departure "([^"]*)" arrived at "([^"]*)"$`, r.loadArrived)
-}
-
-func (r *rules) lock(assignment, order string) error {
-	if r.w.promiseID == "" {
-		return errNoPromise
-	}
-	return r.w.svc.OnFulfillmentLocked(r.w.ctx(), r.w.meta("FulfillmentLocked"), usecases.FulfillmentLocked{
-		AssignmentID: assignment, OrderID: order, GroupNo: 1, PromiseID: r.w.promiseID, NodeID: "N-AUS3",
-	})
-}
-
-func (r *rules) ship(assignment, trackings string) error {
-	return r.w.svc.OnFulfillmentShipped(r.w.ctx(), r.w.meta("FulfillmentShipped"), usecases.FulfillmentShipped{
-		AssignmentID: assignment, TrackingNumbers: strings.Split(trackings, ","),
-	})
 }
 
 func (r *rules) lostAt(tracking, at string) error {
