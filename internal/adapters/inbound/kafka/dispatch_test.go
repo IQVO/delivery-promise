@@ -188,8 +188,8 @@ func TestHandlersAreExactlyTheConsumedMessagesOfTheContract(t *testing.T) {
 	if len(missing) > 0 || len(extra) > 0 {
 		t.Fatalf("handlers not in asyncapi.yaml: %v\nconsumed in asyncapi.yaml without a handler: %v", missing, extra)
 	}
-	if len(handlers) != 38 {
-		t.Fatalf("expected 38 consumed types, got %d", len(handlers))
+	if len(handlers) != 39 {
+		t.Fatalf("expected 39 consumed types, got %d", len(handlers))
 	}
 }
 

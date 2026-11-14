@@ -16,7 +16,10 @@ import (
 // QuoteCommand is the input of QuoteDeliveryOffers.
 type QuoteCommand struct {
 	DestinationPostalPrefix string
-	Lines                   []shared.Line
+	// PickupPointID is the alternative destination: exactly one of the two
+	// is set (ADR 0027).
+	PickupPointID string
+	Lines         []shared.Line
 	// Tiers defaults to the four classic tiers when empty. CONSOLIDATED is
 	// returned only when it is listed here or ConsolidatedDeliveryDay is set.
 	Tiers []shared.Tier
@@ -43,7 +46,14 @@ func (c QuoteCommand) requestedTiers() []shared.Tier {
 }
 
 func (c QuoteCommand) validate() error {
-	if !shared.ValidPostalPrefix(c.DestinationPostalPrefix) {
+	if (c.DestinationPostalPrefix == "") == (c.PickupPointID == "") {
+		return shared.Invalid("exactly one of destinationPostalPrefix and pickupPointId is required")
+	}
+	if c.PickupPointID != "" {
+		if !shared.ValidID(c.PickupPointID) {
+			return shared.Invalid("pickupPointId %q is not a valid id", c.PickupPointID)
+		}
+	} else if !shared.ValidPostalPrefix(c.DestinationPostalPrefix) {
 		return shared.Invalid("destinationPostalPrefix %q is not valid", c.DestinationPostalPrefix)
 	}
 	if err := shared.ValidateLines(c.Lines); err != nil {
@@ -75,7 +85,14 @@ func (s *Service) QuoteDeliveryOffers(ctx context.Context, cmd QuoteCommand) (vi
 	if err != nil {
 		return views.QuoteResult{}, err
 	}
-	in, err := s.searchInput(ctx, now, pol, cmd.DestinationPostalPrefix, cmd.Lines, cmd.requestedTiers(), searchOptions{consolidatedDay: cmd.ConsolidatedDeliveryDay})
+	prefix, station, err := s.resolvePickup(ctx, cmd.PickupPointID)
+	if err != nil {
+		return views.QuoteResult{}, err
+	}
+	if prefix == "" {
+		prefix = cmd.DestinationPostalPrefix
+	}
+	in, err := s.searchInput(ctx, now, pol, prefix, cmd.Lines, cmd.requestedTiers(), searchOptions{consolidatedDay: cmd.ConsolidatedDeliveryDay, pickupStation: station})
 	if err != nil {
 		return views.QuoteResult{}, err
 	}
@@ -89,7 +106,7 @@ func (s *Service) QuoteDeliveryOffers(ctx context.Context, cmd QuoteCommand) (vi
 		out.Unavailable = append(out.Unavailable, views.Unavailable{Tier: string(t), Constraint: string(res.WholeQuote[t])})
 	}
 	for _, g := range res.Groups {
-		os, evs, un := offersOfGroup(g, cmd.DestinationPostalPrefix, pol, now, s.IDs.NewOfferID)
+		os, evs, un := offersOfGroup(g, prefix, pol, now, s.IDs.NewOfferID)
 		offers, events, out.Unavailable = append(offers, os...), append(events, evs...), append(out.Unavailable, un...)
 	}
 	if err := s.tx(ctx, func(ctx context.Context) error {

@@ -841,8 +841,8 @@ components:
           description: The node the carrier collects at (ADR 0026); omitted when the path ends on a wave.
     QuoteRequest:
       type: object
+      description: Exactly one of destinationPostalPrefix or pickupPointId is required (ADR 0027).
       required:
-      - destinationPostalPrefix
       - lines
       properties:
         destinationPostalPrefix:
@@ -852,6 +852,10 @@ components:
           pattern: ^[A-Za-z0-9]+$
           description: Destination postal prefix (never a full address).
           example: '787'
+        pickupPointId:
+          type: string
+          description: The pickup point to quote to; the point's own prefix becomes the destination prefix and its serving station the wave's station (ADR 0027).
+          example: node-pnt-7
         lines:
           type: array
           minItems: 1
@@ -994,10 +998,13 @@ components:
           maximum: 999
     EstimateRequest:
       type: object
+      description: Exactly one of destinationPostalPrefix or pickupPointId is required (ADR 0027).
       required:
-      - destinationPostalPrefix
       - items
       properties:
+        pickupPointId:
+          type: string
+          description: The pickup point to estimate to (ADR 0027).
         destinationPostalPrefix:
           type: string
           minLength: 1

@@ -28,6 +28,9 @@ type searchOptions struct {
 	// existingPromise marks the re-promising of a promise already made: the
 	// fast-tier eligibility filter applies to future quotes only (ADR 0022).
 	existingPromise bool
+	// pickupStation is the serving station of a pickup-point destination:
+	// set only when the quote names a pickupPointId (ADR 0027).
+	pickupStation string
 	// consolidatedDay and consolidatedNotBefore are the CONSOLIDATED tier's
 	// chosen local day, and the instant whose local day is its minimum when a
 	// promise is re-promised (ADR 0024).
@@ -109,6 +112,9 @@ func toCutoffs(in []readmodel.Cutoff) ([]calendar.Cutoff, bool) {
 // searchInput loads the read models, the books and the provisional holds a
 // search needs and assembles its input.
 func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Policy, prefix string, lines []shared.Line, tiers []shared.Tier, opt searchOptions) (search.Input, error) {
+	if opt.pickupStation != "" {
+		return s.pickupInput(ctx, now, pol, prefix, opt.pickupStation, lines, tiers, opt)
+	}
 	in := search.Input{
 		Now: now, Policy: pol, Lines: lines, Tiers: tiers, SingleGroup: opt.singleGroup, OnlyNode: opt.onlyNode,
 		ExcludeNodes: opt.excludeNodes, ExcludeDepartures: opt.excludeDepartures, ExcludeWaves: opt.excludeWaves,
@@ -151,6 +157,60 @@ func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Po
 		return in, nil
 	}
 	return in, s.fill(ctx, &in, area.StationID, lines)
+}
+
+// nodeTypePickupPoint is node-topology's PICKUP_POINT (ADR 0027).
+const nodeTypePickupPoint = "PICKUP_POINT"
+
+// resolvePickup resolves a pickup-point destination to (prefix, serving
+// station): an unknown, non-ACTIVE or station-less point answers ("", ""),
+// which leaves the search without a station - DESTINATION_NOT_SERVED, exactly
+// how checkout fails for a bad point (ADR 0027).
+func (s *Service) resolvePickup(ctx context.Context, pickupPointID string) (string, string, error) {
+	if pickupPointID == "" {
+		return "", "", nil
+	}
+	pt, err := s.Network.GetNode(ctx, pickupPointID)
+	if notFound(err) {
+		return "", "", nil
+	}
+	if err != nil {
+		return "", "", err
+	}
+	if pt.Type != nodeTypePickupPoint || pt.State != readmodel.NodeActive || pt.ServingStationNodeID == "" || pt.PostalPrefix == "" {
+		return "", "", nil
+	}
+	return pt.PostalPrefix, pt.ServingStationNodeID, nil
+}
+
+// pickupInput builds the search input for a pickup-point destination (ADR
+// 0027): no area, no carrier mode - the point's serving station is the wave's
+// station, and the region is the station's own. The point itself is a STOP on
+// that wave, so the candidate, witness and window are unchanged.
+func (s *Service) pickupInput(ctx context.Context, now time.Time, pol *policy.Policy, prefix, stationID string, lines []shared.Line, tiers []shared.Tier, opt searchOptions) (search.Input, error) {
+	in := search.Input{
+		Now: now, Policy: pol, Lines: lines, Tiers: tiers, SingleGroup: opt.singleGroup, OnlyNode: opt.onlyNode,
+		ExcludeNodes: opt.excludeNodes, ExcludeDepartures: opt.excludeDepartures, ExcludeWaves: opt.excludeWaves,
+		Nodes: map[string]search.Node{}, Grades: map[string]search.Grade{}, Books: map[string]search.BookView{},
+		Stock: func(string, string) []shared.OwnerStock { return nil }, MeasuredTransit: s.measuredTransitOf(ctx, pol, now),
+		CalibrationBuffer: s.calibrationBufferOf(ctx, pol, now),
+		ConsolidatedDay:   opt.consolidatedDay, ConsolidatedNotBefore: opt.consolidatedNotBefore,
+	}
+	stationRow, err := s.Network.GetNode(ctx, stationID)
+	if notFound(err) {
+		return in, nil
+	}
+	if err != nil {
+		return in, err
+	}
+	if st := ToSearchNode(stationRow); st.Loc != nil {
+		in.Station, in.AreaRegionID = &st, stationRow.RegionID
+		in.Nodes[st.ID] = st
+	}
+	if in.Station == nil {
+		return in, nil
+	}
+	return in, s.fill(ctx, &in, stationID, lines)
 }
 
 // measuredTransitOf adapts the measured-transit read model to the search's

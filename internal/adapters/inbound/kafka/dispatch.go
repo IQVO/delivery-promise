@@ -113,6 +113,7 @@ func Handlers(s *usecases.Service) map[string]HandlerFunc {
 
 	h[typ("logistics", "shipping-and-tracking", "journey", "PackageDelivered")] = handle(func(v usecases.PackageDelivered) []string { return ids(v.TrackingNumber) }, s.OnPackageDelivered)
 	h[typ("logistics", "shipping-and-tracking", "journey", "PackageHandedToCarrier")] = handle(func(v usecases.PackageHandedToCarrier) []string { return ids(v.TrackingNumber) }, s.OnPackageHandedToCarrier)
+	h[typ("logistics", "shipping-and-tracking", "journey", "PackageReadyForCollection")] = handle(func(v usecases.PackageReadyForCollection) []string { return ids(v.TrackingNumber) }, s.OnPackageReadyForCollection)
 	h[typ("logistics", "shipping-and-tracking", "journey", "PackageExceptionRaised")] = handle(func(v usecases.PackageException) []string { return ids(v.AssignmentID) }, s.OnPackageException)
 	h[typ("logistics", "shipping-and-tracking", "journey", "PackageLost")] = handle(func(v usecases.PackageLost) []string { return ids(v.TrackingNumber) }, s.OnPackageLost)
 	h[typ("logistics", "shipping-and-tracking", "journey", "PackageReturned")] = handle(func(v usecases.PackageReturned) []string { return ids(v.TrackingNumber) }, s.OnPackageReturned)

@@ -58,8 +58,19 @@ func (s *Service) OnNodeRegistered(ctx context.Context, m Meta, e NodeRegistered
 			n = readmodel.Node{ID: e.NodeID, State: readmodel.NodeProposed}
 		}
 		n.Type, n.Subtype, n.Operator, n.RegionID, n.Timezone = e.NodeType, e.Subtype, e.Operator, e.RegionID, e.Timezone
+		n.ServingStationNodeID, n.PostalPrefix = e.ServingStationNodeID, prefixOf(e.PostalCode)
 		return s.Network.PutNode(ctx, n)
 	})
+}
+
+// prefixOf reduces a postal code to the prefix the promise quotes against: a
+// pickup point's own code is already labellable, so the first characters are
+// the prefix (ADR 0027).
+func prefixOf(postalCode string) string {
+	if len(postalCode) <= shared.MaxPostalPrefix {
+		return postalCode
+	}
+	return postalCode[:shared.MaxPostalPrefix]
 }
 
 // OnNodeProfileDeclared projects NodeOperationalProfileDeclared; a revision not
