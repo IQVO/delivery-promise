@@ -38,6 +38,10 @@ type Witness struct {
 	PickupDepartureID string   `json:"pickupDepartureId,omitempty"`
 	Legs              []string `json:"legs"`
 	DeliveryWaveID    string   `json:"deliveryWaveId,omitempty"`
+	// CarrierID and HandoffNodeID name the carrier that delivers a
+	// CARRIER_HANDOFF area instead of a wave (ADR 0026); omitted otherwise.
+	CarrierID     string `json:"carrierId,omitempty"`
+	HandoffNodeID string `json:"handoffNodeId,omitempty"`
 }
 
 // Offer is a delivery offer.
@@ -66,6 +70,9 @@ type Offer struct {
 	// option leaves the network at least one local day to merge it with other
 	// orders (ADR 0024). Omitted otherwise, never false by default.
 	ConsolidationEligible *bool `json:"consolidationEligible,omitempty"`
+	// CarrierArea says the offer's final leg is the chosen carrier of a
+	// CARRIER_HANDOFF area, not a delivery wave (ADR 0026); omitted otherwise.
+	CarrierArea bool `json:"carrierArea,omitempty"`
 }
 
 // Unavailable says why a (group, tier) has no offer.
@@ -180,6 +187,9 @@ type Policy struct {
 	TransitWindowDays          int    `json:"transitWindowDays"`
 	TransitServiceLevelPercent int    `json:"transitServiceLevelPercent"`
 	MinTransitObservations     int    `json:"minTransitObservations"`
+	// CarrierWindowHours is the width of a carrier-area promise's window
+	// (ADR 0026); always resolved (24 by default).
+	CarrierWindowHours int `json:"carrierWindowHours"`
 	// The calibration fields of ADR 0020.
 	TargetOnTimeProbabilityPercent int             `json:"targetOnTimeProbabilityPercent"`
 	MinCalibrationObservations     int             `json:"minCalibrationObservations"`
@@ -202,7 +212,7 @@ func witness(w shared.Witness) Witness {
 	if legs == nil {
 		legs = []string{}
 	}
-	return Witness{NodeID: w.NodeID, PickupDepartureID: w.PickupDepartureID, Legs: legs, DeliveryWaveID: w.DeliveryWaveID}
+	return Witness{NodeID: w.NodeID, PickupDepartureID: w.PickupDepartureID, Legs: legs, DeliveryWaveID: w.DeliveryWaveID, CarrierID: w.CarrierID, HandoffNodeID: w.HandoffNodeID}
 }
 
 func terms(t promise.Terms) Terms {
@@ -220,6 +230,7 @@ func FromOffer(o *offer.Offer) Offer {
 		Tier: string(o.Tier()), Lines: lines(o.Lines()), Window: Window{Earliest: o.Window().Earliest.UTC(), Latest: o.Window().Latest.UTC(), TimeZone: o.Window().TimeZone},
 		WitnessPath: witness(o.Witness()), Basis: string(o.Basis()), Confidence: o.Confidence().Ptr(), PolicyVersion: o.PolicyVersion(), QuotedAt: o.QuotedAt().UTC(), ExpiresAt: o.ExpiresAt().UTC(),
 		OrderByAt: o.OrderByAt().UTC(), CapacityBand: string(o.CapacityBand()), ConsolidationEligible: o.ConsolidationEligible(),
+		CarrierArea: o.Witness().CarrierID != "",
 	}
 }
 
@@ -272,6 +283,7 @@ func FromPolicy(p *policy.Policy) Policy {
 		PolicyVersion: p.VersionName(), Version: p.Version(), OfferTTLMinutes: int(p.OfferTTL() / time.Minute), HoldTTLMinutes: int(p.HoldTTL() / time.Minute),
 		PackagesPerOrder: p.PackagesPerOrder(), CapacitySharePercent: p.SharePercent(), TransitWindowDays: p.TransitWindowDays(),
 		TransitServiceLevelPercent: p.TransitServiceLevelPercent(), MinTransitObservations: p.MinTransitObservations(),
+		CarrierWindowHours:             int(p.CarrierWindowHours() / time.Hour),
 		TargetOnTimeProbabilityPercent: p.TargetOnTimeProbabilityPercent(), MinCalibrationObservations: p.MinCalibrationObservations(),
 		CalibrationWindowDays: p.CalibrationWindowDays(), MaxCalibrationBufferMinutes: p.MaxCalibrationBufferMinutes(),
 		OrderDeadlines: ds, PublishedAt: p.PublishedAt().UTC(),

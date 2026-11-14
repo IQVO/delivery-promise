@@ -49,6 +49,7 @@ type state struct {
 	trackingOf      map[string][]string
 	outcomes        map[string]readmodel.PackageOutcome
 	transitOpen     map[string]transitOpenRow
+	carrierOpen     map[string]carrierOpenRow
 	transitRings    map[transitPair][]readmodel.TransitObservation
 	tierEligibility map[tierKey]readmodel.NodeTierEligibility
 	calibration     map[readmodel.CalibrationKey][]readmodel.CalibrationObservation
@@ -75,6 +76,7 @@ func newState() state {
 		listings: map[string]readmodel.Listing{}, departures: map[string]search.Departure{}, waves: map[string]search.Wave{},
 		scorecards: map[string]readmodel.Scorecard{}, assignments: map[string]readmodel.Assignment{}, shipments: map[string][]string{},
 		trackingOf: map[string][]string{}, outcomes: map[string]readmodel.PackageOutcome{}, transitOpen: map[string]transitOpenRow{},
+		carrierOpen:  map[string]carrierOpenRow{},
 		transitRings: map[transitPair][]readmodel.TransitObservation{}, tierEligibility: map[tierKey]readmodel.NodeTierEligibility{},
 		calibration: map[readmodel.CalibrationKey][]readmodel.CalibrationObservation{},
 		arrivals:    map[string]time.Time{}, inbox: map[string]string{},
@@ -95,7 +97,7 @@ func (st state) clone() state {
 		nodes: cloneMap(st.nodes), regions: cloneMap(st.regions), areas: cloneMap(st.areas), lanes: cloneMap(st.lanes),
 		items: cloneMap(st.items), listings: cloneMap(st.listings), departures: cloneMap(st.departures), waves: cloneMap(st.waves),
 		scorecards: cloneMap(st.scorecards), assignments: cloneMap(st.assignments), shipments: cloneMap(st.shipments),
-		trackingOf: cloneMap(st.trackingOf), outcomes: cloneMap(st.outcomes), transitOpen: cloneMap(st.transitOpen),
+		trackingOf: cloneMap(st.trackingOf), outcomes: cloneMap(st.outcomes), transitOpen: cloneMap(st.transitOpen), carrierOpen: cloneMap(st.carrierOpen),
 		transitRings: cloneTransitRings(st.transitRings), tierEligibility: cloneMap(st.tierEligibility), arrivals: cloneMap(st.arrivals),
 		calibration: cloneMap(st.calibration), inbox: cloneMap(st.inbox),
 		outbox: append([]shared.Event(nil), st.outbox...),

@@ -232,34 +232,61 @@ func ValidTimeZone(s string) bool {
 }
 
 // Witness is the concrete path that proves a window is feasible (WitnessPath).
-// A NOMINAL witness carries no departure or wave ids (contracts-delta E8).
+// A NOMINAL witness carries no departure or wave ids (contracts-delta E8). A
+// carrier witness (a CARRIER_HANDOFF area, ADR 0026) carries the pickup
+// departure and the legs up to the handoff node, then names the carrier and
+// its handoff node instead of a delivery wave.
 type Witness struct {
 	NodeID            string
 	PickupDepartureID string
 	Legs              []string
 	DeliveryWaveID    string
+	CarrierID         string
+	HandoffNodeID     string
 }
 
 // Validate checks the witness against its basis. A MEASURED witness carries
 // the same path as a SCHEDULED one (ADR 0014); only NOMINAL is empty
-// (contracts-delta E8).
+// (contracts-delta E8). A SCHEDULED or MEASURED witness ends on a delivery
+// wave OR on a carrier - never both, never neither (ADR 0026).
 func (w Witness) Validate(b Basis) error {
 	if !ValidID(w.NodeID) {
 		return Invalid("witness nodeId %q is not a valid id", w.NodeID)
 	}
 	if b == BasisNominal {
-		if w.PickupDepartureID != "" || w.DeliveryWaveID != "" || len(w.Legs) > 0 {
-			return Invalid("a NOMINAL witness carries no departure or wave ids")
-		}
-		return nil
+		return w.validateEmpty()
 	}
-	if !ValidID(w.PickupDepartureID) || !ValidID(w.DeliveryWaveID) {
-		return Invalid("a %s witness needs a pickup departure and a delivery wave", b)
+	if !ValidID(w.PickupDepartureID) {
+		return Invalid("a %s witness needs a pickup departure", b)
+	}
+	if err := w.validateFinalLeg(b); err != nil {
+		return err
 	}
 	for _, l := range w.Legs {
 		if !ValidID(l) {
 			return Invalid("witness leg %q is not a valid id", l)
 		}
+	}
+	return nil
+}
+
+// validateEmpty refuses every path field on a NOMINAL witness
+// (contracts-delta E8).
+func (w Witness) validateEmpty() error {
+	if w.PickupDepartureID != "" || w.DeliveryWaveID != "" || len(w.Legs) > 0 || w.CarrierID != "" || w.HandoffNodeID != "" {
+		return Invalid("a NOMINAL witness carries no departure or wave ids")
+	}
+	return nil
+}
+
+// validateFinalLeg checks the last leg of a SCHEDULED or MEASURED witness: a
+// delivery wave or a carrier with its handoff node, never both (ADR 0026).
+func (w Witness) validateFinalLeg(b Basis) error {
+	if w.DeliveryWaveID != "" && (w.CarrierID != "" || w.HandoffNodeID != "") {
+		return Invalid("a witness names a delivery wave or a carrier, never both")
+	}
+	if w.DeliveryWaveID == "" && (!ValidID(w.CarrierID) || !ValidID(w.HandoffNodeID)) {
+		return Invalid("a %s witness needs a delivery wave or a carrier with its handoff node", b)
 	}
 	return nil
 }

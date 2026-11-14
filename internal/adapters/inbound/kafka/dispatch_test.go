@@ -188,8 +188,8 @@ func TestHandlersAreExactlyTheConsumedMessagesOfTheContract(t *testing.T) {
 	if len(missing) > 0 || len(extra) > 0 {
 		t.Fatalf("handlers not in asyncapi.yaml: %v\nconsumed in asyncapi.yaml without a handler: %v", missing, extra)
 	}
-	if len(handlers) != 37 {
-		t.Fatalf("expected 37 consumed types, got %d", len(handlers))
+	if len(handlers) != 39 {
+		t.Fatalf("expected 39 consumed types, got %d", len(handlers))
 	}
 }
 
@@ -224,6 +224,7 @@ func TestEveryProjectionHandlerAcceptsAMinimalPayload(t *testing.T) {
 		"logistics.shipping-and-tracking.journey.PackageLost":             {"trackingNumber": "T-1"},
 		"logistics.shipping-and-tracking.journey.PackageReturned":         {"trackingNumber": "T-1"},
 		"logistics.shipping-and-tracking.journey.PackageDelivered":        {"trackingNumber": "T-1", "deliveredAt": "2026-10-23T12:00:00Z"},
+		"logistics.shipping-and-tracking.journey.PackageHandedToCarrier":  {"trackingNumber": "T-1", "carrierId": "c-1", "handoffNodeId": "N-1", "destinationPostalPrefix": "787", "handedAt": "2026-10-23T12:00:00Z"},
 		"commerce.customer-ordering.customerorder.CustomerOrderCancelled": {"orderId": "ord-1", "groupNos": []int{}},
 		"commerce.customer-ordering.customerorder.CustomerOrderPlaced":    {"orderId": "ord-1", "groups": []any{}},
 		// the producers' own shapes: objects in excludedNodes, no assignmentId when no label data arrived

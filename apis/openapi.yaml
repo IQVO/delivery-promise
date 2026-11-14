@@ -815,7 +815,8 @@ components:
       type: object
       description: 'The node, pickup departure, departure legs and delivery wave that prove feasibility. A NOMINAL
         path (STANDARD and CONSOLIDATED only) carries no departure or wave ids: pickupDepartureId and deliveryWaveId are omitted
-        and legs is empty (E8).'
+        and legs is empty (E8). A carrier path of a CARRIER_HANDOFF area names carrierId and handoffNodeId instead of
+        deliveryWaveId (ADR 0026).'
       required:
       - nodeId
       - legs
@@ -831,10 +832,17 @@ components:
             description: departureId
         deliveryWaveId:
           type: string
+        carrierId:
+          type: string
+          description: The carrier that delivers a CARRIER_HANDOFF area, named instead of a delivery wave (ADR 0026);
+            omitted when the path ends on a wave.
+        handoffNodeId:
+          type: string
+          description: The node the carrier collects at (ADR 0026); omitted when the path ends on a wave.
     QuoteRequest:
       type: object
+      description: Exactly one of destinationPostalPrefix or pickupPointId is required (ADR 0027).
       required:
-      - destinationPostalPrefix
       - lines
       properties:
         destinationPostalPrefix:
@@ -844,6 +852,10 @@ components:
           pattern: ^[A-Za-z0-9]+$
           description: Destination postal prefix (never a full address).
           example: '787'
+        pickupPointId:
+          type: string
+          description: The pickup point to quote to; the point's own prefix becomes the destination prefix and its serving station the wave's station (ADR 0027).
+          example: node-pnt-7
         lines:
           type: array
           minItems: 1
@@ -964,6 +976,10 @@ components:
           $ref: '#/components/schemas/CapacityBand'
         consolidationEligible:
           $ref: '#/components/schemas/ConsolidationEligible'
+        carrierArea:
+          type: boolean
+          description: True when the offer's final leg is the chosen carrier of a CARRIER_HANDOFF area instead of a
+            delivery wave (ADR 0026); omitted otherwise.
     EstimateItem:
       type: object
       required:
@@ -982,10 +998,13 @@ components:
           maximum: 999
     EstimateRequest:
       type: object
+      description: Exactly one of destinationPostalPrefix or pickupPointId is required (ADR 0027).
       required:
-      - destinationPostalPrefix
       - items
       properties:
+        pickupPointId:
+          type: string
+          description: The pickup point to estimate to (ADR 0027).
         destinationPostalPrefix:
           type: string
           minLength: 1
@@ -1056,6 +1075,10 @@ components:
             on a quote's offer; omitted when unknown.
         capacityBand:
           $ref: '#/components/schemas/CapacityBand'
+        carrierArea:
+          type: boolean
+          description: True when the option's final leg is the chosen carrier of a CARRIER_HANDOFF area instead of a
+            delivery wave (ADR 0026); omitted otherwise.
     EstimateConstraint:
       type: object
       description: Why a tier has no option, in the quote's OfferConstraint vocabulary. tier is omitted when the
@@ -1410,6 +1433,12 @@ components:
           maximum: 1000
           description: Observations a lane needs inside the window before its measured transit can push a promise
             later than the timetable (ADR 0014). Default 20 when omitted or 0.
+        carrierWindowHours:
+          type: integer
+          minimum: 1
+          maximum: 96
+          description: Width in hours of the delivery window promised for a CARRIER_HANDOFF service area; the Latest
+            is the carrier Earliest plus this width (ADR 0026). Default 24 only when the field is omitted.
         targetOnTimeProbabilityPercent:
           type: integer
           minimum: 50
@@ -1466,6 +1495,7 @@ components:
       - transitWindowDays
       - transitServiceLevelPercent
       - minTransitObservations
+      - carrierWindowHours
       - targetOnTimeProbabilityPercent
       - minCalibrationObservations
       - calibrationWindowDays
@@ -1504,6 +1534,12 @@ components:
           maximum: 1000
           description: Observations a lane needs inside the window before its measured transit can push a promise
             later than the timetable (ADR 0014).
+        carrierWindowHours:
+          type: integer
+          minimum: 1
+          maximum: 96
+          description: Width in hours of the delivery window promised for a CARRIER_HANDOFF service area (ADR 0026);
+            always resolved, 24 by default.
         targetOnTimeProbabilityPercent:
           type: integer
           minimum: 50

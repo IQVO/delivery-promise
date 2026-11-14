@@ -23,9 +23,11 @@ func toLines(in []lineDTO) []shared.Line {
 }
 
 type quoteRequest struct {
-	DestinationPostalPrefix string    `json:"destinationPostalPrefix"`
-	Lines                   []lineDTO `json:"lines"`
-	Tiers                   []string  `json:"tiers"`
+	DestinationPostalPrefix string `json:"destinationPostalPrefix"`
+	// PickupPointID is the alternative destination (ADR 0027).
+	PickupPointID string    `json:"pickupPointId"`
+	Lines         []lineDTO `json:"lines"`
+	Tiers         []string  `json:"tiers"`
 	// ConsolidatedDeliveryDay is the optional local date chosen for the
 	// CONSOLIDATED tier (YYYY-MM-DD, ADR 0024).
 	ConsolidatedDeliveryDay string `json:"consolidatedDeliveryDay"`
@@ -40,18 +42,20 @@ func toTiers(in []string) []shared.Tier {
 }
 
 func (q quoteRequest) command() usecases.QuoteCommand {
-	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, Lines: toLines(q.Lines), Tiers: toTiers(q.Tiers), ConsolidatedDeliveryDay: q.ConsolidatedDeliveryDay}
+	return usecases.QuoteCommand{DestinationPostalPrefix: q.DestinationPostalPrefix, PickupPointID: q.PickupPointID, Lines: toLines(q.Lines), Tiers: toTiers(q.Tiers), ConsolidatedDeliveryDay: q.ConsolidatedDeliveryDay}
 }
 
 // estimateRequest is the body of POST /delivery-estimates (ADR 0019).
 type estimateRequest struct {
-	DestinationPostalPrefix string    `json:"destinationPostalPrefix"`
-	Items                   []lineDTO `json:"items"`
-	Tiers                   []string  `json:"tiers"`
+	DestinationPostalPrefix string `json:"destinationPostalPrefix"`
+	// PickupPointID is the alternative destination (ADR 0027).
+	PickupPointID string    `json:"pickupPointId"`
+	Items         []lineDTO `json:"items"`
+	Tiers         []string  `json:"tiers"`
 }
 
 func (e estimateRequest) command() usecases.EstimateCommand {
-	return usecases.EstimateCommand{DestinationPostalPrefix: e.DestinationPostalPrefix, Items: toLines(e.Items), Tiers: toTiers(e.Tiers)}
+	return usecases.EstimateCommand{DestinationPostalPrefix: e.DestinationPostalPrefix, PickupPointID: e.PickupPointID, Items: toLines(e.Items), Tiers: toTiers(e.Tiers)}
 }
 
 type makePromiseRequest struct {
@@ -84,11 +88,14 @@ type publishPolicyRequest struct {
 	MinTransitObservations     int `json:"minTransitObservations"`
 	// The calibration fields (ADR 0020). maxCalibrationBufferMinutes is a
 	// pointer because 0 is a valid cap: only an absent value takes the default.
-	TargetOnTimeProbabilityPercent int                `json:"targetOnTimeProbabilityPercent"`
-	MinCalibrationObservations     int                `json:"minCalibrationObservations"`
-	CalibrationWindowDays          int                `json:"calibrationWindowDays"`
-	MaxCalibrationBufferMinutes    *int               `json:"maxCalibrationBufferMinutes"`
-	OrderDeadlines                 []orderDeadlineDTO `json:"orderDeadlines"`
+	TargetOnTimeProbabilityPercent int  `json:"targetOnTimeProbabilityPercent"`
+	MinCalibrationObservations     int  `json:"minCalibrationObservations"`
+	CalibrationWindowDays          int  `json:"calibrationWindowDays"`
+	MaxCalibrationBufferMinutes    *int `json:"maxCalibrationBufferMinutes"`
+	// CarrierWindowHours is the width of a carrier-area promise's window
+	// (ADR 0026): a pointer because only an absent value takes the default 24.
+	CarrierWindowHours *int               `json:"carrierWindowHours"`
+	OrderDeadlines     []orderDeadlineDTO `json:"orderDeadlines"`
 }
 
 // input maps the request to the domain input; an omitted value takes the policy default.
@@ -103,6 +110,7 @@ func (p publishPolicyRequest) input() (policy.Input, error) {
 		MinCalibrationObservations:     orDefault(p.MinCalibrationObservations, def.MinCalibrationObservations()),
 		CalibrationWindowDays:          orDefault(p.CalibrationWindowDays, def.CalibrationWindowDays()),
 		MaxCalibrationBufferMinutes:    p.MaxCalibrationBufferMinutes,
+		CarrierWindowHours:             p.CarrierWindowHours,
 	}
 	for _, d := range p.OrderDeadlines {
 		minute, err := parseLocalTime(d.LocalTime)

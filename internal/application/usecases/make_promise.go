@@ -139,6 +139,12 @@ func (s *Service) revalidate(ctx context.Context, w shared.Witness, pol *policy.
 			return err
 		}
 	}
+	if w.DeliveryWaveID == "" {
+		// a carrier witness ends on the carrier, not a wave (ADR 0026): the
+		// legs up to the handoff node are revalidated above, the carrier leg
+		// is re-checked at handoff by shipping-and-tracking.
+		return nil
+	}
 	return s.revalidateWave(ctx, w.DeliveryWaveID)
 }
 

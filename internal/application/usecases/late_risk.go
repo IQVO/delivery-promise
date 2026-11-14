@@ -50,7 +50,10 @@ func (s *Service) FlagPredictedLate(ctx context.Context, limit int) (int, error)
 
 // flagIfPredictedLate flags one CONFIRMED promise whose path is late. The flag
 // is its own unit of work and re-reads the promise, so a promise that left
-// CONFIRMED meanwhile (another risk event) is not flagged twice.
+// CONFIRMED meanwhile (another risk event) is not flagged twice. A carrier
+// witness is never flagged here: its final leg has no departure to watch, so
+// the sweep cannot assess it - carrier lateness is caught by the silence
+// policy on WITH_CARRIER and the measured ring, not by the sweeper (ADR 0026).
 func (s *Service) flagIfPredictedLate(ctx context.Context, v *pathView, id promise.ID) (bool, error) {
 	p, err := s.Promises.Get(ctx, id)
 	if notFound(err) || err == nil && p.State() != promise.StateConfirmed {
@@ -58,6 +61,9 @@ func (s *Service) flagIfPredictedLate(ctx context.Context, v *pathView, id promi
 	}
 	if err != nil {
 		return false, err
+	}
+	if p.Witness().CarrierID != "" {
+		return false, nil
 	}
 	risk, err := v.assess(ctx, p.Witness())
 	if err != nil || !risk.Late {

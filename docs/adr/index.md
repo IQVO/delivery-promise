@@ -37,3 +37,5 @@ The decisions of `delivery-promise`, in the order they were taken. The ADR bodie
 | [0023](./0023-offers-carry-a-capacity-band.md) | Offers carry a capacity band | Accepted (2026-11-09) |
 | [0024](./0024-an-opt-in-consolidated-tier-with-a-customer-chosen-delivery-day.md) | An opt-in CONSOLIDATED tier with a customer-chosen delivery day | Accepted (2026-11-10) |
 | [0025](./0025-a-tracking-number-may-belong-to-several-assignments.md) | A tracking number may belong to several assignments | Accepted (2026-11-10) |
+| [0026](./0026-a-carrier-handoff-service-area-is-promised-without-a-delivery-wave.md) | A carrier-handoff service area is promised without a delivery wave | Accepted (2026-11-13) |
+| [0027](./0027-a-pickup-point-as-the-quoted-destination.md) | A pickup point as the quoted destination | Accepted (2026-11-13) |

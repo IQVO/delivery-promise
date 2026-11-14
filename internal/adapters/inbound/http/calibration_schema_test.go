@@ -56,7 +56,7 @@ func TestTheConfidenceFieldsConformToTheOpenAPISchemas(t *testing.T) {
 	}
 	conformTo(t, "PromisePolicy", views.Policy{
 		PolicyVersion: "v1", Version: 1, OfferTTLMinutes: 10, HoldTTLMinutes: 15, PackagesPerOrder: 1, CapacitySharePercent: 100,
-		TransitWindowDays: 28, TransitServiceLevelPercent: 90, MinTransitObservations: 20,
+		TransitWindowDays: 28, TransitServiceLevelPercent: 90, MinTransitObservations: 20, CarrierWindowHours: 24,
 		TargetOnTimeProbabilityPercent: 95, MinCalibrationObservations: 50, CalibrationWindowDays: 28, MaxCalibrationBufferMinutes: 0,
 		OrderDeadlines: []views.OrderDeadline{}, PublishedAt: calibrationAt,
 	})

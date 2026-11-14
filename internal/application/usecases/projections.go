@@ -58,8 +58,19 @@ func (s *Service) OnNodeRegistered(ctx context.Context, m Meta, e NodeRegistered
 			n = readmodel.Node{ID: e.NodeID, State: readmodel.NodeProposed}
 		}
 		n.Type, n.Subtype, n.Operator, n.RegionID, n.Timezone = e.NodeType, e.Subtype, e.Operator, e.RegionID, e.Timezone
+		n.ServingStationNodeID, n.PostalPrefix = e.ServingStationNodeID, prefixOf(e.PostalCode)
 		return s.Network.PutNode(ctx, n)
 	})
+}
+
+// prefixOf reduces a postal code to the prefix the promise quotes against: a
+// pickup point's own code is already labellable, so the first characters are
+// the prefix (ADR 0027).
+func prefixOf(postalCode string) string {
+	if len(postalCode) <= shared.MaxPostalPrefix {
+		return postalCode
+	}
+	return postalCode[:shared.MaxPostalPrefix]
 }
 
 // OnNodeProfileDeclared projects NodeOperationalProfileDeclared; a revision not
@@ -135,7 +146,8 @@ func (s *Service) OnLaneClosed(ctx context.Context, m Meta, e LaneClosed) error 
 }
 
 // OnServiceAreaAssigned projects ServiceAreaAssigned; an assignmentVersion not
-// above the stored one is ignored.
+// above the stored one is ignored. The ADR 0026 delivery mode and carrier
+// options ride along: absent fields mean NETWORK_ROUTE with no options.
 func (s *Service) OnServiceAreaAssigned(ctx context.Context, m Meta, e ServiceAreaAssigned) error {
 	return s.project(ctx, m, func(ctx context.Context) error {
 		cur, err := s.Network.GetArea(ctx, e.PostalPrefix)
@@ -145,7 +157,15 @@ func (s *Service) OnServiceAreaAssigned(ctx context.Context, m Meta, e ServiceAr
 		if err == nil && e.AssignmentVersion <= cur.Version {
 			return nil
 		}
-		return s.Network.PutArea(ctx, readmodel.Area{PostalPrefix: e.PostalPrefix, StationID: e.DeliveryStationNodeID, RegionID: e.RegionID, Version: e.AssignmentVersion})
+		options := make([]search.CarrierOption, 0, len(e.Carriers))
+		for _, c := range e.Carriers {
+			options = append(options, search.CarrierOption{CarrierID: c.CarrierID, HandoffNodeID: c.HandoffNodeID, CostPerPackageCents: c.CostPerPackageCents, TransitMinutes: c.TransitMinutes})
+		}
+		mode := e.DeliveryMode
+		if mode == "" {
+			mode = readmodel.AreaNetworkRoute
+		}
+		return s.Network.PutArea(ctx, readmodel.Area{PostalPrefix: e.PostalPrefix, StationID: e.DeliveryStationNodeID, RegionID: e.RegionID, Version: e.AssignmentVersion, DeliveryMode: mode, Carriers: options})
 	})
 }
 

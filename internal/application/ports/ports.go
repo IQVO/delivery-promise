@@ -163,8 +163,10 @@ type Inbox interface {
 
 // TransitActuals stores the measured-transit read model (ADR 0014): one open
 // row per departed load, paired by LoadArrived into a ring of observed
-// transits per (origin, dest) pair. Every call joins the unit of work carried
-// by ctx when there is one.
+// transits per (origin, dest) pair; and, since ADR 0026, one open row per
+// handed-over package, paired by the delivery into the same ring under the
+// key (handoffNodeID, "area:"+prefix). Every call joins the unit of work
+// carried by ctx when there is one.
 type TransitActuals interface {
 	// RecordLoadDeparted opens the pairing row of a load.
 	RecordLoadDeparted(ctx context.Context, loadID, originNodeID string, departedAt time.Time) error
@@ -172,6 +174,15 @@ type TransitActuals interface {
 	// (origin, dest) pair, appends it to the ring (latest 200) and deletes the
 	// open row. A load with no open row changes nothing.
 	RecordLoadArrived(ctx context.Context, loadID, destNodeID string, arrivedAt time.Time) error
+	// RecordCarrierHandoff opens the carrier pairing row of a package handed
+	// to the carrier of a CARRIER_HANDOFF area, keyed by tracking number with
+	// the ring key (handoffNodeID, "area:"+prefix) it will pair under
+	// (ADR 0026). A repeated handoff overwrites the row.
+	RecordCarrierHandoff(ctx context.Context, trackingNumber, handoffNodeID, postalPrefix string, handedAt time.Time) error
+	// RecordCarrierDelivered pairs the package's open carrier row into one
+	// observation of its (handoffNodeID, "area:"+prefix) pair and deletes the
+	// row; a package with no open row changes nothing (ADR 0026).
+	RecordCarrierDelivered(ctx context.Context, trackingNumber string, deliveredAt time.Time) error
 	// MeasuredTransit answers the nearest-rank `percentile` transit in minutes
 	// of the pair's observations inside the last windowDays days; ok is false
 	// while there are fewer than minObservations of them.
