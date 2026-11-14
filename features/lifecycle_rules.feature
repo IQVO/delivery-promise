@@ -225,6 +225,18 @@ Feature: Lifecycle rules of the promise
     When the sweeper flags the promises predicted late
     Then the promise is AT_RISK
 
+  Scenario: A promise flagged predicted late whose window can no longer be reached goes to the normal re-promise
+    # 12 hours behind at the first leg, the delivery wave of Friday cannot be made by 21:00 any more
+    Given I quote 2 of "ci-1001" for postal prefix "787" on the tier NEXT_DAY
+    And a promise exists from the NEXT_DAY offer
+    And I confirm the promise for the order "ord-1" group 1
+    And the clock is set to "2026-10-23T08:00:00-05:00"
+    And the sweeper flags the promises predicted late
+    When the sweeper re-promises the at-risk promises
+    Then the last command published the event "PromiseRevised" 1 time
+    And the promise is CONFIRMED
+    And the promise has 1 revision with the reason "PREDICTED_LATE"
+
   # ---- JudgePromise --------------------------------------------------------
 
   Scenario: A delivery exactly at the end of the window keeps the promise
@@ -246,6 +258,15 @@ Feature: Lifecycle rules of the promise
     Then the promise is BROKEN
     And the promise was late by 1 minutes
     And the judgement cause is "LATE"
+
+  Scenario: A delivery seconds after the window is late by a whole minute
+    Given I quote 2 of "ci-1001" for postal prefix "787" on the tier NEXT_DAY
+    And a promise exists from the NEXT_DAY offer
+    And I confirm the promise for the order "ord-1" group 1
+    And the assignment "asg-1" of the order "ord-1" is locked and shipped with the packages "TRK-1"
+    When the package "TRK-1" is delivered at "2026-10-23T21:00:30-05:00"
+    Then the promise is BROKEN
+    And the promise was late by 1 minutes
 
   Scenario: A delivery redelivered with the same CloudEvents id judges once
     Given I quote 2 of "ci-1001" for postal prefix "787" on the tier NEXT_DAY

@@ -108,6 +108,15 @@ Feature: Capacity rules of the promise book and of the stock a quote sells
 
   # ---- CloseBooksAtCutoff -------------------------------------------------
 
+  Scenario: An offer is refused the minute its pickup can no longer be met
+    # quoted at 16:24 the offer expires at 16:25 (18:00 minus 95 minutes of handling), the instant the book stops taking holds
+    Given the clock is set to "2026-10-22T16:24:00-05:00"
+    And I quote 2 of "ci-1001" for postal prefix "787" on the tier NEXT_DAY
+    And the clock is set to "2026-10-22T16:25:00-05:00"
+    When I make a promise from the NEXT_DAY offer
+    Then the command is refused with "ErrOfferNotQuotable"
+    And the NEXT_DAY offer is QUOTED
+
   Scenario: The sweeper closes a book at its cutoff and not a minute before
     Given I quote 2 of "ci-1001" for postal prefix "787" on the tier NEXT_DAY
     And a promise exists from the NEXT_DAY offer
