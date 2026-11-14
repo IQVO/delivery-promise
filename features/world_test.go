@@ -57,6 +57,10 @@ func (w *world) reset() {
 		UoW: w.store.UnitOfWork(), Offers: w.store.Offers(), Promises: w.store.Promises(), Books: w.store.Books(),
 		Policies: w.store.Policies(), Network: w.store.Network(), Shipments: w.store.Shipments(), Calibration: w.store.Calibration(), Outbox: w.store.Outbox(),
 		Inbox: w.store.Inbox(), Clock: w.clock, IDs: &memory.SeqIDs{},
+		// The read models of the late-risk sweep (ADR 0021), the fast-tier
+		// eligibility gate (ADR 0022) and the measured transit (ADR 0014): empty
+		// until a scenario feeds them, so the older scenarios quote as before.
+		TransitActuals: w.store.TransitActuals(), DepartureArrivals: w.store.DepartureArrivals(), TierEligibility: w.store.TierEligibility(),
 	})
 	// The real REST adapter over the same in-memory doubles; Idempotency stays
 	// nil because the transactional middleware is Postgres-bound and is proven

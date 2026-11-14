@@ -93,7 +93,7 @@ Tell a shopper, before and at purchase, the date a package will arrive, and make
 | node-performance | `NodeScorecardUpdated`, `NodeTierEligibilityChanged` | Events | `retailnetwork.node-performance.events` | Conformist |
 | agents, console | the REST reads, five MCP tools, two A2A skills | Queries | REST GET, MCP, A2A | none negotiated |
 
-37 consumed types in total. The relationship column states the pattern the aggregator's model assigns; this repository only records that it conforms to each upstream vocabulary (tolerant local copies in `apis/asyncapi.yaml`).
+39 consumed types in total. The relationship column states the pattern the aggregator's model assigns; this repository only records that it conforms to each upstream vocabulary (tolerant local copies in `apis/asyncapi.yaml`).
 
 ## Outbound communication
 

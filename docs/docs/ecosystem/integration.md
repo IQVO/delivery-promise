@@ -53,7 +53,7 @@ Source: `internal/adapters/inbound/kafka/dispatch.go`, `internal/adapters/outbou
 
 ## Upstream: what Delivery Promise consumes
 
-One consumer (`cmd/api`, group `DELIVERY_PROMISE_CONSUMER_GROUP`, `delivery-promise-consumer` in the cluster) reads eight topics. Dispatch is on the full CloudEvents `type`; the 37 handled types are in `Handlers` (`internal/adapters/inbound/kafka/dispatch.go`).
+One consumer (`cmd/api`, group `DELIVERY_PROMISE_CONSUMER_GROUP`, `delivery-promise-consumer` in the cluster) reads eight topics. Dispatch is on the full CloudEvents `type`; the 39 handled types are in `Handlers` (`internal/adapters/inbound/kafka/dispatch.go`).
 
 | Producer | Topic | Event types (entity) | Built use |
 | --- | --- | --- | --- |

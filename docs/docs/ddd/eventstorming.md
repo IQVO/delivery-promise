@@ -132,15 +132,21 @@ flowchart LR
   c1["ExpireOffers"]:::cmd
   c2["ReleaseExpiredHolds"]:::cmd
   c3["CloseBooks"]:::cmd
-  c4["RepriceAtRisk"]:::cmd
+  c4["FlagPredictedLate<br/>(ADR 0021, before RepriceAtRisk)"]:::cmd
+  c5["RepriceAtRisk"]:::cmd
   a1["DeliveryOffer EXPIRED"]:::agg
   a2["Promise RELEASED + book hold returned"]:::agg
   a3["PromiseBook CLOSED"]:::agg
+  a4["Promise AT_RISK, reason PREDICTED_LATE"]:::agg
   e2(["PromiseReleased"]):::evt
+  e3(["PromiseAtRisk"]):::evt
   tick --> c1 --> a1
   tick --> c2 --> a2 --> e2
   tick --> c3 --> a3
-  tick --> c4
+  tick --> c4 --> a4 --> e3
+  tick --> c5
 ```
+
+The sweeper runs five passes in this order: `ExpireOffers`, `ReleaseExpiredHolds`, `CloseBooks`, `FlagPredictedLate`, `RepriceAtRisk` (`cmd/api/workers.go`, `sweepOnce`). `FlagPredictedLate` runs before `RepriceAtRisk`, so a promise it flags as unreachable is re-promised in the same sweep.
 
 Source for all boards: `internal/application/usecases/*.go`, `cmd/api/workers.go`, `internal/adapters/inbound/kafka/dispatch.go`.

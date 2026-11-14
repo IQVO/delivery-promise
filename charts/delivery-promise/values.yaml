@@ -112,7 +112,8 @@ config:
   # not rendered; the binary defaults to 1s.
   outboxRelayInterval: ""
   # SWEEP_INTERVAL: how often the sweeper runs ExpireOffers, ReleaseExpiredHolds,
-  # CloseBooks and RepriceAtRisk. Empty = not rendered; the binary defaults to 15s.
+  # CloseBooks, FlagPredictedLate and RepriceAtRisk. Empty = not rendered; the binary
+  # defaults to 15s.
   sweepInterval: ""
   # SHUTDOWN_DRAIN_DELAY: wait after /readyz flips before closing the listener
   # (Go duration, "0" disables). Empty = not rendered; the binary defaults to 5s.

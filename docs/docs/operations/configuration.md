@@ -27,7 +27,7 @@ Source: `cmd/api/config.go`, `cmd/api/telemetry.go`, `cmd/api/workers.go`, `cmd/
 | `EVENT_PUBLISHER` | empty (means `kafka`) | no | Only `kafka` (or empty) is accepted; any other value is a boot error (`EVENT_PUBLISHER=<x> is not supported`). The log sink does not exist. |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | no | Poll interval of the outbox relay. |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | no | Failures before the relay excludes an outbox row. `0` means unlimited; a negative or unparsable value warns and falls back to 20, so a typo never removes the cap. |
-| `SWEEP_INTERVAL` | `15s` | no | How often the clock-driven sweeper runs its four passes (batch of 100 each). |
+| `SWEEP_INTERVAL` | `15s` | no | How often the clock-driven sweeper runs its five passes (batch of 100 each). |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | no | Wait between flipping `/readyz` to 503 and closing the listener. `0` disables the wait; a negative or unparsable value warns and uses 5s. |
 | `LOG_LEVEL` | `info` | no | `debug`, `info`, `warn` (or `warning`), `error`, case-insensitive; anything else is `info`. |
 | `OTEL_SERVICE_NAME` | `delivery-promise` | no | `service.name` of spans, metrics and the Loki `app` label. |

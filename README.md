@@ -108,7 +108,7 @@ entity `promise`, `promisebook`, `deliveryoffer` or `promisepolicy`
 | `retailnetwork.delivery-promise.events` (integration) | `PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseUnkeepable`, `PromiseBookExhausted` |
 | `retailnetwork.delivery-promise.analytics` (analytics only) | `PromiseMade`, `PromiseConfirmed`, `PromiseReleased`, `PromiseCancelled`, `DeliveryOfferQuoted`, `PromisePolicyPublished` |
 
-**Consumed** — 36 event types from eight producer topics (ADR 0003), kept as
+**Consumed** — 39 event types from eight producer topics (ADR 0003), kept as
 event-fed local read models or driving RepromiseOnRisk, JudgeOnDelivery and
 CancelPromise; every consumer is idempotent on the CloudEvents `id` (inbox
 table) and dispatches on the full `type`:
@@ -151,7 +151,7 @@ need only `DATABASE_URL` — they never dial Kafka.
 | `DELIVERY_PROMISE_CONSUMER_GROUP` | **required** | Stable group id of the consumer of the eight producer topics (a chart value, never derived from the pod name) |
 | `EVENT_PUBLISHER` | `kafka` | Only `kafka` is accepted; any other value is a boot error |
 | `HTTP_ADDR` | `:8080` | Listen address |
-| `SWEEP_INTERVAL` | `15s` | How often the sweeper runs its four passes (Go duration or seconds) |
+| `SWEEP_INTERVAL` | `15s` | How often the sweeper runs its five passes (Go duration or seconds) |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Poll interval of the relay (Go duration or seconds) |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row; `0` = unlimited (ADR 0005) |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait between flipping `/readyz` to 503 and closing the listener; `0` disables |
@@ -295,13 +295,23 @@ on pre-commit and `make check` on pre-push.
 
 ## Architecture Decision Records
 
-Index: [`docs/adr/index.md`](docs/adr/index.md) — 11 ADRs (0001–0011): the
+Index: [`docs/adr/index.md`](docs/adr/index.md) — 27 ADRs (0001–0027): the
 bounded context (0001), the aggregates, invariants and numbered assumptions
 (0002), consumed contracts and local read models (0003), the CloudEvents
 catalogue (0004), the outbox relay (0005), the HTTP adapter, consumer,
 sweeper and readiness (0006), the read-only MCP server (0007), the console
 remote (0008), the fleet observability standard (0009), the A2A agent (0010),
-the delivery window's local time zone (0011).
+the delivery window's local time zone (0011), the fleet REST API guideline
+(0012), agent authority levels and the complete MCP surface (0013), the
+measured transit basis (0014), confirmed units staying decremented (0015),
+the book charge following the locked node (0016), owner-aware availability and
+promise netting (0017), the analytics read side (0018), batch delivery
+estimates for listing pages (0019), promise calibration from the service's own
+judgement (0020), the late-path sweep (0021), node eligibility for fast-tier
+candidates (0022), the capacity band on offers (0023), the opt-in consolidated
+tier (0024), a tracking number belonging to several assignments (0025), the
+carrier-handoff service area promised without a delivery wave (0026), a pickup
+point as the quoted destination (0027).
 
 ## License
 

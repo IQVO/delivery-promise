@@ -85,7 +85,7 @@ flowchart LR
   api --> db
   mcp --> db
   a2a --> db
-  producers -->|"36 event types"| kafka
+  producers -->|"39 event types"| kafka
   kafka -->|"consume"| api
   api -->|"outbox relay: 12 event types"| kafka
 ```
