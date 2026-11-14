@@ -192,6 +192,16 @@ type Input struct {
 	// horizon, collecting the candidates of every day that has one (a
 	// re-promise, ADR 0024). It overrides ConsolidatedDay.
 	ConsolidatedNotBefore time.Time
+	// Carrier is set when the destination service area's delivery mode is
+	// CARRIER_HANDOFF (ADR 0026): the final leg is the chosen carrier option's
+	// handoff node plus the carrier's effective transit instead of a delivery
+	// wave; nil means the area is promised on waves as before.
+	Carrier *CarrierArea
+	// MeasuredCarrierTransit answers the measured carrier transit in minutes
+	// of a handoff node's area pair at the policy's service level; ok is false
+	// while the pair has too few observations. A nil closure never measures:
+	// the declared transit stands (ADR 0014 ring, ADR 0026).
+	MeasuredCarrierTransit func(handoffNodeID string) (ok bool, minutes int)
 }
 
 // Candidate is one feasible witness path with the numbers an offer needs.

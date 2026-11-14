@@ -10,6 +10,7 @@
   "data": {
     "calibrationWindowDays": 14,
     "capacitySharePercent": 80,
+    "carrierWindowHours": 0,
     "holdTtlMinutes": 15,
     "maxCalibrationBufferMinutes": 0,
     "minCalibrationObservations": 40,

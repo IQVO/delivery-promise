@@ -59,27 +59,30 @@ func (s *Service) OnFulfillmentUnsourceable(ctx context.Context, m Meta, e Fulfi
 
 // ---- shipping-and-tracking ---------------------------------------------------------------------------------
 
-// OnPackageDelivered records the delivery and judges the group when it was the
-// last package.
-func (s *Service) OnPackageDelivered(ctx context.Context, m Meta, e PackageDelivered) error {
-	return s.recordOutcome(ctx, m, readmodel.PackageOutcome{TrackingNumber: e.TrackingNumber, AssignmentID: e.AssignmentID, Kind: readmodel.OutcomeDelivered, At: e.DeliveredAt.UTC()})
-}
+// OnPackageDelivered lives with the carrier pairing it also feeds (ADR 0026):
+// projections_carrier.go.
 
 // OnPackageLost records the loss; the group is judged BROKEN (cause LOST).
 func (s *Service) OnPackageLost(ctx context.Context, m Meta, e PackageLost) error {
-	return s.recordOutcome(ctx, m, readmodel.PackageOutcome{TrackingNumber: e.TrackingNumber, Kind: readmodel.OutcomeLost, At: e.DeclaredAt.UTC()})
+	return s.recordOutcome(ctx, m, readmodel.PackageOutcome{TrackingNumber: e.TrackingNumber, Kind: readmodel.OutcomeLost, At: e.DeclaredAt.UTC()}, nil)
 }
 
 // OnPackageReturned records the return; the group is judged BROKEN (cause RETURNED).
 func (s *Service) OnPackageReturned(ctx context.Context, m Meta, e PackageReturned) error {
-	return s.recordOutcome(ctx, m, readmodel.PackageOutcome{TrackingNumber: e.TrackingNumber, Kind: readmodel.OutcomeReturned, At: e.ReturnedAt.UTC()})
+	return s.recordOutcome(ctx, m, readmodel.PackageOutcome{TrackingNumber: e.TrackingNumber, Kind: readmodel.OutcomeReturned, At: e.ReturnedAt.UTC()}, nil)
 }
 
 // recordOutcome stores the package fact, then judges EVERY assignment that
 // shares the tracking number (a merged package belongs to several, ADR 0025),
-// each on its own promise window.
-func (s *Service) recordOutcome(ctx context.Context, m Meta, o readmodel.PackageOutcome) error {
+// each on its own promise window. extra, when not nil, runs inside the same
+// unit of work before the facts are stored (the carrier pairing of ADR 0026).
+func (s *Service) recordOutcome(ctx context.Context, m Meta, o readmodel.PackageOutcome, extra func(ctx context.Context) error) error {
 	return s.project(ctx, m, func(ctx context.Context) error {
+		if extra != nil {
+			if err := extra(ctx); err != nil {
+				return err
+			}
+		}
 		ids, err := s.sharingAssignments(ctx, o.AssignmentID, o.TrackingNumber)
 		if err != nil {
 			return err

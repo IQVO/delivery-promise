@@ -82,6 +82,19 @@ type ServiceAreaAssigned struct {
 	DeliveryStationNodeID string `json:"deliveryStationNodeId"`
 	RegionID              string `json:"regionId"`
 	AssignmentVersion     int    `json:"assignmentVersion"`
+	// DeliveryMode and Carriers are the ADR 0026 carrier-handoff declaration;
+	// both are absent on an old producer, which means NETWORK_ROUTE with no
+	// options - the promise then keeps using waves.
+	DeliveryMode string             `json:"deliveryMode"`
+	Carriers     []carrierOptionDTO `json:"carriers"`
+}
+
+// carrierOptionDTO is one declared carrier option of a CARRIER_HANDOFF area.
+type carrierOptionDTO struct {
+	CarrierID           string `json:"carrierId"`
+	HandoffNodeID       string `json:"handoffNodeId"`
+	CostPerPackageCents int64  `json:"costPerPackageCents"`
+	TransitMinutes      int    `json:"transitMinutes"`
 }
 
 // RegionDefined is node-topology RegionDefined.
@@ -190,6 +203,19 @@ type PackageDelivered struct {
 	TrackingNumber string    `json:"trackingNumber"`
 	AssignmentID   string    `json:"assignmentId"`
 	DeliveredAt    time.Time `json:"deliveredAt"`
+}
+
+// PackageHandedToCarrier is shipping-and-tracking PackageHandedToCarrier
+// (ADR 0026): the physical handoff of a package to the chosen carrier of a
+// CARRIER_HANDOFF area - the departure half of a carrier transit observation.
+type PackageHandedToCarrier struct {
+	TrackingNumber          string    `json:"trackingNumber"`
+	AssignmentID            string    `json:"assignmentId"`
+	OrderID                 string    `json:"orderId"`
+	CarrierID               string    `json:"carrierId"`
+	HandoffNodeID           string    `json:"handoffNodeId"`
+	DestinationPostalPrefix string    `json:"destinationPostalPrefix"`
+	HandedAt                time.Time `json:"handedAt"`
 }
 
 // PackageException is shipping-and-tracking PackageExceptionRaised.

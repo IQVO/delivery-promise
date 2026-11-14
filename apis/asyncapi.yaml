@@ -154,6 +154,8 @@ channels:
     messages:
       PackageDelivered:
         $ref: '#/components/messages/PackageDelivered'
+      PackageHandedToCarrier:
+        $ref: '#/components/messages/PackageHandedToCarrier'
       PackageExceptionRaised:
         $ref: '#/components/messages/PackageExceptionRaised'
       PackageLost:
@@ -352,14 +354,15 @@ operations:
     channel:
       $ref: '#/channels/shippingAndTrackingEvents'
     title: Consume shipping-and-tracking events
-    summary: Consume PackageDelivered, PackageExceptionRaised, PackageLost, PackageReturned from shipping-and-tracking.
-    description: The service consumes PackageDelivered, PackageExceptionRaised, PackageLost, PackageReturned from `retailnetwork.shipping-and-tracking.events`
+    summary: Consume PackageDelivered, PackageHandedToCarrier, PackageExceptionRaised, PackageLost, PackageReturned from shipping-and-tracking.
+    description: The service consumes PackageDelivered, PackageHandedToCarrier, PackageExceptionRaised, PackageLost, PackageReturned from `retailnetwork.shipping-and-tracking.events`
       to keep its local read models and to drive RepromiseOnRisk, JudgeOnDelivery and CancelPromise. It never calls shipping-and-tracking
       synchronously.
     tags:
     - name: consumed-shipping-and-tracking
     messages:
     - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageDelivered'
+    - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageHandedToCarrier'
     - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageExceptionRaised'
     - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageLost'
     - $ref: '#/channels/shippingAndTrackingEvents/messages/PackageReturned'
@@ -1048,6 +1051,39 @@ components:
             assignmentId: asg-31b7
             orderId: ord-55a901
             deliveredAt: '2026-10-23T18:30:00Z'
+    PackageHandedToCarrier:
+      name: PackageHandedToCarrier
+      title: A package was handed to an area carrier
+      summary: A package was handed to the chosen carrier of a CARRIER_HANDOFF area.
+      contentType: application/cloudevents+json
+      description: 'Consumed from `retailnetwork.shipping-and-tracking.events`; `type` = `com.retailnetwork.logistics.shipping-and-tracking.journey.PackageHandedToCarrier`
+        (dispatch on the full type). Tolerant local copy: only the fields delivery-promise relies on are listed and unknown
+        fields are ignored. Use: opens the carrier pairing row of the measured-transit ring, keyed by tracking number under
+        (handoffNodeId, area-prefixed dest); paired by PackageDelivered (ADR 0026).'
+      tags:
+      - name: consumed-shipping-and-tracking
+      payload:
+        $ref: '#/components/schemas/PackageHandedToCarrierConsumed'
+      examples:
+      - name: packageHandedToCarrier
+        summary: A package was handed to the chosen carrier of a CARRIER_HANDOFF area.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a0019
+          source: /retailnetwork/shipping-and-tracking
+          type: com.retailnetwork.logistics.shipping-and-tracking.journey.PackageHandedToCarrier
+          subject: TRK-1001
+          time: '2026-10-23T08:00:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shipping-and-tracking:events:PackageHandedToCarrier:v1
+          data:
+            trackingNumber: TRK-1001
+            assignmentId: asg-31b7
+            orderId: ord-55a901
+            carrierId: c-x
+            handoffNodeId: N-DAU1
+            destinationPostalPrefix: '787'
+            handedAt: '2026-10-23T08:00:00Z'
     PackageExceptionRaised:
       name: PackageExceptionRaised
       title: A package raised a tracking exception
@@ -2392,6 +2428,7 @@ components:
             - transitWindowDays
             - transitServiceLevelPercent
             - minTransitObservations
+            - carrierWindowHours
             - targetOnTimeProbabilityPercent
             - minCalibrationObservations
             - calibrationWindowDays
@@ -2423,6 +2460,11 @@ components:
                 minimum: 5
                 maximum: 1000
                 description: Observations a lane needs before its measured transit beats the timetable (ADR 0014).
+              carrierWindowHours:
+                type: integer
+                minimum: 1
+                maximum: 96
+                description: Width in hours of the delivery window promised for a CARRIER_HANDOFF service area (ADR 0026).
               targetOnTimeProbabilityPercent:
                 type: integer
                 minimum: 50
@@ -2555,6 +2597,23 @@ components:
               trackingNumber: *id001
               assignmentId: *id001
               deliveredAt: *id002
+    PackageHandedToCarrierConsumed:
+      allOf:
+      - $ref: '#/components/schemas/ConsumedEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - trackingNumber
+            properties:
+              trackingNumber: *id001
+              assignmentId: *id001
+              orderId: *id001
+              carrierId: *id001
+              handoffNodeId: *id001
+              destinationPostalPrefix: *id001
+              handedAt: *id002
     PackageExceptionRaisedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'
@@ -2946,6 +3005,33 @@ components:
               deliveryStationNodeId: *id001
               regionId: *id001
               assignmentVersion: *id003
+              deliveryMode:
+                type: string
+                enum:
+                - NETWORK_ROUTE
+                - CARRIER_HANDOFF
+                description: The planner's delivery mode for the area (ADR 0026); absent means NETWORK_ROUTE and the
+                  promise keeps using waves.
+              carriers:
+                type: array
+                description: The declared carrier options of a CARRIER_HANDOFF area (ADR 0026); absent or empty means none.
+                items:
+                  type: object
+                  required:
+                  - carrierId
+                  - handoffNodeId
+                  - costPerPackageCents
+                  - transitMinutes
+                  properties:
+                    carrierId: *id001
+                    handoffNodeId: *id001
+                    costPerPackageCents:
+                      type: integer
+                      format: int64
+                      minimum: 0
+                    transitMinutes:
+                      type: integer
+                      minimum: 1
     RegionDefinedConsumed:
       allOf:
       - $ref: '#/components/schemas/ConsumedEnvelope'

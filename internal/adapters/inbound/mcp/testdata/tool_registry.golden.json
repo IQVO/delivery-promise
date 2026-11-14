@@ -204,6 +204,9 @@
         "capacitySharePercent": {
           "type": "integer"
         },
+        "carrierWindowHours": {
+          "type": "integer"
+        },
         "holdTtlMinutes": {
           "type": "integer"
         },
@@ -276,6 +279,7 @@
         "transitWindowDays",
         "transitServiceLevelPercent",
         "minTransitObservations",
+        "carrierWindowHours",
         "targetOnTimeProbabilityPercent",
         "minCalibrationObservations",
         "calibrationWindowDays",
@@ -318,6 +322,9 @@
         },
         "capacityBand": {
           "type": "string"
+        },
+        "carrierArea": {
+          "type": "boolean"
         },
         "confidence": {
           "type": [
@@ -405,7 +412,13 @@
         "witnessPath": {
           "additionalProperties": false,
           "properties": {
+            "carrierId": {
+              "type": "string"
+            },
             "deliveryWaveId": {
+              "type": "string"
+            },
+            "handoffNodeId": {
               "type": "string"
             },
             "legs": {
@@ -688,7 +701,13 @@
         "witnessPath": {
           "additionalProperties": false,
           "properties": {
+            "carrierId": {
+              "type": "string"
+            },
             "deliveryWaveId": {
+              "type": "string"
+            },
+            "handoffNodeId": {
               "type": "string"
             },
             "legs": {
@@ -1070,7 +1089,13 @@
               "witnessPath": {
                 "additionalProperties": false,
                 "properties": {
+                  "carrierId": {
+                    "type": "string"
+                  },
                   "deliveryWaveId": {
+                    "type": "string"
+                  },
+                  "handoffNodeId": {
                     "type": "string"
                   },
                   "legs": {

@@ -84,11 +84,14 @@ type publishPolicyRequest struct {
 	MinTransitObservations     int `json:"minTransitObservations"`
 	// The calibration fields (ADR 0020). maxCalibrationBufferMinutes is a
 	// pointer because 0 is a valid cap: only an absent value takes the default.
-	TargetOnTimeProbabilityPercent int                `json:"targetOnTimeProbabilityPercent"`
-	MinCalibrationObservations     int                `json:"minCalibrationObservations"`
-	CalibrationWindowDays          int                `json:"calibrationWindowDays"`
-	MaxCalibrationBufferMinutes    *int               `json:"maxCalibrationBufferMinutes"`
-	OrderDeadlines                 []orderDeadlineDTO `json:"orderDeadlines"`
+	TargetOnTimeProbabilityPercent int  `json:"targetOnTimeProbabilityPercent"`
+	MinCalibrationObservations     int  `json:"minCalibrationObservations"`
+	CalibrationWindowDays          int  `json:"calibrationWindowDays"`
+	MaxCalibrationBufferMinutes    *int `json:"maxCalibrationBufferMinutes"`
+	// CarrierWindowHours is the width of a carrier-area promise's window
+	// (ADR 0026): a pointer because only an absent value takes the default 24.
+	CarrierWindowHours *int               `json:"carrierWindowHours"`
+	OrderDeadlines     []orderDeadlineDTO `json:"orderDeadlines"`
 }
 
 // input maps the request to the domain input; an omitted value takes the policy default.
@@ -103,6 +106,7 @@ func (p publishPolicyRequest) input() (policy.Input, error) {
 		MinCalibrationObservations:     orDefault(p.MinCalibrationObservations, def.MinCalibrationObservations()),
 		CalibrationWindowDays:          orDefault(p.CalibrationWindowDays, def.CalibrationWindowDays()),
 		MaxCalibrationBufferMinutes:    p.MaxCalibrationBufferMinutes,
+		CarrierWindowHours:             p.CarrierWindowHours,
 	}
 	for _, d := range p.OrderDeadlines {
 		minute, err := parseLocalTime(d.LocalTime)

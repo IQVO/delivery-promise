@@ -130,6 +130,13 @@ func (s *Service) searchInput(ctx context.Context, now time.Time, pol *policy.Po
 	if err != nil {
 		return in, err
 	}
+	// A CARRIER_HANDOFF area promises on the carrier options instead of waves;
+	// an area without a mode, or one whose options never arrived, stays on
+	// waves exactly as before (ADR 0026).
+	if area.DeliveryMode == readmodel.AreaCarrierHandoff && len(area.Carriers) > 0 {
+		in.Carrier = &search.CarrierArea{Options: area.Carriers}
+	}
+	in.MeasuredCarrierTransit = s.measuredCarrierTransitOf(ctx, pol, now, prefix)
 	stationRow, err := s.Network.GetNode(ctx, area.StationID)
 	if errors.Is(err, ports.ErrNotFound) {
 		return in, nil
@@ -156,6 +163,21 @@ func (s *Service) measuredTransitOf(ctx context.Context, pol *policy.Policy, now
 	percentile, minObs, window := pol.TransitServiceLevelPercent(), pol.MinTransitObservations(), pol.TransitWindowDays()
 	return func(origin, dest string) (bool, int) {
 		return s.TransitActuals.MeasuredTransit(ctx, origin, dest, percentile, minObs, window, now)
+	}
+}
+
+// measuredCarrierTransitOf is measuredTransitOf for the final leg of a
+// CARRIER_HANDOFF area: the same ring asked with the dest "area:"+prefix, so
+// carrier observations never mix with linehaul ones (ADR 0026). A service
+// without the port never measures.
+func (s *Service) measuredCarrierTransitOf(ctx context.Context, pol *policy.Policy, now time.Time, prefix string) func(handoffNodeID string) (bool, int) {
+	if s.TransitActuals == nil {
+		return nil
+	}
+	percentile, minObs, window := pol.TransitServiceLevelPercent(), pol.MinTransitObservations(), pol.TransitWindowDays()
+	dest := "area:" + prefix
+	return func(handoffNodeID string) (bool, int) {
+		return s.TransitActuals.MeasuredTransit(ctx, handoffNodeID, dest, percentile, minObs, window, now)
 	}
 }
 
