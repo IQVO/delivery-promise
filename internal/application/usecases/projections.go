@@ -108,7 +108,11 @@ func (s *Service) OnNodeProfileDeclared(ctx context.Context, m Meta, e NodeProfi
 }
 
 // OnNodeStateChanged projects NodeActivated, NodeSuspended and NodeRetired; state
-// is one of readmodel.NodeActive, NodeSuspended or NodeRetired.
+// is one of readmodel.NodeActive, NodeSuspended or NodeRetired (ADR 0029).
+// RETIRED is terminal: a retired node takes no later fact, whatever its time,
+// and a retirement applies whatever its time (it can never be older than a
+// real activation). Between ACTIVE and SUSPENDED the newer CloudEvents time
+// wins; an equal instant applies; a zero time carries no ordering.
 func (s *Service) OnNodeStateChanged(ctx context.Context, m Meta, e NodeStateChanged, state string) error {
 	return s.project(ctx, m, func(ctx context.Context) error {
 		n, err := s.Network.GetNode(ctx, e.NodeID)
@@ -118,7 +122,16 @@ func (s *Service) OnNodeStateChanged(ctx context.Context, m Meta, e NodeStateCha
 		if notFound(err) {
 			n = readmodel.Node{ID: e.NodeID}
 		}
+		if n.State == readmodel.NodeRetired {
+			return nil
+		}
+		if state != readmodel.NodeRetired && staleFact(n.StateAt, m.Time) {
+			return nil
+		}
 		n.State = state
+		if !m.Time.IsZero() {
+			n.StateAt = m.Time.UTC()
+		}
 		return s.Network.PutNode(ctx, n)
 	})
 }
@@ -238,7 +251,9 @@ func validOwner(ownerRef string) error {
 }
 
 // OnListingToggled projects ListingSuppressed (suppressed true) and
-// ListingRestored (false).
+// ListingRestored (false). The newer CloudEvents time wins (ADR 0029): a
+// fact older than the one the row holds is dropped, an equal instant applies,
+// a zero time carries no ordering.
 func (s *Service) OnListingToggled(ctx context.Context, m Meta, e ListingToggled, suppressed bool) error {
 	return s.project(ctx, m, func(ctx context.Context) error {
 		l, err := s.Network.GetListing(ctx, e.ListingID)
@@ -248,7 +263,13 @@ func (s *Service) OnListingToggled(ctx context.Context, m Meta, e ListingToggled
 		if notFound(err) {
 			l = readmodel.Listing{ID: e.ListingID, NodeID: e.NodeID}
 		}
+		if staleFact(l.SuppressedAt, m.Time) {
+			return nil
+		}
 		l.Suppressed = suppressed
+		if !m.Time.IsZero() {
+			l.SuppressedAt = m.Time.UTC()
+		}
 		return s.Network.PutListing(ctx, l)
 	})
 }

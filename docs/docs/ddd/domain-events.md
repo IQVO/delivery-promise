@@ -68,9 +68,9 @@ Each consumed event updates a read model (never an aggregate directly) or runs a
 
 | Event (producer) | Reaction | Policy or projection |
 | --- | --- | --- |
-| `NodeRegistered`, `NodeOperationalProfileDeclared`, `NodeActivated`, `NodeSuspended`, `NodeRetired` (node-topology) | upsert the node and profile; a suspended or retired node leaves the candidate set | projection `rm_nodes` |
+| `NodeRegistered`, `NodeOperationalProfileDeclared`, `NodeActivated`, `NodeSuspended`, `NodeRetired` (node-topology) | upsert the node and profile; a suspended or retired node leaves the candidate set; `NodeActivated` / `NodeSuspended` older than the stored `StateAt` is dropped and an equal instant applies; `RETIRED` is terminal: no later status fact revives the node (ADR 0029) | projection `rm_nodes` |
 | `LaneOpened`, `LaneClosed`, `ServiceAreaAssigned`, `RegionDefined` (node-topology) | upsert lane, service area, region | projections |
-| `CatalogItemCreated`, `CatalogItemDiscontinued`, `ListingCreated`, `ListingAvailabilityChanged`, `ListingSuppressed`, `ListingRestored` (offer-availability) | upsert item and listing | projections |
+| `CatalogItemCreated`, `CatalogItemDiscontinued`, `ListingCreated`, `ListingAvailabilityChanged`, `ListingSuppressed`, `ListingRestored` (offer-availability) | upsert item and listing; `ListingSuppressed` / `ListingRestored` older than the stored `SuppressedAt` is dropped, an equal instant applies (ADR 0029) | projections |
 | `DepartureScheduled`, `DepartureCapacityChanged` (linehaul) | upsert the departure and its remaining packages; a capacity event older than the stored `CapacityAt` is dropped, an equal instant applies (ADR 0028) | projection `rm_departures` |
 | `LoadDeparted`, `LoadArrived` (linehaul) | `LoadDeparted` opens the load's pairing row and `LoadArrived` pairs it into one measured-transit observation; `LoadArrived` also records the arrival of the load's departure (needs a `departureId`) | projections `rm_load_transit_open`, `rm_transit_actuals` ([ADR 0014](/docs/adr/0014-measured-transit-basis)), `rm_departure_arrival` for the late-risk sweep ([ADR 0021](/docs/adr/0021-a-sweep-flags-promises-whose-locked-path-is-running-late)) |
 | `DepartureCancelled` (linehaul) | mark the departure unscheduled; flag promises whose witness uses it | `RepromiseOnRisk` |

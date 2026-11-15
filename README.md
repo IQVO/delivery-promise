@@ -295,7 +295,7 @@ on pre-commit and `make check` on pre-push.
 
 ## Architecture Decision Records
 
-Index: [`docs/adr/index.md`](docs/adr/index.md) — 27 ADRs (0001–0027): the
+Index: [`docs/adr/index.md`](docs/adr/index.md) — 29 ADRs (0001–0029): the
 bounded context (0001), the aggregates, invariants and numbered assumptions
 (0002), consumed contracts and local read models (0003), the CloudEvents
 catalogue (0004), the outbox relay (0005), the HTTP adapter, consumer,
@@ -311,7 +311,9 @@ judgement (0020), the late-path sweep (0021), node eligibility for fast-tier
 candidates (0022), the capacity band on offers (0023), the opt-in consolidated
 tier (0024), a tracking number belonging to several assignments (0025), the
 carrier-handoff service area promised without a delivery wave (0026), a pickup
-point as the quoted destination (0027).
+point as the quoted destination (0027), out-of-order capacity and scorecard
+facts never overwriting a newer one (0028), node status and listing
+suppression following "newer time wins" with a terminal retired node (0029).
 
 ## License
 
