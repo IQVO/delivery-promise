@@ -55,7 +55,12 @@ type Node struct {
 	RegionID string
 	Timezone string
 	State    string
-	Profile  *Profile
+	// StateAt is the CloudEvents time of the newest NodeActivated or
+	// NodeSuspended applied to State (zero until one carries a time); a
+	// RETIRED node takes no later fact (ADR 0029). Stored in the row's data
+	// jsonb: no migration.
+	StateAt time.Time
+	Profile *Profile
 	// ServingStationNodeID is set only on a PICKUP_POINT: its serving
 	// delivery station (ADR 0027). PostalPrefix is the point's own prefix.
 	ServingStationNodeID string
@@ -108,6 +113,10 @@ type Listing struct {
 	AvailableQty int
 	AsOf         time.Time
 	Suppressed   bool
+	// SuppressedAt is the CloudEvents time of the newest ListingSuppressed or
+	// ListingRestored applied to Suppressed (zero until one carries a time;
+	// ADR 0029). Stored in the row's data jsonb: no migration.
+	SuppressedAt time.Time
 }
 
 // Scorecard is a row of ScorecardView (the 30d window only).
