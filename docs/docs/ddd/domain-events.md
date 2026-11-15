@@ -71,14 +71,14 @@ Each consumed event updates a read model (never an aggregate directly) or runs a
 | `NodeRegistered`, `NodeOperationalProfileDeclared`, `NodeActivated`, `NodeSuspended`, `NodeRetired` (node-topology) | upsert the node and profile; a suspended or retired node leaves the candidate set | projection `rm_nodes` |
 | `LaneOpened`, `LaneClosed`, `ServiceAreaAssigned`, `RegionDefined` (node-topology) | upsert lane, service area, region | projections |
 | `CatalogItemCreated`, `CatalogItemDiscontinued`, `ListingCreated`, `ListingAvailabilityChanged`, `ListingSuppressed`, `ListingRestored` (offer-availability) | upsert item and listing | projections |
-| `DepartureScheduled`, `DepartureCapacityChanged` (linehaul) | upsert the departure and its remaining packages | projection `rm_departures` |
+| `DepartureScheduled`, `DepartureCapacityChanged` (linehaul) | upsert the departure and its remaining packages; a capacity event older than the stored `CapacityAt` is dropped, an equal instant applies (ADR 0028) | projection `rm_departures` |
 | `LoadDeparted`, `LoadArrived` (linehaul) | `LoadDeparted` opens the load's pairing row and `LoadArrived` pairs it into one measured-transit observation; `LoadArrived` also records the arrival of the load's departure (needs a `departureId`) | projections `rm_load_transit_open`, `rm_transit_actuals` ([ADR 0014](/docs/adr/0014-measured-transit-basis)), `rm_departure_arrival` for the late-risk sweep ([ADR 0021](/docs/adr/0021-a-sweep-flags-promises-whose-locked-path-is-running-late)) |
 | `DepartureCancelled` (linehaul) | mark the departure unscheduled; flag promises whose witness uses it | `RepromiseOnRisk` |
 | `BookingMoved`, `BookingFailed` (linehaul) | flag promises that rode the booking | `RepromiseOnRisk` |
-| `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged` (last-mile) | upsert the wave | projection `rm_waves` |
+| `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged` (last-mile) | upsert the wave; a capacity event older than the stored `CapacityAt` is dropped, an equal instant applies (ADR 0028) | projection `rm_waves` |
 | `DeliveryWaveCancelled` (last-mile) | mark cancelled; flag promises whose witness wave it is | `RepromiseOnRisk` |
 | `PackageInductionDeferred` (last-mile) | flag the promise | `RepromiseOnRisk` |
-| `NodeScorecardUpdated` (node-performance) | upsert the grade | projection `rm_scorecards` |
+| `NodeScorecardUpdated` (node-performance) | upsert the grade when `computedAt` is not older than the stored one (ADR 0028) | projection `rm_scorecards` |
 | `NodeTierEligibilityChanged` (node-performance) | upsert the (node, tier) fact when `changedAt` is not older than the stored one; unknown tier or missing field is ignored and counted | projection `rm_node_tier_eligibility` |
 | `FulfillmentLocked`, `FulfillmentShipped` (order-sourcing) | record the assignment, then the packages; may complete the facts for judging | `JudgeOnDelivery` |
 | `FulfillmentUnsourceable` (order-sourcing) | flag the promise at risk and re-promise excluding the listed nodes | `RepromiseOnRisk` |
