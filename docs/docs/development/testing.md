@@ -24,7 +24,7 @@ About 80 test files. The domain packages (`book`, `calendar`, `offer`, `policy`,
 
 ## Godog features
 
-Nine files, **124 scenario definitions** (`git grep -c -E "^[[:space:]]*Scenario" -- features`, which counts `Scenario` and `Scenario Outline`); the runner executes them as **143 scenarios** because the Examples rows of the Outlines expand (the `143 scenarios (143 passed)` line of `go test ./features -run TestFeatures -count=1 -v`).
+Ten files, **127 scenario definitions** (`git grep -c -E "^[[:space:]]*Scenario" -- 'features/*.feature'`, which counts `Scenario` and `Scenario Outline`); the runner executes them as **149 scenarios** because the Examples rows of the Outlines expand (the `149 scenarios (149 passed)` line of `go test ./features -run TestFeatures -count=1 -v`).
 
 | File | Definitions | Covers |
 | --- | --- | --- |
@@ -37,6 +37,7 @@ Nine files, **124 scenario definitions** (`git grep -c -E "^[[:space:]]*Scenario
 | `keeping.feature` | 9 | judging kept or broken, re-promising on risk |
 | `calibration.feature` | 5 | promise calibration (ADR 0020) |
 | `consolidated.feature` | 5 | the opt-in consolidated tier (ADR 0024) |
+| `stale_facts_rules.feature` | 3 | capacity and scorecard facts that arrive out of order never overwrite a newer one (ADR 0028) |
 
 The three `*_rules.feature` files pin rules the context's documentation states (ADR 0002, 0003, 0015, 0021, 0022, 0025). A scenario that describes a documented rule the code does not yet honour is tagged `@known-bug`: it is excluded by default (`BDD_TAGS` defaults to `~@known-bug`) and runs alone with `BDD_TAGS=@known-bug`, where it must fail. No scenario carries the tag today.
 
