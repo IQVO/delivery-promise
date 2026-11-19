@@ -129,29 +129,6 @@ func TestValidKeyAcceptsOneTo128PrintableASCIICharacters(t *testing.T) {
 	}
 }
 
-func TestSettleSavepointKeeps2xxAndDiscards4xx(t *testing.T) {
-	ctx := context.Background()
-	for name, c := range map[string]struct {
-		code      int
-		commits   int
-		rollbacks int
-	}{
-		"created":     {http.StatusCreated, 1, 0},
-		"ok":          {http.StatusOK, 1, 0},
-		"bad request": {http.StatusBadRequest, 0, 1},
-		"conflict":    {http.StatusConflict, 0, 1},
-		"invalid":     {http.StatusUnprocessableEntity, 0, 1},
-	} {
-		tx := &fakeTx{}
-		if err := settleSavepoint(ctx, tx, c.code); err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		if tx.commits != c.commits || tx.rollbacks != c.rollbacks {
-			t.Errorf("%s: %d commits %d rollbacks, want %d and %d", name, tx.commits, tx.rollbacks, c.commits, c.rollbacks)
-		}
-	}
-}
-
 func TestStoreOutcomeWritesTheAnswerIntoTheTransaction(t *testing.T) {
 	rec := &capture{header: http.Header{}}
 	rec.Header().Set("Location", "/promises/prm-1")

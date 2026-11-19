@@ -43,3 +43,7 @@ their own pull requests.
 - A very large order or node-day would still be read in full by the use case before slicing; push the keyset into the
   repository queries if those parents ever grow beyond a few dozen rows.
 - The quote poll writes an `idempotency_keys` row only when the caller sends a key.
+
+## Addendum 2026-11-18: which answers a key replays
+
+The Idempotency-Key bullet says the same key, method, path and body replays the stored answer byte for byte. That holds for a 2xx and for FINAL refusals. A RETRYABLE refusal and a 5xx are not stored: the key is released and a different body under it is a new request, not `409 idempotency-key-reused`. The Decision text above is unchanged; [ADR 0031](./0031-every-problem-type-has-a-replay-class.md) holds the rule and the class of every problem type.

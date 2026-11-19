@@ -98,3 +98,7 @@ The orchestrator closed the assumptions that were listed as open model gaps. Eac
 
 - Every assumption has a table-driven test in the package that enforces it.
 - `model_gaps`: none open. A1, A2, A12 (share formula), A17, A19, A20 and A21 are settled in "Settled assumptions" above; assumptions stay final unless the orchestrator overrules them.
+
+## Addendum 2026-11-18: idempotency replay classes (A23)
+
+A23 requires the `Idempotency-Key` on every state-changing POST; what a repeat under the same key answers now depends on the replay class of the first answer. The Decision text above is unchanged; [ADR 0031](./0031-every-problem-type-has-a-replay-class.md) holds the rule and the class of every problem type.
