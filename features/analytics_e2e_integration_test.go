@@ -154,6 +154,16 @@ type e2eReports struct {
 
 const e2eSpan = "?from=2026-11-03&to=2026-11-05"
 
+// coverage is the promiseCoverage block of the quote-conversion report (ADR 0030).
+func (r e2eReports) coverage() []map[string]any {
+	r.t.Helper()
+	var out struct {
+		Coverage []map[string]any `json:"promiseCoverage"`
+	}
+	e2eGetJSON(r.t, r.url+"/reports/quote-conversion"+e2eSpan, &out)
+	return out.Coverage
+}
+
 func (r e2eReports) days(path string) []map[string]any {
 	r.t.Helper()
 	var out struct {
@@ -275,6 +285,15 @@ func e2eAssertReports(t *testing.T, reports e2eReports) {
 	}
 	if got := reports.days("/reports/quote-conversion"); !reflect.DeepEqual(got, wantConversion) {
 		t.Errorf("quote-conversion = %v\nwant %v", got, wantConversion)
+	}
+	// The four offers went to destination prefix 787 (region 78) with a Chicago window ending the next
+	// local day: all four are within 1, 2, 3 and 5 days.
+	within := func(days float64) map[string]any { return map[string]any{"days": days, "count": 4.0, "share": 1.0} }
+	wantCoverage := []map[string]any{{"day": "2026-11-03", "regions": []any{map[string]any{
+		"region": "78", "requests": 4.0, "answeredWithPromise": 4.0,
+		"answeredWithinDays": []any{within(1), within(2), within(3), within(5)}}}}}
+	if got := reports.coverage(); !reflect.DeepEqual(got, wantCoverage) {
+		t.Errorf("promiseCoverage = %v\nwant %v", got, wantCoverage)
 	}
 }
 

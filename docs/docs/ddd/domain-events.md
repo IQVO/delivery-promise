@@ -47,7 +47,7 @@ Source: aggregates `internal/domain/{offer,promise,book,policy}`; consumers veri
 
 | Event | Aggregate | Meaning | Raised by | Recipients |
 | --- | --- | --- | --- | --- |
-| `DeliveryOfferQuoted` | DeliveryOffer | An offer was persisted with its window and witness, the optional `capacityBand` of its book at quote time (ADR 0023) and, for a `CONSOLIDATED` offer, `consolidationEligible` (ADR 0024). One per offer, so one quote can raise several. | `QuoteDeliveryOffers` | none (analytics: quote-to-order conversion per tier and node) |
+| `DeliveryOfferQuoted` | DeliveryOffer | An offer was persisted with its window and witness, the optional `capacityBand` of its book at quote time (ADR 0023) and, for a `CONSOLIDATED` offer, `consolidationEligible` (ADR 0024). One per offer, so one quote can raise several. | `QuoteDeliveryOffers` | none (analytics: quote-to-order conversion per tier and node; promise coverage per region from `destinationPostalPrefix`, `deliverByLatest` and `timeZone`, ADR 0030) |
 | `PromiseMade` | Promise | A provisional promise holds capacity; the offer is consumed. A `CONSOLIDATED` promise also carries `consolidationEligible` (ADR 0024). | `MakePromise` | none (analytics) |
 | `PromiseConfirmed` | Promise | The order was placed; the hold became confirmed. A repeated confirm raises nothing. | `ConfirmPromise` | none (analytics) |
 | `PromiseReleased` | Promise | A provisional promise's hold expired and was returned (`reason: HOLD_EXPIRED`). | `ReleaseExpiredHolds` | none (analytics: hold leakage) |

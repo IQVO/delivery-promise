@@ -28,8 +28,10 @@ type MemoryStore struct {
 }
 
 type memOffer struct {
-	tier string
-	at   time.Time
+	tier   string
+	at     time.Time
+	region string
+	days   *int // promised days (ADR 0030), nil without a latest delivery
 }
 
 type memMade struct {
@@ -82,7 +84,8 @@ func (m *MemoryStore) Apply(_ context.Context, e report.Event) (bool, error) {
 	at := e.At.UTC()
 	switch e.Kind {
 	case report.KindDeliveryOfferQuoted:
-		m.offers[e.OfferID] = memOffer{tier: e.Tier, at: at}
+		m.offers[e.OfferID] = memOffer{tier: e.Tier, at: at, region: e.Region,
+			days: report.PromisedDays(e.At, e.DeliverByLatest, e.TimeZone)}
 	case report.KindPromiseMade:
 		m.made[e.PromiseID] = memMade{tier: e.Tier, basis: e.Basis, at: at,
 			window: report.WindowOf(e.DeliverByEarliest, e.DeliverByLatest, e.TimeZone)}

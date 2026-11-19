@@ -22,6 +22,8 @@ type fakeReader struct {
 	reliability []report.ReliabilityDay
 	precision   []report.PrecisionDay
 	conversion  []report.ConversionDay
+	coverage    []report.CoverageBucket
+	coverageErr error
 	last        *time.Time
 	err         error
 	asked       report.Range
@@ -40,6 +42,11 @@ func (f *fakeReader) PromisePrecision(_ context.Context, r report.Range) ([]repo
 func (f *fakeReader) QuoteConversion(_ context.Context, r report.Range) ([]report.ConversionDay, error) {
 	f.asked = r
 	return f.conversion, f.err
+}
+
+func (f *fakeReader) PromiseCoverage(_ context.Context, r report.Range) ([]report.CoverageBucket, error) {
+	f.asked = r
+	return f.coverage, f.coverageErr
 }
 
 func (f *fakeReader) LastEventAt(context.Context) (*time.Time, error) { return f.last, f.err }
@@ -127,7 +134,7 @@ func TestQuoteConversionReport(t *testing.T) {
 	want := map[string]any{"from": "2026-10-05", "to": "2026-11-03", "days": []any{
 		map[string]any{"day": "2026-11-03", "tier": "NEXT_DAY", "offersQuoted": 4.0, "promisesMade": 1.0, "conversion": 0.25},
 		map[string]any{"day": "2026-11-03", "tier": "SAME_DAY", "offersQuoted": 0.0, "promisesMade": 2.0, "conversion": nil},
-	}}
+	}, "promiseCoverage": []any{}}
 	if !reflect.DeepEqual(body, want) {
 		t.Fatalf("body = %v\nwant %v", body, want)
 	}

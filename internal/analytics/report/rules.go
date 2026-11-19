@@ -67,17 +67,26 @@ func dayOf(t time.Time, loc *time.Location) string { return t.In(loc).Format(day
 // database cannot load, reads the window in UTC and is not ZoneKnown. "Local"
 // is never a delivery station's zone (it would be the projector host's).
 func WindowOf(earliest, latest time.Time, zone string) Window {
-	loc, known := time.UTC, false
-	if zone != "" && zone != "Local" {
-		if l, err := time.LoadLocation(zone); err == nil {
-			loc, known = l, true
-		}
-	}
+	loc, known := locationOf(zone)
 	return Window{
 		Minutes:   latest.Sub(earliest).Minutes(),
 		ExactDay:  dayOf(earliest, loc) == dayOf(latest, loc),
 		ZoneKnown: known,
 	}
+}
+
+// locationOf loads the IANA zone of a delivery station. An absent zone, or one
+// the zone database cannot load, is UTC and not known. "Local" is never a
+// delivery station's zone (it would be the projector host's).
+func locationOf(zone string) (loc *time.Location, known bool) {
+	if zone == "" || zone == "Local" {
+		return time.UTC, false
+	}
+	l, err := time.LoadLocation(zone)
+	if err != nil {
+		return time.UTC, false
+	}
+	return l, true
 }
 
 // ErrInvalidEvent marks a fact that can never be projected: a required field is

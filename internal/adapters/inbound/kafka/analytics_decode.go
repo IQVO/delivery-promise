@@ -56,6 +56,7 @@ type analyticsData struct {
 	DeliverByEarliest time.Time `json:"deliverByEarliest"`
 	DeliverByLatest   time.Time `json:"deliverByLatest"`
 	TimeZone          string    `json:"timeZone"`
+	DestinationPrefix string    `json:"destinationPostalPrefix"`
 	RevisionNo        int       `json:"revisionNo"`
 	Cause             string    `json:"cause"`
 	LateByMinutes     int       `json:"lateByMinutes"`
@@ -77,7 +78,7 @@ func toEvent(kind report.Kind, evt ce.Event) (report.Event, error) {
 	}
 	e := report.Event{
 		Kind: kind, EventID: evt.ID(), At: evt.Time().UTC(), PromiseID: d.PromiseID, OfferID: d.OfferID, Tier: d.Tier,
-		Basis: d.Basis, DeliverByEarliest: d.DeliverByEarliest.UTC(), DeliverByLatest: d.DeliverByLatest.UTC(), TimeZone: d.TimeZone,
+		Basis: d.Basis, Region: report.RegionOf(d.DestinationPrefix), DeliverByEarliest: d.DeliverByEarliest.UTC(), DeliverByLatest: d.DeliverByLatest.UTC(), TimeZone: d.TimeZone,
 		RevisionNo: d.RevisionNo, Cause: d.Cause, LateByMinutes: d.LateByMinutes,
 	}
 	if err := e.Validate(); err != nil {

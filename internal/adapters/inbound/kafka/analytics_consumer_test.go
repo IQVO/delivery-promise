@@ -90,6 +90,7 @@ var projectedCases = []projectedCase{
 		func(e report.Event) report.Event {
 			// The union decode also carries the quote's window and basis (unused).
 			e.Kind, e.PromiseID, e.OfferID, e.Basis = report.KindDeliveryOfferQuoted, "", "off-1", "SCHEDULED"
+			e.Region = "78" // the first two characters of the destination prefix 787 (ADR 0030)
 			e.DeliverByEarliest, e.DeliverByLatest = earliest, latest
 			return e
 		}},
