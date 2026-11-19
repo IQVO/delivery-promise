@@ -57,7 +57,7 @@ type panickyFacts struct{}
 func (panickyFacts) RecordQuote(string, int, views.QuoteResult) { panic("boom") }
 func (panickyFacts) RecordEstimate(int, views.EstimateResult)   { panic("boom") }
 
-func post(h http.Handler, path, body string) *httptest.ResponseRecorder {
+func postJSON(h http.Handler, path, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
 	req.Header.Set("Idempotency-Key", "k-1")
 	rec := httptest.NewRecorder()
@@ -95,10 +95,10 @@ func TestNoFactForARefusalOrAFailure(t *testing.T) {
 	for _, err := range []error{shared.Invalid("bad"), errors.New("db down")} {
 		spy := &spyFacts{}
 		h := NewRouter(&Server{API: &fakeAPI{err: err}, Facts: spy}, nil, "")
-		if rec := post(h, "/delivery-quotes", quoteBody); rec.Code < 400 {
+		if rec := postJSON(h, "/delivery-quotes", quoteBody); rec.Code < 400 {
 			t.Fatalf("status %d", rec.Code)
 		}
-		if rec := post(h, "/delivery-estimates", estimateBody); rec.Code < 400 {
+		if rec := postJSON(h, "/delivery-estimates", estimateBody); rec.Code < 400 {
 			t.Fatalf("status %d", rec.Code)
 		}
 		if len(spy.quotes)+len(spy.estimates) != 0 {
@@ -107,7 +107,7 @@ func TestNoFactForARefusalOrAFailure(t *testing.T) {
 	}
 	spy := &spyFacts{}
 	h := NewRouter(&Server{API: &fakeAPI{}, Facts: spy}, nil, "")
-	if rec := post(h, "/delivery-quotes", `{"nope":`); rec.Code != http.StatusBadRequest {
+	if rec := postJSON(h, "/delivery-quotes", `{"nope":`); rec.Code != http.StatusBadRequest {
 		t.Fatalf("malformed body: %d", rec.Code)
 	}
 	if len(spy.quotes) != 0 {
@@ -135,7 +135,7 @@ func TestNoFactWhenTheIdempotencyLayerDoesNotAnswer200(t *testing.T) {
 	for name, mw := range answers {
 		spy := &spyFacts{}
 		h := NewRouter(&Server{API: &fakeAPI{}, Facts: spy, Idempotency: mw}, nil, "")
-		post(h, "/delivery-quotes", quoteBody)
+		postJSON(h, "/delivery-quotes", quoteBody)
 		if len(spy.quotes) != 0 {
 			t.Errorf("%s: left a fact", name)
 		}
@@ -145,8 +145,8 @@ func TestNoFactWhenTheIdempotencyLayerDoesNotAnswer200(t *testing.T) {
 func TestAPanickingRecorderLeavesTheResponseUntouched(t *testing.T) {
 	api := &fakeAPI{estimated: sampleEstimate()}
 	for _, route := range []struct{ path, body string }{{"/delivery-quotes", quoteBody}, {"/delivery-estimates", estimateBody}} {
-		want := post(NewRouter(&Server{API: api}, nil, ""), route.path, route.body)
-		got := post(NewRouter(&Server{API: api, Facts: panickyFacts{}}, nil, ""), route.path, route.body)
+		want := postJSON(NewRouter(&Server{API: api}, nil, ""), route.path, route.body)
+		got := postJSON(NewRouter(&Server{API: api, Facts: panickyFacts{}}, nil, ""), route.path, route.body)
 		if got.Code != http.StatusOK || got.Code != want.Code || got.Body.String() != want.Body.String() || !sameHeaders(got.Header(), want.Header()) {
 			t.Fatalf("%s: a panic in the hand-over changed the response: %d\n%s", route.path, got.Code, got.Body)
 		}
@@ -171,7 +171,7 @@ func TestTheResponseIsByteIdenticalWithTheFactEnabledOrDisabled(t *testing.T) {
 		{"refused quote", "/delivery-quotes", `{"destinationPostalPrefix":`},
 	}
 	for _, rt := range routes {
-		off := post(NewRouter(&Server{API: api()}, nil, ""), rt.path, rt.body)
+		off := postJSON(NewRouter(&Server{API: api()}, nil, ""), rt.path, rt.body)
 		for name, w := range writers {
 			q := requestfacts.NewQueue(w, nil, nil, requestfacts.Config{Capacity: 1, FlushInterval: time.Millisecond})
 			ctx, stop := context.WithCancel(context.Background())
@@ -179,7 +179,7 @@ func TestTheResponseIsByteIdenticalWithTheFactEnabledOrDisabled(t *testing.T) {
 			rec := requestfacts.NewRecorder(q, nil, func() time.Time { return time.Date(2026, 10, 22, 19, 5, 0, 0, time.UTC) })
 			h := NewRouter(&Server{API: api(), Facts: rec}, nil, "")
 			for i := 0; i < 5; i++ { // more requests than the queue holds: the full queue changes nothing either
-				on := post(h, rt.path, rt.body)
+				on := postJSON(h, rt.path, rt.body)
 				if on.Code != off.Code || on.Body.String() != off.Body.String() || !sameHeaders(on.Header(), off.Header()) {
 					t.Fatalf("%s/%s request %d: status %d vs %d\nbody on:  %s\nbody off: %s", rt.name, name, i, on.Code, off.Code, on.Body, off.Body)
 				}
@@ -200,7 +200,7 @@ func TestARequestIsNotSlowedByABlockedFactWriter(t *testing.T) {
 	h := NewRouter(&Server{API: &fakeAPI{estimated: sampleEstimate()}, Facts: requestfacts.NewRecorder(q, nil, time.Now)}, nil, "")
 	start := time.Now()
 	for i := 0; i < 200; i++ {
-		if rec := post(h, "/delivery-estimates", estimateBody); rec.Code != http.StatusOK {
+		if rec := postJSON(h, "/delivery-estimates", estimateBody); rec.Code != http.StatusOK {
 			t.Fatalf("status %d", rec.Code)
 		}
 	}
