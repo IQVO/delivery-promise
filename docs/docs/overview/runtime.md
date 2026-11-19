@@ -139,9 +139,15 @@ PROVISIONAL, KEPT, BROKEN or RELEASED promise (ADR 0002 A30).
 `Idempotency-Key` is required on every state-changing POST except the quote, where it is
 optional (the middleware only runs when the caller sends a key). The key is scoped to
 (route, key) and stored with a hash of the request; a repeat with the same body replays the
-stored status and body (`Idempotency-Replayed` header), with another body it is `422
-idempotency-key-reused`. The handler runs under a savepoint inside the key's transaction: a
-2xx commits the aggregates, their outbox rows and the key together; a 4xx rolls the writes
-back but stores and replays the problem; a 5xx or a panic rolls everything back and stores
-nothing, so the same key can retry. Keys older than 24 hours are purged on the next keyed
-write.
+stored status and body (`Idempotency-Replayed` header), with another body it is `409
+idempotency-key-reused`. The handler runs under a savepoint inside the key's transaction, and
+what happens to the answer is the replay class of its problem type, declared on the catalogue
+entry in `internal/adapters/inbound/http/errors.go` (ADR 0031): a 2xx commits the aggregates,
+their outbox rows and the key together; a FINAL refusal (the request itself is wrong, or the
+state it hit is terminal) rolls the writes back but stores and replays the problem; a RETRYABLE
+refusal (`not-found`, `promise-capacity-exhausted`, `book-closed`, `offer-not-quotable`,
+`illegal-transition`, `concurrent-update`, `group-spans-nodes`), a 5xx and a panic roll
+everything back, the key row included, and store nothing, so the same key runs the request
+again and a different body under it is a new request. A concurrent duplicate waits on the key
+row; when the first ends RETRYABLE it runs the handler itself. Keys older than 24 hours are
+purged on the next keyed write.

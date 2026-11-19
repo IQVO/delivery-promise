@@ -103,6 +103,6 @@ Short form; the symptom-first catalogue is [Troubleshooting](/docs/operations/tr
 - **Probe from inside the cluster:** `kubectl -n warehouse-systems port-forward svc/delivery-promise 8080:80`, then `curl localhost:8080/healthz` and `/readyz`.
 - **Outbox depth and parked rows:** the SQL above, against the Postgres behind PgBouncer.
 - **Dead letters:** consume `<topic>.dlq` and read the `x-dlq-*` headers; fix the producer, nothing to replay inside this service.
-- **Publish a new promise policy:** `POST /promise-policies` with an `Idempotency-Key` (version is strictly increasing; a concurrent publish answers 409 `concurrent-update`). Offers and promises made afterwards record the new `policyVersion`.
+- **Publish a new promise policy:** `POST /promise-policies` with an `Idempotency-Key` (version is strictly increasing; a concurrent publish answers 409 `concurrent-update`, which is not stored: retry with the same key). Offers and promises made afterwards record the new `policyVersion`.
 - **Scale:** `replicaCount` or `autoscaling.api` in the chart. More than one replica is safe for the relay (`SKIP LOCKED`), the version-guarded writes and the consumer (stable group plus inbox dedupe); replays are no-ops (stable CloudEvents ids). It has not been load-tested.
 - **Refresh the read models from scratch:** point the consumer at a new group id (re-reads each topic from the start); the inbox makes it safe to replay events already applied.
