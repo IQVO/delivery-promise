@@ -32,6 +32,7 @@ import (
 	"github.com/claudioed/delivery-promise/internal/adapters/outbound/postgres"
 	"github.com/claudioed/delivery-promise/internal/domain/offer"
 	"github.com/claudioed/delivery-promise/internal/domain/promise"
+	"github.com/claudioed/delivery-promise/internal/domain/requestfact"
 	"github.com/claudioed/delivery-promise/internal/domain/shared"
 	"github.com/claudioed/delivery-promise/internal/testing/kafkatest"
 	"github.com/claudioed/delivery-promise/internal/testing/pgtest"
@@ -112,6 +113,14 @@ func e2eQuoted(id string, at time.Time, tier shared.Tier) offer.DeliveryOfferQuo
 		Basis:  shared.BasisScheduled, PolicyVersion: "v1", ExpiresAt: at.Add(10 * time.Minute)}
 }
 
+// e2eAnswered is a DeliveryRequestAnswered (ADR 0031) for region 78: nil days is a request answered with no promise.
+func e2eAnswered(id string, at time.Time, kind requestfact.Kind, days *int) requestfact.DeliveryRequestAnswered {
+	return requestfact.DeliveryRequestAnswered{Header: e2eHeader(at), RequestID: id, Region: "78", Kind: kind, Items: 2,
+		Answered: days != nil, ShortestPromisedDays: days}
+}
+
+func e2eDays(n int) *int { return &n }
+
 func e2eBroken(id string, at time.Time, cause promise.Cause, lateBy int) promise.PromiseBroken {
 	return promise.PromiseBroken{Header: e2eHeader(at), PromiseID: promise.ID(id), OrderID: "ord-" + id, NodeID: "N-1",
 		DeliverByLatest: at.Add(-time.Hour), LateByMinutes: lateBy, Cause: cause}
@@ -129,6 +138,11 @@ func e2eEvents() []shared.Event {
 		e2eQuoted("off-B", e2eAt(3, 8), shared.TierNextDay),
 		e2eQuoted("off-C", e2eAt(3, 8), shared.TierSameDay),
 		e2eQuoted("off-D", e2eAt(3, 8), shared.TierStandard),
+		// Four requests answered the same day for the same region: two with a promise (shortest 1 and 3 days), two without.
+		e2eAnswered("req-1", e2eAt(3, 8), requestfact.KindQuote, e2eDays(1)),
+		e2eAnswered("req-2", e2eAt(3, 8), requestfact.KindEstimate, e2eDays(3)),
+		e2eAnswered("req-3", e2eAt(3, 8), requestfact.KindQuote, nil),
+		e2eAnswered("req-4", e2eAt(3, 8), requestfact.KindEstimate, nil),
 		e2eMade("A", e2eAt(3, 9), shared.TierNextDay, shared.BasisScheduled, chicagoDay),
 		promise.PromiseConfirmed{Header: e2eHeader(e2eAt(3, 9)), PromiseID: "A", OrderID: "ord-A", GroupNo: 1},
 		e2eMade("B", e2eAt(3, 10), shared.TierNextDay, shared.BasisMeasured, noZone),
@@ -153,6 +167,19 @@ type e2eReports struct {
 }
 
 const e2eSpan = "?from=2026-11-03&to=2026-11-05"
+
+// requestsAnswered is the request-based count of the first day's region row (ADR 0031), 0 until projected.
+func (r e2eReports) requestsAnswered(region string) float64 {
+	for _, day := range r.coverage() {
+		for _, reg := range day["regions"].([]any) {
+			if m := reg.(map[string]any); m["region"] == region {
+				n, _ := m["requestsAnswered"].(float64)
+				return n
+			}
+		}
+	}
+	return 0
+}
 
 // coverage is the promiseCoverage block of the quote-conversion report (ADR 0030).
 func (r e2eReports) coverage() []map[string]any {
@@ -239,7 +266,8 @@ func TestAnalyticsReadSide_EndToEnd(t *testing.T) {
 		}
 		e2eGetJSON(t, srv.URL+"/reports/freshness", &f)
 		return f.AsOf != nil && f.AsOf.Equal(e2eAt(5, 18)) && len(reports.days("/reports/promise-reliability")) == 4 &&
-			len(reports.days("/reports/promise-precision")) == 2 && len(reports.days("/reports/quote-conversion")) == 3
+			len(reports.days("/reports/promise-precision")) == 2 && len(reports.days("/reports/quote-conversion")) == 3 &&
+			reports.requestsAnswered("78") == 4
 	})
 
 	e2eAssertReports(t, reports)
@@ -289,9 +317,15 @@ func e2eAssertReports(t *testing.T, reports e2eReports) {
 	// The four offers went to destination prefix 787 (region 78) with a Chicago window ending the next
 	// local day: all four are within 1, 2, 3 and 5 days.
 	within := func(days float64) map[string]any { return map[string]any{"days": days, "count": 4.0, "share": 1.0} }
+	// The four request facts (ADR 0031) of the same region: 2 answered with a promise, shortest 1 and 3 days.
+	reqWithin := func(days, count float64) map[string]any {
+		return map[string]any{"days": days, "count": count, "share": count / 4}
+	}
 	wantCoverage := []map[string]any{{"day": "2026-11-03", "regions": []any{map[string]any{
 		"region": "78", "requests": 4.0, "answeredWithPromise": 4.0,
-		"answeredWithinDays": []any{within(1), within(2), within(3), within(5)}}}}}
+		"answeredWithinDays": []any{within(1), within(2), within(3), within(5)},
+		"requestsAnswered":   4.0, "requestsWithPromise": 2.0, "requestShare": 0.5,
+		"requestsWithinDays": []any{reqWithin(1, 1), reqWithin(2, 1), reqWithin(3, 2), reqWithin(5, 2)}}}}}
 	if got := reports.coverage(); !reflect.DeepEqual(got, wantCoverage) {
 		t.Errorf("promiseCoverage = %v\nwant %v", got, wantCoverage)
 	}
