@@ -16,7 +16,7 @@ const (
 	entityDeliveryOffer = "deliveryoffer"
 	entityPromiseBook   = "promisebook"
 	entityPromisePolicy = "promisepolicy"
-	// entityDeliveryRequest is the entity of the request-level fact (ADR 0031).
+	// entityDeliveryRequest is the entity of the request-level fact (ADR 0032).
 	entityDeliveryRequest = "deliveryrequest"
 )
 
@@ -64,7 +64,7 @@ type analyticsData struct {
 	Cause             string    `json:"cause"`
 	LateByMinutes     int       `json:"lateByMinutes"`
 
-	// DeliveryRequestAnswered (ADR 0031).
+	// DeliveryRequestAnswered (ADR 0032).
 	RequestID            string `json:"requestId"`
 	DestinationRegion    string `json:"destinationRegion"`
 	RequestKind          string `json:"kind"`

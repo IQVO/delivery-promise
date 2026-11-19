@@ -8,7 +8,7 @@ import (
 	"github.com/claudioed/delivery-promise/internal/analytics/report"
 )
 
-// requestCoverageSQL: the request facts answered in the range (ADR 0031), per
+// requestCoverageSQL: the request facts answered in the range (ADR 0032), per
 // UTC day, region, answered flag and shortest promised days (NULL: none). The
 // top regions, the cumulative counts and the shares come from
 // internal/analytics/report.

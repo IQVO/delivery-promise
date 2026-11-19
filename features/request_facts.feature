@@ -1,4 +1,4 @@
-Feature: Request-level promise coverage facts (ADR 0031)
+Feature: Request-level promise coverage facts (ADR 0032)
   One analytics-only DeliveryRequestAnswered per quote or estimate answered
   with 200, with or without a promise, handed over AFTER the response to a
   bounded in-memory queue and written by a single worker as one outbox row in

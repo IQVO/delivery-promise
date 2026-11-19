@@ -1,4 +1,4 @@
-# ADR 0031: Request-level promise coverage from a best-effort fact
+# ADR 0032: Request-level promise coverage from a best-effort fact
 
 ## Status
 

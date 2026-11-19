@@ -1,5 +1,5 @@
 // Package requestfact holds the pure rules of the request-level promise
-// coverage fact (ADR 0031): what one answered delivery request (a quote or an
+// coverage fact (ADR 0032): what one answered delivery request (a quote or an
 // estimate) reduces to, and the analytics-only event that carries it. It is a
 // best-effort fact, not an aggregate: nothing here is stored by the request
 // path, and its loss never changes a response.

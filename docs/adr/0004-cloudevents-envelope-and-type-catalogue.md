@@ -16,7 +16,7 @@ Every Kafka message in the retail network is a CloudEvents 1.0 event in structur
 - Kafka value = the JSON event format; header `content-type: application/cloudevents+json; charset=UTF-8`; Kafka key = the subject, so all events of one aggregate stay ordered on one partition.
 - `data` is camelCase; optional fields are omitted when unset (never null); arrays are always present; timestamps are RFC 3339 UTC.
 - Built and decoded only through `internal/adapters/kafka/cloudevents`.
-- `<entity>` is the raising aggregate, lowercase, no separators: `promise`, `promisebook`, `deliveryoffer`, `promisepolicy`; the one non-aggregate fact, `DeliveryRequestAnswered` (ADR 0031), uses `deliveryrequest` and its subject is a fresh `requestId`. Tier is `commerce`.
+- `<entity>` is the raising aggregate, lowercase, no separators: `promise`, `promisebook`, `deliveryoffer`, `promisepolicy`; the one non-aggregate fact, `DeliveryRequestAnswered` (ADR 0032), uses `deliveryrequest` and its subject is a fresh `requestId`. Tier is `commerce`.
 
 ### Published types
 
@@ -52,7 +52,7 @@ type: com.retailnetwork.commerce.delivery-promise.deliveryrequest.DeliveryReques
 | `PromiseBookExhausted` | events | `bookId` | a hold made `provisional + confirmed = share` | order-sourcing |
 | `DeliveryOfferQuoted` | analytics | `offerId` | QuoteDeliveryOffers persisted an offer (one event per offer) | analytics only |
 | `PromisePolicyPublished` | analytics | `policyVersion` | PublishPromisePolicy is saved (G19) | analytics only |
-| `DeliveryRequestAnswered` | analytics | `requestId` | a quote or an estimate was answered with 200, best effort and only while `DELIVERY_REQUEST_FACTS_ENABLED` is true (ADR 0031) | analytics only |
+| `DeliveryRequestAnswered` | analytics | `requestId` | a quote or an estimate was answered with 200, best effort and only while `DELIVERY_REQUEST_FACTS_ENABLED` is true (ADR 0032) | analytics only |
 
 Payload rules:
 

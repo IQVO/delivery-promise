@@ -169,7 +169,7 @@ func quotedData(ev offer.DeliveryOfferQuoted) map[string]any {
 	return withConsolidation(withConfidence(withZone(d, ev.Window), ev.Confidence), ev.ConsolidationEligible)
 }
 
-// answeredData is the analytics payload of DeliveryRequestAnswered (ADR 0031):
+// answeredData is the analytics payload of DeliveryRequestAnswered (ADR 0032):
 // the two-character region, never the prefix; shortestPromisedDays is omitted
 // when no promise was answered, never written as null or zero.
 func answeredData(ev requestfact.DeliveryRequestAnswered) map[string]any {

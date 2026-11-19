@@ -31,7 +31,7 @@ const (
 	KindPromiseBroken       Kind = "PromiseBroken"
 
 	// KindDeliveryRequestAnswered is the best-effort request-level fact of
-	// ADR 0031: one per quote or estimate answered, with or without a promise.
+	// ADR 0032: one per quote or estimate answered, with or without a promise.
 	KindDeliveryRequestAnswered Kind = "DeliveryRequestAnswered"
 )
 
@@ -71,7 +71,7 @@ type Event struct {
 	DeliverByLatest   time.Time
 	TimeZone          string
 
-	// DeliveryRequestAnswered (ADR 0031): Region (above) is its
+	// DeliveryRequestAnswered (ADR 0032): Region (above) is its
 	// destinationRegion, at most two characters; RequestKind is QUOTE or
 	// ESTIMATE; ShortestDays is the shortest promised days across the answered
 	// options, nil when no promise was answered.
@@ -113,7 +113,7 @@ type Reader interface {
 	// days (ADR 0030); the rules (top regions, cumulative counts, shares) are
 	// PromiseCoverage in this package.
 	PromiseCoverage(ctx context.Context, r Range) ([]CoverageBucket, error)
-	// RequestCoverage is the request facts (ADR 0031) per UTC day, region,
+	// RequestCoverage is the request facts (ADR 0032) per UTC day, region,
 	// answered flag and shortest promised days, for the range of their answer
 	// instant. Best effort: only the facts that reached the projection.
 	RequestCoverage(ctx context.Context, r Range) ([]RequestBucket, error)

@@ -242,7 +242,7 @@ func (c *coverageWorld) dayRowsList(tier, day string, offers, promises int) erro
 }
 
 // answer applies count DeliveryRequestAnswered at 10:00Z of day for a
-// destination prefix (ADR 0031); days < 0 is a request answered with no promise.
+// destination prefix (ADR 0032); days < 0 is a request answered with no promise.
 func (c *coverageWorld) answer(day, prefix, kind string, days, count int) error {
 	d, err := time.Parse("2006-01-02", day)
 	if err != nil {

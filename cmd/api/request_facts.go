@@ -16,7 +16,7 @@ import (
 	"github.com/claudioed/delivery-promise/internal/application/requestfacts"
 )
 
-// The request-level coverage fact (ADR 0031): OFF unless
+// The request-level coverage fact (ADR 0032): OFF unless
 // DELIVERY_REQUEST_FACTS_ENABLED is true, best effort, and sized by two optional
 // variables.
 const (

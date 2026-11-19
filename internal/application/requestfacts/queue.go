@@ -18,7 +18,7 @@ type Writer interface {
 }
 
 // Queue is the bounded in-memory hand-over between the request path and the
-// single background worker (ADR 0031). Offer never blocks and never fails the
+// single background worker (ADR 0032). Offer never blocks and never fails the
 // caller: a full queue drops the newest fact. Run drains the queue every flush
 // interval and writes each fact on its own; a failed write drops the fact
 // (best effort by design, there is no retry). Every loss is counted and

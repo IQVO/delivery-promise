@@ -1,4 +1,4 @@
--- Request-level promise coverage (ADR 0031). Additive: one new table, nothing
+-- Request-level promise coverage (ADR 0032). Additive: one new table, nothing
 -- dropped or rewritten, 0001 and 0002 untouched.
 --
 -- One row per analytics.DeliveryRequestAnswered: a quote or an estimate the

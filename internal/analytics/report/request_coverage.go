@@ -2,7 +2,7 @@ package report
 
 import "time"
 
-// RequestBucket is what the store counts of the request facts (ADR 0031) for
+// RequestBucket is what the store counts of the request facts (ADR 0032) for
 // one UTC day, one region (never empty), whether a promise was answered and the
 // shortest promised days (nil: none): the requests answered.
 type RequestBucket struct {

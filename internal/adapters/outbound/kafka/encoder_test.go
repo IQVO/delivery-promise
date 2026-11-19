@@ -81,7 +81,7 @@ func goldenCases() map[string]shared.Event {
 			Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute), CapacityBand: shared.BandTight},
 		"DeliveryOfferQuoted_consolidated": offer.DeliveryOfferQuoted{Header: hdr, OfferID: "off-5", Tier: shared.TierConsolidated, DestinationPrefix: "787", NodeID: "N-AUS3",
 			Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute), ConsolidationEligible: new(bool)},
-		// ADR 0031: one analytics-only fact per answered request, with and without a promise
+		// ADR 0032: one analytics-only fact per answered request, with and without a promise
 		"DeliveryRequestAnswered": requestfact.DeliveryRequestAnswered{Header: hdr, RequestID: "req-1", Region: "78", Kind: requestfact.KindEstimate,
 			Items: 12, Answered: true, ShortestPromisedDays: new(2)},
 		"DeliveryRequestAnswered_unanswered": requestfact.DeliveryRequestAnswered{Header: hdr, RequestID: "req-2", Region: "7", Kind: requestfact.KindQuote, Items: 1},

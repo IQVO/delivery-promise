@@ -10,7 +10,7 @@ import (
 )
 
 // FactRecorder takes the best-effort request fact of an answered quote or
-// estimate (ADR 0031). Both methods return at once and never fail: the request
+// estimate (ADR 0032). Both methods return at once and never fail: the request
 // path never waits on, fails on or is slowed by the fact. *requestfacts.Recorder
 // is the production implementation; a nil Server.Facts disables the feature.
 type FactRecorder interface {

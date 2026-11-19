@@ -62,7 +62,7 @@ grep -q 'OUTBOX_MAX_ATTEMPTS: "20"' <<<"$configmap" || fail "OUTBOX_MAX_ATTEMPTS
 unlimited="$(render "${base[@]}" --set config.outboxMaxAttempts=0 --show-only templates/configmap.yaml)"
 grep -q 'OUTBOX_MAX_ATTEMPTS: "0"' <<<"$unlimited" || fail "config.outboxMaxAttempts=0 is not rendered"
 
-# --- request-level coverage facts (ADR 0031): OFF by default, never a required value ---
+# --- request-level coverage facts (ADR 0032): OFF by default, never a required value ---
 # Default: "false" in the ConfigMap and the Deployment; the two optional sizes are not rendered.
 grep -q 'DELIVERY_REQUEST_FACTS_ENABLED: "false"' <<<"$configmap" || fail "DELIVERY_REQUEST_FACTS_ENABLED must default to false in the ConfigMap"
 [[ "$(env_value "$deployment" DELIVERY_REQUEST_FACTS_ENABLED)" == false ]] || fail "the api Deployment must render DELIVERY_REQUEST_FACTS_ENABLED=false by default"

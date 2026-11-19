@@ -2,7 +2,7 @@ package report
 
 import "slices"
 
-// The request-level coverage fact of ADR 0031: the vocabulary and the checks of
+// The request-level coverage fact of ADR 0032: the vocabulary and the checks of
 // DeliveryRequestAnswered, hand-mirrored from apis/asyncapi.yaml.
 
 // Request kinds of DeliveryRequestAnswered.

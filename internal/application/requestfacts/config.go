@@ -1,5 +1,5 @@
 // Package requestfacts is the best-effort path of the request-level promise
-// coverage fact (ADR 0031): the request handler hands a small value to a
+// coverage fact (ADR 0032): the request handler hands a small value to a
 // bounded in-memory Queue after the response is written, and a single
 // background worker stores one analytics-only outbox row per fact in its own
 // short transaction. The request path never waits on, fails on or is slowed by

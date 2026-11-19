@@ -48,7 +48,7 @@ type Server struct {
 	// (nil = no middleware, a unit-test fixture; cmd/api always sets it).
 	Idempotency func(http.Handler) http.Handler
 	// Facts takes the best-effort request fact of every answered quote and
-	// estimate after its response was written (ADR 0031). Nil = off, the
+	// estimate after its response was written (ADR 0032). Nil = off, the
 	// default: the routes are then exactly the ones without the feature.
 	Facts FactRecorder
 }

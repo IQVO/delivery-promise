@@ -3,7 +3,7 @@ package ports
 import "context"
 
 // RequestFactMetrics counts what became of the best-effort request facts
-// (ADR 0031). The implementation lives in internal/adapters/outbound/telemetry;
+// (ADR 0032). The implementation lives in internal/adapters/outbound/telemetry;
 // a nil one records nothing.
 type RequestFactMetrics interface {
 	// FactWritten counts a fact the worker stored as an analytics outbox row.

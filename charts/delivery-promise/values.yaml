@@ -119,7 +119,7 @@ config:
   # (Go duration, "0" disables). Empty = not rendered; the binary defaults to 5s.
   # The grace period below must exceed it plus 40s.
   shutdownDrainDelay: ""
-  # DELIVERY_REQUEST_FACTS_ENABLED (ADR 0031): record one best-effort
+  # DELIVERY_REQUEST_FACTS_ENABLED (ADR 0032): record one best-effort
   # DeliveryRequestAnswered fact per quote or estimate answered with 200, for the
   # request-level fields of promiseCoverage in the quote-conversion report. OFF
   # by default: nothing changes on deploy until it is switched on. The facts are

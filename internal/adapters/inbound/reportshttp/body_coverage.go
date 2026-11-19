@@ -7,7 +7,7 @@ import (
 )
 
 // The promiseCoverage block of GET /reports/quote-conversion: the offers-based
-// fields of ADR 0030 and the request-based fields of ADR 0031.
+// fields of ADR 0030 and the request-based fields of ADR 0032.
 
 // promiseCoverage reads the offers and the request facts of the range and
 // derives the block.
@@ -31,7 +31,7 @@ type withinBody struct {
 
 // regionCoverageBody: requests, answeredWithPromise and answeredWithinDays are
 // OFFERS-based (ADR 0030); requestsAnswered, requestsWithPromise,
-// requestsWithinDays and requestShare are REQUEST-based (ADR 0031), best effort
+// requestsWithinDays and requestShare are REQUEST-based (ADR 0032), best effort
 // and present from the day the request fact was switched on.
 type regionCoverageBody struct {
 	Region              string       `json:"region"`

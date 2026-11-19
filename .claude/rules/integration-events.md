@@ -69,7 +69,7 @@ structured content mode. This is a hard rule, not a preference:
 | `com.retailnetwork.commerce.delivery-promise.promise.PromiseCancelled` | `retailnetwork.delivery-promise.analytics` | promiseId |
 | `com.retailnetwork.commerce.delivery-promise.deliveryoffer.DeliveryOfferQuoted` | `retailnetwork.delivery-promise.analytics` | offerId |
 | `com.retailnetwork.commerce.delivery-promise.promisepolicy.PromisePolicyPublished` | `retailnetwork.delivery-promise.analytics` | policyVersion |
-| `com.retailnetwork.commerce.delivery-promise.deliveryrequest.DeliveryRequestAnswered` | `retailnetwork.delivery-promise.analytics` | requestId (best effort, flag `DELIVERY_REQUEST_FACTS_ENABLED`, ADR 0031) |
+| `com.retailnetwork.commerce.delivery-promise.deliveryrequest.DeliveryRequestAnswered` | `retailnetwork.delivery-promise.analytics` | requestId (best effort, flag `DELIVERY_REQUEST_FACTS_ENABLED`, ADR 0032) |
 
 ### Consumed types
 

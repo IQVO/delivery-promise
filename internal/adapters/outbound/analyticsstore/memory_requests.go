@@ -8,7 +8,7 @@ import (
 	"github.com/claudioed/delivery-promise/internal/analytics/report"
 )
 
-// memRequest is one request fact (ADR 0031), as requests_answered keeps it.
+// memRequest is one request fact (ADR 0032), as requests_answered keeps it.
 type memRequest struct {
 	at       time.Time
 	region   string
@@ -36,7 +36,7 @@ type requestKey struct {
 
 // RequestCoverage implements report.Reader: the request facts answered in the
 // range, counted per UTC day, region, answered flag and shortest promised
-// days (ADR 0031), ordered as the Postgres reader.
+// days (ADR 0032), ordered as the Postgres reader.
 func (m *MemoryStore) RequestCoverage(_ context.Context, r report.Range) ([]report.RequestBucket, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

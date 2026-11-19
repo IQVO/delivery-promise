@@ -15,7 +15,7 @@ import (
 )
 
 // requestFactsWorld is the state of request_facts.feature: the REAL REST
-// router with the best-effort recorder and the bounded queue of ADR 0031 over
+// router with the best-effort recorder and the bounded queue of ADR 0032 over
 // the in-memory outbox. The worker is driven deterministically: stopping it
 // runs its final drain, so no scenario sleeps or races.
 type requestFactsWorld struct {

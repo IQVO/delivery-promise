@@ -75,7 +75,7 @@ type Within struct {
 
 // RegionCoverage is one region of one day. The OFFERS-BASED fields (ADR 0030):
 // the offers quoted (Requests), those that carry a promise, and the cumulative
-// counts per CoverageDays. The REQUEST-BASED fields (ADR 0031, best effort, only
+// counts per CoverageDays. The REQUEST-BASED fields (ADR 0032, best effort, only
 // from the day the fact was switched on): the requests answered, those answered
 // with a promise, the cumulative counts per CoverageDays of their shortest
 // promised days and the share of requests answered with a promise (nil when no
@@ -162,7 +162,7 @@ func withins(counts []int, total int) []Within {
 	return out
 }
 
-// PromiseCoverage derives the report of ADR 0030 and ADR 0031 from the store's
+// PromiseCoverage derives the report of ADR 0030 and ADR 0032 from the store's
 // buckets: per day (ascending) the top regions, the rest folded into
 // OtherRegion, each with its offers-based and its request-based counts and
 // shares. A day or region exists when either kind of bucket has it. Nil inputs
@@ -192,7 +192,7 @@ func PromiseCoverage(offers []CoverageBucket, requests []RequestBucket) []Covera
 	return out
 }
 
-// rankRegions orders the tallies of one day by requests answered (ADR 0031,
+// rankRegions orders the tallies of one day by requests answered (ADR 0032,
 // most first), then by offers quoted (ADR 0030), then by region in byte order,
 // keeps TopRegions and folds the remainder into OtherRegion. A day with no
 // request fact ranks exactly as ADR 0030 did.

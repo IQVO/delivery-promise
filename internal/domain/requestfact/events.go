@@ -3,7 +3,7 @@ package requestfact
 import "github.com/claudioed/delivery-promise/internal/domain/shared"
 
 // DeliveryRequestAnswered is the analytics-only event of one answered delivery
-// request (ADR 0031): one per quote or estimate the service answered, whether
+// request (ADR 0032): one per quote or estimate the service answered, whether
 // or not a promise came back. It carries no address and no shopper id: the
 // region is the first two characters of the destination postal prefix.
 type DeliveryRequestAnswered struct {

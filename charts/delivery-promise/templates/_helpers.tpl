@@ -200,7 +200,7 @@ binary; refuse it at render so the intent is never silently lost.
 {{- end -}}
 
 {{/*
-config.requestFactsEnabled (ADR 0031) is OFF unless it is true: the value the
+config.requestFactsEnabled (ADR 0032) is OFF unless it is true: the value the
 binary gets is always the string "true" or "false", and a missing or empty value
 is false, so a release written before the value existed renders unchanged.
 */}}

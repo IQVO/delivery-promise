@@ -9,14 +9,14 @@ import (
 	"github.com/claudioed/delivery-promise/internal/application/ports"
 )
 
-// The request-fact counters (ADR 0031). The Prometheus exporter appends _total,
+// The request-fact counters (ADR 0032). The Prometheus exporter appends _total,
 // so they are queried as deliverypromise_request_facts_written_total and
 // deliverypromise_request_facts_dropped_total{reason}.
 const (
 	requestFactsWrittenName = "deliverypromise.request_facts.written"
 	requestFactsDroppedName = "deliverypromise.request_facts.dropped"
 	requestFactsWrittenHelp = "Request-level coverage facts (DeliveryRequestAnswered) the background worker stored as analytics outbox rows."
-	requestFactsDroppedHelp = "Request-level coverage facts that were LOST by design (best effort, ADR 0031), by reason: queue_full (the bounded " +
+	requestFactsDroppedHelp = "Request-level coverage facts that were LOST by design (best effort, ADR 0032), by reason: queue_full (the bounded " +
 		"queue had no room, the newest fact is dropped), write_failed (the worker's own transaction failed or timed out, no retry), " +
 		"internal_error (the hand-over itself failed), shutdown (still queued when the final drain ended). No response was affected. " +
 		"A request-based coverage share tolerates a bounded loss; a sustained non-zero rate means the share rests on fewer requests than were answered."

@@ -73,7 +73,7 @@ Feature: Promise coverage per region in the quote-conversion report
     When I read the quote-conversion report from "2026-11-10" to "2026-11-10"
     Then the day rows list the tier "NEXT_DAY" on "2026-11-10" with 3 offers quoted and 0 promises made
 
-  # --- Request-level fields (ADR 0031) -----------------------------------
+  # --- Request-level fields (ADR 0032) -----------------------------------
   # Next to the offers-based fields above, each region row carries the
   # REQUEST-based ones: the quote and estimate requests answered, with or
   # without a promise (DeliveryRequestAnswered, best effort, only from the day

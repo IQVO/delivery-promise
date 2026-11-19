@@ -15,7 +15,7 @@
 //	OUTBOX_MAX_ATTEMPTS           failures before the relay excludes a row (default 20, 0 = unlimited)
 //	SWEEP_INTERVAL                clock-driven sweep interval (default 15s)
 //	SHUTDOWN_DRAIN_DELAY          wait after flipping /readyz before closing (default 5s)
-//	DELIVERY_REQUEST_FACTS_ENABLED          record one best-effort DeliveryRequestAnswered fact per answered quote/estimate (default false, ADR 0031)
+//	DELIVERY_REQUEST_FACTS_ENABLED          record one best-effort DeliveryRequestAnswered fact per answered quote/estimate (default false, ADR 0032)
 //	DELIVERY_REQUEST_FACTS_QUEUE_SIZE       bounded in-memory queue of those facts; a full queue drops the newest (default 1000, max 100000)
 //	DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL   how often the background worker drains the queue (default 1s)
 //	LOG_LEVEL                     debug|info|warn|error (default info)

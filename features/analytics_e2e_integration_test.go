@@ -113,7 +113,7 @@ func e2eQuoted(id string, at time.Time, tier shared.Tier) offer.DeliveryOfferQuo
 		Basis:  shared.BasisScheduled, PolicyVersion: "v1", ExpiresAt: at.Add(10 * time.Minute)}
 }
 
-// e2eAnswered is a DeliveryRequestAnswered (ADR 0031) for region 78: nil days is a request answered with no promise.
+// e2eAnswered is a DeliveryRequestAnswered (ADR 0032) for region 78: nil days is a request answered with no promise.
 func e2eAnswered(id string, at time.Time, kind requestfact.Kind, days *int) requestfact.DeliveryRequestAnswered {
 	return requestfact.DeliveryRequestAnswered{Header: e2eHeader(at), RequestID: id, Region: "78", Kind: kind, Items: 2,
 		Answered: days != nil, ShortestPromisedDays: days}
@@ -168,7 +168,7 @@ type e2eReports struct {
 
 const e2eSpan = "?from=2026-11-03&to=2026-11-05"
 
-// requestsAnswered is the request-based count of the first day's region row (ADR 0031), 0 until projected.
+// requestsAnswered is the request-based count of the first day's region row (ADR 0032), 0 until projected.
 func (r e2eReports) requestsAnswered(region string) float64 {
 	for _, day := range r.coverage() {
 		for _, reg := range day["regions"].([]any) {
@@ -317,7 +317,7 @@ func e2eAssertReports(t *testing.T, reports e2eReports) {
 	// The four offers went to destination prefix 787 (region 78) with a Chicago window ending the next
 	// local day: all four are within 1, 2, 3 and 5 days.
 	within := func(days float64) map[string]any { return map[string]any{"days": days, "count": 4.0, "share": 1.0} }
-	// The four request facts (ADR 0031) of the same region: 2 answered with a promise, shortest 1 and 3 days.
+	// The four request facts (ADR 0032) of the same region: 2 answered with a promise, shortest 1 and 3 days.
 	reqWithin := func(days, count float64) map[string]any {
 		return map[string]any{"days": days, "count": count, "share": count / 4}
 	}

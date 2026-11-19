@@ -86,7 +86,7 @@ spec:
             - name: SHUTDOWN_DRAIN_DELAY
               value: {{ . | quote }}
             {{- end }}
-            # Best-effort request-level coverage facts (ADR 0031): always
+            # Best-effort request-level coverage facts (ADR 0032): always
             # rendered, "false" unless config.requestFactsEnabled is true.
             - name: DELIVERY_REQUEST_FACTS_ENABLED
               value: {{ include "delivery-promise.requestFactsEnabled" . | quote }}

@@ -22,7 +22,7 @@ type MemoryStore struct {
 	revisions  map[memRevision]bool
 	unkeepable map[string]bool
 	judgements map[string]memJudgement
-	requests   map[string]memRequest // request facts by request id (ADR 0031)
+	requests   map[string]memRequest // request facts by request id (ADR 0032)
 	// Fail, when set, is returned by the next Apply (and cleared), to drive
 	// the consumer's transient and rejection paths.
 	Fail error

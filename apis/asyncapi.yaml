@@ -14,7 +14,7 @@ info:
     (PromiseMade, PromiseConfirmed, PromiseReleased, PromiseCancelled, DeliveryOfferQuoted, PromisePolicyPublished,
     DeliveryRequestAnswered). DeliveryRequestAnswered is the one BEST-EFFORT fact: it is not written in the transaction of
     any request but by a background worker from a bounded in-memory queue, only when DELIVERY_REQUEST_FACTS_ENABLED is true,
-    and a fact that does not fit or cannot be stored is dropped and counted (ADR 0031). The types are catalogued in ADR 0004.
+    and a fact that does not fit or cannot be stored is dropped and counted (ADR 0032). The types are catalogued in ADR 0004.
 
 
     **Consumed.** Events of eight producers, kept as event-fed local read models or driving RepromiseOnRisk, JudgeOnDelivery
@@ -61,7 +61,7 @@ info:
   - name: promisepolicy
     description: Events raised by the promisepolicy aggregate.
   - name: deliveryrequest
-    description: Best-effort facts about answered delivery requests (quotes and estimates), not an aggregate (ADR 0031).
+    description: Best-effort facts about answered delivery requests (quotes and estimates), not an aggregate (ADR 0032).
   - name: consumed-customer-ordering
     description: Events consumed from customer-ordering.
   - name: consumed-last-mile-delivery
@@ -287,7 +287,7 @@ operations:
     summary: Publish the 7 analytics events through the transactional outbox.
     description: The service sends PromiseMade, PromiseConfirmed, PromiseReleased, PromiseCancelled, DeliveryOfferQuoted,
       PromisePolicyPublished, DeliveryRequestAnswered to `retailnetwork.delivery-promise.analytics`. Consumers route on the full `type`.
-      DeliveryRequestAnswered is raised only while DELIVERY_REQUEST_FACTS_ENABLED is true, best effort (ADR 0031).
+      DeliveryRequestAnswered is raised only while DELIVERY_REQUEST_FACTS_ENABLED is true, best effort (ADR 0032).
     tags:
     - name: delivery-promise
     messages:
@@ -842,7 +842,7 @@ components:
       description: '`type` = `com.retailnetwork.commerce.delivery-promise.deliveryrequest.DeliveryRequestAnswered`; `dataschema`
         = `urn:retailnetwork:delivery-promise:analytics:DeliveryRequestAnswered:v1`; subject and key = the requestId, a fresh
         opaque id minted for the fact. Topic: retailnetwork.delivery-promise.analytics. ANALYTICS ONLY: no integration consumer reads
-        it, only this context''s own projector (ADR 0031). One per quote (`POST /delivery-quotes`) or estimate (`POST /delivery-estimates`)
+        it, only this context''s own projector (ADR 0032). One per quote (`POST /delivery-quotes`) or estimate (`POST /delivery-estimates`)
         answered with HTTP 200, including a request answered with NO feasible promise, which publishes nothing else; a replayed
         Idempotency-Key and a refused request raise none. BEST EFFORT BY DESIGN: it is raised only while DELIVERY_REQUEST_FACTS_ENABLED
         is true (default false), after the response was written, from a bounded in-memory queue drained by one background
