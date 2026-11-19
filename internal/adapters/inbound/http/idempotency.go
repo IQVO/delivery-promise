@@ -47,15 +47,20 @@ const keyRetention = "24 hours"
 //     being finished. If it rolled back, the blocked insert succeeds instead.
 //   - The wrapped handler runs in a SAVEPOINT of that transaction, with the
 //     savepoint bound into its context (TxBinder), so the idempotency row, the
-//     aggregates and their outbox rows commit or roll back together. A 2xx
-//     keeps the handler's writes; a 4xx rolls the savepoint back (a refused
-//     request leaves no trace) but its problem is still stored and replayed; a
-//     5xx or a panic rolls everything back and is never stored, so the same key
-//     can retry the real work.
+//     aggregates and their outbox rows commit or roll back together. What
+//     happens to the answer is its replay class (ADR 0031), declared on the
+//     catalogue entry of its problem type and marked on the capture by
+//     writeError: a 2xx keeps the handler's writes and is stored; a FINAL
+//     refusal rolls the savepoint back (a refused request leaves no trace) and
+//     its problem is stored and replayed; an OUTCOME refusal commits the
+//     handler's writes with the stored problem; a RETRYABLE refusal, a refusal
+//     with no class, a 5xx and a panic roll everything back, key row included,
+//     and are never stored, so the same key runs the real work again. A request
+//     waiting on the key meanwhile finds no row and runs the handler itself.
 //   - A missing key is 400 idempotency-key-required; a key over 128
 //     characters or with non-printable ASCII is 400 idempotency-key-invalid.
 //   - A different method, path or body under a stored key is 409
-//     idempotency-key-reused.
+//     idempotency-key-reused; under a released key it is a new request.
 func RequireIdempotencyKey(pool *pgxpool.Pool, bind TxBinder) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -197,9 +202,35 @@ type capture struct {
 	header http.Header
 	code   int
 	body   bytes.Buffer
+	// class is the replay class writeError marked (replayMarker); replayUnset
+	// when the handler answered without a catalogue problem.
+	class replayClass
 }
 
 func (c *capture) Header() http.Header { return c.header }
+
+// MarkReplay implements replayMarker.
+func (c *capture) MarkReplay(class replayClass) { c.class = class }
+
+// verdict is the whole of what the middleware decides about an answer: a 2xx is
+// stored with its writes, a 5xx is never stored, and every other answer is
+// ruled by the replay class its catalogue entry declares. A refusal that
+// declares none is not stored either: the key stays free.
+func (c *capture) verdict() verdict {
+	switch {
+	case c.code >= http.StatusOK && c.code < http.StatusMultipleChoices:
+		return storeAndKeep
+	case c.code >= http.StatusInternalServerError:
+		return releaseKey
+	}
+	switch c.class {
+	case replayFinal:
+		return storeRefusal
+	case replayOutcome:
+		return storeAndKeep
+	}
+	return releaseKey
+}
 
 func (c *capture) WriteHeader(code int) {
 	if c.code == 0 {
@@ -235,14 +266,15 @@ func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request
 	if rec.code == 0 {
 		rec.code = http.StatusOK
 	}
-	if rec.code >= http.StatusInternalServerError {
-		// A server failure is never cached: roll everything back so the same
-		// key can retry the real work.
+	v := rec.verdict()
+	if v == releaseKey {
+		// A 5xx and a RETRYABLE refusal are never cached: roll everything back,
+		// the key row included, so the same key can run the real work again.
 		_ = tx.Rollback(ctx)
 		flush(w, rec)
 		return
 	}
-	if err := settleSavepoint(ctx, sp, rec.code); err != nil {
+	if err := settleSavepoint(ctx, sp, v); err != nil {
 		_ = tx.Rollback(ctx)
 		writeError(w, r, err)
 		return
@@ -259,10 +291,11 @@ func runFreshRequest(ctx context.Context, w http.ResponseWriter, r *http.Request
 	flush(w, rec)
 }
 
-// settleSavepoint keeps the handler's writes on a 2xx/3xx and discards them on
-// a 4xx.
-func settleSavepoint(ctx context.Context, sp pgx.Tx, code int) error {
-	if code >= http.StatusBadRequest {
+// settleSavepoint keeps the handler's writes when the verdict says they commit
+// with the stored answer (a 2xx, an OUTCOME refusal) and discards them for a
+// FINAL refusal, which is stored alone.
+func settleSavepoint(ctx context.Context, sp pgx.Tx, v verdict) error {
+	if v != storeAndKeep {
 		return sp.Rollback(ctx)
 	}
 	return sp.Commit(ctx)
