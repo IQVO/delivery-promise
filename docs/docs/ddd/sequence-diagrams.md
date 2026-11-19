@@ -64,7 +64,7 @@ sequenceDiagram
   H-->>CO: 201 PROVISIONAL promise
 ```
 
-Source: `internal/application/usecases/make_promise.go`, `internal/adapters/inbound/http/idempotency.go`. Offer, promise and book change in one transaction: the documented exception to one aggregate per transaction (gap G22).
+Source: `internal/application/usecases/make_promise.go`, `internal/adapters/inbound/http/idempotency.go`. Offer, promise and book change in one transaction: the documented exception to one aggregate per transaction (gap G22). When the use case refuses with a RETRYABLE problem (a full book, a lost optimistic lock), the middleware rolls the transaction back, key row included, instead of storing the refusal: the same key runs again (ADR 0031).
 
 ## Confirm
 

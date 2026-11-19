@@ -43,8 +43,13 @@ the wiring is `cmd/api/main.go` `run`:
   global (looked up by key alone); same key + same body replays the first response with
   `Idempotency-Replayed: true`, same key + other body is 409
   `idempotency-key-reused`, a missing key 400 `idempotency-key-required`; keys live
-  24 h in `idempotency_keys`. The handler runs in a SAVEPOINT: a 4xx is stored but
-  leaves no writes, a 5xx is never stored. A new state-changing route registers
+  24 h in `idempotency_keys`. The handler runs in a SAVEPOINT. Every catalogue entry
+  declares a replay class (`errors.go`, ADR 0031; no class fails
+  `TestEveryCatalogueEntryDeclaresAReplayClass`): a FINAL refusal is stored but leaves no
+  writes, an OUTCOME refusal commits its writes with the stored answer, a RETRYABLE refusal
+  releases the key (rollback, nothing stored, a retry executes), and a 5xx is never stored.
+  Classify a new `Err` in the catalogue row, ADR 0031's table and the `release the key
+  (RETRYABLE)` sentence of `apis/openapi.yaml`. A new state-changing route registers
   through `Server.idempotent`, never a bare `r.Post`; only a SAFE route that stores
   nothing (`POST /delivery-estimates`) is a bare `r.Post`.
 - **NUL** (U+0000) is rejected before anything else (`nul.go`).

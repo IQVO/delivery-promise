@@ -185,7 +185,10 @@ Contract: [`apis/openapi.yaml`](apis/openapi.yaml). Errors are RFC 9457
 `offer-not-quotable`, `nominal-basis-not-allowed-for-tier`,
 `idempotency-key-reused`, `validation-failed` (422). Every state-changing
 POST takes an `Idempotency-Key`; a repeat with the same key and body replays
-the first response (`POST /promises/{promiseId}/cancellations` requires it).
+the first response when it is final: a 2xx, or a refusal the same request cannot pass later. A refusal that depends
+on state that can change (`not-found`, `promise-capacity-exhausted`, `book-closed`, `offer-not-quotable`,
+`illegal-transition`, `concurrent-update`, `group-spans-nodes`) is not stored: the key is released and a retry under
+the same key runs again (ADR 0031; `POST /promises/{promiseId}/cancellations` requires the key).
 
 | Route | Use case |
 | --- | --- |
