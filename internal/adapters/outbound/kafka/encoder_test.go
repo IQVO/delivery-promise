@@ -20,6 +20,7 @@ import (
 	"github.com/claudioed/delivery-promise/internal/domain/offer"
 	"github.com/claudioed/delivery-promise/internal/domain/policy"
 	"github.com/claudioed/delivery-promise/internal/domain/promise"
+	"github.com/claudioed/delivery-promise/internal/domain/requestfact"
 	"github.com/claudioed/delivery-promise/internal/domain/shared"
 )
 
@@ -80,6 +81,12 @@ func goldenCases() map[string]shared.Event {
 			Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute), CapacityBand: shared.BandTight},
 		"DeliveryOfferQuoted_consolidated": offer.DeliveryOfferQuoted{Header: hdr, OfferID: "off-5", Tier: shared.TierConsolidated, DestinationPrefix: "787", NodeID: "N-AUS3",
 			Window: win, Basis: shared.BasisScheduled, PolicyVersion: "v2", ExpiresAt: t0.Add(10 * time.Minute), ConsolidationEligible: new(bool)},
+		// ADR 0031: one analytics-only fact per answered request, with and without a promise
+		"DeliveryRequestAnswered": requestfact.DeliveryRequestAnswered{Header: hdr, RequestID: "req-1", Region: "78", Kind: requestfact.KindEstimate,
+			Items: 12, Answered: true, ShortestPromisedDays: new(2)},
+		"DeliveryRequestAnswered_unanswered": requestfact.DeliveryRequestAnswered{Header: hdr, RequestID: "req-2", Region: "7", Kind: requestfact.KindQuote, Items: 1},
+		"DeliveryRequestAnswered_sameDay": requestfact.DeliveryRequestAnswered{Header: hdr, RequestID: "req-3", Region: "10", Kind: requestfact.KindQuote,
+			Items: 3, Answered: true, ShortestPromisedDays: new(0)},
 		"PromisePolicyPublished": policy.PromisePolicyPublished{Header: hdr, PolicyVersion: "v2", Number: 2, OfferTTLMinutes: 10, HoldTTLMinutes: 15,
 			PackagesPerOrder: 2, SharePercent: 80, TransitWindowDays: 21, TransitServiceLevelPercent: 95, MinTransitObservations: 30, PublishedAt: t0,
 			TargetOnTimeProbabilityPercent: 90, MinCalibrationObservations: 40, CalibrationWindowDays: 14, MaxCalibrationBufferMinutes: 0,
