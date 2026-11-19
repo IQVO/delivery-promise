@@ -15,6 +15,9 @@
 //	OUTBOX_MAX_ATTEMPTS           failures before the relay excludes a row (default 20, 0 = unlimited)
 //	SWEEP_INTERVAL                clock-driven sweep interval (default 15s)
 //	SHUTDOWN_DRAIN_DELAY          wait after flipping /readyz before closing (default 5s)
+//	DELIVERY_REQUEST_FACTS_ENABLED          record one best-effort DeliveryRequestAnswered fact per answered quote/estimate (default false, ADR 0031)
+//	DELIVERY_REQUEST_FACTS_QUEUE_SIZE       bounded in-memory queue of those facts; a full queue drops the newest (default 1000, max 100000)
+//	DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL   how often the background worker drains the queue (default 1s)
 //	LOG_LEVEL                     debug|info|warn|error (default info)
 //	OTEL_SERVICE_NAME             service.name of spans and metrics (default delivery-promise)
 //	OTEL_EXPORTER_OTLP_ENDPOINT   Collector OTLP/gRPC endpoint (default telemetry.DefaultEndpoint); export never blocks
@@ -101,6 +104,10 @@ func run(ctx context.Context) error {
 	}
 	svc := buildService(pool, outbox, logger, promiseMetrics)
 	svc.LateRisk = lateRiskMetrics
+	facts, factsWorker, err := startRequestFacts(pool, outbox, os.Getenv, logger)
+	if err != nil {
+		return err
+	}
 	readiness := inboundhttp.NewReadiness(inboundhttp.DefaultReadinessTTL, inboundhttp.DefaultReadinessTimeout,
 		inboundhttp.Dependency{Name: "postgres", Check: pool.Ping},
 		inboundhttp.Dependency{Name: "kafka", Check: outboundkafka.NewBrokerCheck(rt.brokers).Check},
@@ -109,6 +116,7 @@ func run(ctx context.Context) error {
 		API:         svc,
 		Readiness:   readiness,
 		Idempotency: inboundhttp.RequireIdempotencyKey(pool, postgres.BindTx),
+		Facts:       facts, // nil while DELIVERY_REQUEST_FACTS_ENABLED is off (the default)
 	}, logger, tel.serviceName)
 	httpServer := &http.Server{
 		Addr:              rt.httpAddr,
@@ -119,7 +127,13 @@ func run(ctx context.Context) error {
 	consumer, closeConsumer := startConsumer(svc, rt, logger)
 	sweep, closeSweeper := startSweeper(svc, os.Getenv, logger)
 	relay, closeRelay := startOutboxRelay(outbox, rt, os.Getenv, logger)
-	return serve(ctx, logger, httpServer, readiness, []*worker{consumer, sweep}, func() { closeConsumer(); closeSweeper() }, relay, closeRelay)
+	workers, closeWorkers := []*worker{consumer, sweep}, func() { closeConsumer(); closeSweeper() }
+	if factsWorker != nil {
+		// Stopped with the other workers, after the HTTP drain and before the
+		// relay: its final drain appends outbox rows the relay still publishes.
+		workers, closeWorkers = append(workers, factsWorker), func() { closeConsumer(); closeSweeper(); factsWorker.stop() }
+	}
+	return serve(ctx, logger, httpServer, readiness, workers, closeWorkers, relay, closeRelay)
 }
 
 // openPostgres runs the embedded migrations, then opens and pings the pool. The

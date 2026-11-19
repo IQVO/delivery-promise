@@ -8,6 +8,9 @@ config:
   eventPublisher: "kafka"
   consumerGroup: "delivery-promise-consumer"
   outboxRelayInterval: "500ms"
+  requestFactsEnabled: true
+  requestFactsQueueSize: 500
+  requestFactsFlushInterval: "2s"
   outboxMaxAttempts: 20
   sweepInterval: "15s"
   shutdownDrainDelay: "5s"

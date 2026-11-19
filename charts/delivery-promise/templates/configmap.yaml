@@ -27,3 +27,10 @@ data:
   {{- with .Values.config.shutdownDrainDelay }}
   SHUTDOWN_DRAIN_DELAY: {{ . | quote }}
   {{- end }}
+  DELIVERY_REQUEST_FACTS_ENABLED: {{ include "delivery-promise.requestFactsEnabled" . | quote }}
+  {{- with .Values.config.requestFactsQueueSize }}
+  DELIVERY_REQUEST_FACTS_QUEUE_SIZE: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.requestFactsFlushInterval }}
+  DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL: {{ . | quote }}
+  {{- end }}

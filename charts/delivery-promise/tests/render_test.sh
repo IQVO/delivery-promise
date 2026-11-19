@@ -62,6 +62,42 @@ grep -q 'OUTBOX_MAX_ATTEMPTS: "20"' <<<"$configmap" || fail "OUTBOX_MAX_ATTEMPTS
 unlimited="$(render "${base[@]}" --set config.outboxMaxAttempts=0 --show-only templates/configmap.yaml)"
 grep -q 'OUTBOX_MAX_ATTEMPTS: "0"' <<<"$unlimited" || fail "config.outboxMaxAttempts=0 is not rendered"
 
+# --- request-level coverage facts (ADR 0031): OFF by default, never a required value ---
+# Default: "false" in the ConfigMap and the Deployment; the two optional sizes are not rendered.
+grep -q 'DELIVERY_REQUEST_FACTS_ENABLED: "false"' <<<"$configmap" || fail "DELIVERY_REQUEST_FACTS_ENABLED must default to false in the ConfigMap"
+[[ "$(env_value "$deployment" DELIVERY_REQUEST_FACTS_ENABLED)" == false ]] || fail "the api Deployment must render DELIVERY_REQUEST_FACTS_ENABLED=false by default"
+for var in DELIVERY_REQUEST_FACTS_QUEUE_SIZE DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL; do
+  if grep -q "name: $var\$" <<<"$deployment"; then fail "$var must not be rendered while its value is empty"; fi
+  if grep -q "$var" <<<"$configmap"; then fail "$var must not reach the ConfigMap while its value is empty"; fi
+done
+# The default values file of the chart sets none of them: no new required value.
+if grep -qE 'requestFacts' "$chart_dir/ci/default-values.yaml"; then fail "ci/default-values.yaml must not need a request-facts value"; fi
+# A release written before the value existed (the key absent or null) still renders, as false.
+for none in "config.requestFactsEnabled=null" "config.requestFactsEnabled="; do
+  gone="$(render "${base[@]}" --set "$none" --show-only templates/deployment.yaml)"
+  [[ "$(env_value "$gone" DELIVERY_REQUEST_FACTS_ENABLED)" == false ]] || fail "$none must render DELIVERY_REQUEST_FACTS_ENABLED=false"
+done
+# Switched on, with its two sizes, in both places.
+facts=(--set config.requestFactsEnabled=true --set config.requestFactsQueueSize=250 --set config.requestFactsFlushInterval=500ms)
+facts_cm="$(render "${base[@]}" "${facts[@]}" --show-only templates/configmap.yaml)"
+facts_dep="$(render "${base[@]}" "${facts[@]}" --show-only templates/deployment.yaml)"
+for kv in DELIVERY_REQUEST_FACTS_ENABLED=true DELIVERY_REQUEST_FACTS_QUEUE_SIZE=250 DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL=500ms; do
+  grep -q "^  ${kv%%=*}: \"${kv#*=}\"" <<<"$facts_cm" || fail "${kv%%=*} is not rendered into the ConfigMap"
+  [[ "$(env_value "$facts_dep" "${kv%%=*}")" == "${kv#*=}" ]] || fail "${kv%%=*} is not rendered into the api Deployment"
+done
+# Anything the binary would warn about and replace is refused at render.
+for bad in config.requestFactsEnabled=maybe config.requestFactsQueueSize=0 config.requestFactsQueueSize=100001 config.requestFactsQueueSize=lots config.requestFactsFlushInterval=soon; do
+  if render "${base[@]}" --set "$bad" >/dev/null 2>&1; then fail "--set $bad must be refused at render"; fi
+done
+# The sizes are accepted at their bounds.
+for ok in config.requestFactsQueueSize=1 config.requestFactsQueueSize=100000 config.requestFactsFlushInterval=3; do
+  render "${base[@]}" --set "$ok" >/dev/null 2>&1 || fail "--set $ok must be accepted"
+done
+# extraEnv may not set them a second time.
+if render "${base[@]}" --set 'extraEnv[0].name=DELIVERY_REQUEST_FACTS_ENABLED' --set 'extraEnv[0].value=true' >/dev/null 2>&1; then
+  fail "extraEnv must not set DELIVERY_REQUEST_FACTS_ENABLED (it has a dedicated value)"
+fi
+
 # --- chart vs binary: every env var cmd/api reads is rendered, and only those -------
 # The names are the whole-string upper-case literals of cmd/api's non-test files
 # (env("X"), os.Getenv("X") and the env... constants), so a new variable in

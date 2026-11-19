@@ -123,7 +123,7 @@ reads none; the real runtime has no mode switch). It also may not set a
 variable the chart renders from a dedicated value, so nothing is set twice.
 */}}
 {{- define "delivery-promise.requireCleanExtraEnv" -}}
-{{- $dedicated := list "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "DELIVERY_PROMISE_CONSUMER_GROUP" "EVENT_PUBLISHER" "HTTP_ADDR" "LOG_LEVEL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SWEEP_INTERVAL" "SHUTDOWN_DRAIN_DELAY" "ENVIRONMENT" "SERVICE_VERSION" "OTEL_SERVICE_NAME" "OTEL_EXPORTER_OTLP_ENDPOINT" -}}
+{{- $dedicated := list "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "DELIVERY_PROMISE_CONSUMER_GROUP" "EVENT_PUBLISHER" "HTTP_ADDR" "LOG_LEVEL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SWEEP_INTERVAL" "SHUTDOWN_DRAIN_DELAY" "DELIVERY_REQUEST_FACTS_ENABLED" "DELIVERY_REQUEST_FACTS_QUEUE_SIZE" "DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL" "ENVIRONMENT" "SERVICE_VERSION" "OTEL_SERVICE_NAME" "OTEL_EXPORTER_OTLP_ENDPOINT" -}}
 {{- range .Values.extraEnv -}}
 {{- $name := toString .name -}}
 {{- $value := toString (default "" .value) -}}
@@ -191,10 +191,36 @@ seconds. A malformed value is warned about and replaced by the default by the
 binary; refuse it at render so the intent is never silently lost.
 */}}
 {{- define "delivery-promise.requireIntervals" -}}
-{{- range $key := list "sweepInterval" "outboxRelayInterval" -}}
+{{- range $key := list "sweepInterval" "outboxRelayInterval" "requestFactsFlushInterval" -}}
 {{- $v := toString (default "" (index $.Values.config $key)) -}}
 {{- if and $v (not (regexMatch "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$|^[0-9]+(\\.[0-9]+)?$" $v)) -}}
 {{- fail (printf "config.%s is %q - want a Go duration such as 500ms, 15s or 1m, or a plain number of seconds." $key $v) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+config.requestFactsEnabled (ADR 0031) is OFF unless it is true: the value the
+binary gets is always the string "true" or "false", and a missing or empty value
+is false, so a release written before the value existed renders unchanged.
+*/}}
+{{- define "delivery-promise.requestFactsEnabled" -}}
+{{- if eq (toString .Values.config.requestFactsEnabled) "true" -}}true{{- else -}}false{{- end -}}
+{{- end -}}
+
+{{/*
+The request-fact settings: a boolean, and a queue capacity of 1 to 100000. A
+value the binary would warn about and replace is refused at render instead.
+*/}}
+{{- define "delivery-promise.requireRequestFacts" -}}
+{{- $e := toString (default "" .Values.config.requestFactsEnabled) -}}
+{{- if and $e (not (has $e (list "true" "false"))) -}}
+{{- fail (printf "config.requestFactsEnabled is %q - want true or false." $e) -}}
+{{- end -}}
+{{- if not (kindIs "invalid" .Values.config.requestFactsQueueSize) -}}
+{{- $q := toString .Values.config.requestFactsQueueSize -}}
+{{- if and (ne $q "") (or (not (regexMatch "^[0-9]{1,6}$" $q)) (lt (int $q) 1) (gt (int $q) 100000)) -}}
+{{- fail (printf "config.requestFactsQueueSize is %q - want a whole number from 1 to 100000." $q) -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
@@ -210,5 +236,6 @@ Deployment (always rendered) includes it, so a mis-set release fails
 {{- include "delivery-promise.requireConsumerGroup" . -}}
 {{- include "delivery-promise.requireCleanExtraEnv" . -}}
 {{- include "delivery-promise.requireIntervals" . -}}
+{{- include "delivery-promise.requireRequestFacts" . -}}
 {{- include "delivery-promise.requireGracePeriod" . -}}
 {{- end -}}

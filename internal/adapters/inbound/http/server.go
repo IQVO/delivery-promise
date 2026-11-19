@@ -47,6 +47,10 @@ type Server struct {
 	// Idempotency wraps the mutating routes that require an Idempotency-Key
 	// (nil = no middleware, a unit-test fixture; cmd/api always sets it).
 	Idempotency func(http.Handler) http.Handler
+	// Facts takes the best-effort request fact of every answered quote and
+	// estimate after its response was written (ADR 0031). Nil = off, the
+	// default: the routes are then exactly the ones without the feature.
+	Facts FactRecorder
 }
 
 func (s *Server) idempotent(h http.HandlerFunc) http.Handler {
@@ -80,9 +84,9 @@ func NewRouter(s *Server, logger *slog.Logger, serviceName string) http.Handler 
 	r.Get("/healthz", s.handleHealthz)
 	r.Get("/readyz", s.handleReadyz)
 
-	r.Method(http.MethodPost, "/delivery-quotes", s.idempotent(s.handleQuote))
+	r.Method(http.MethodPost, "/delivery-quotes", s.recordsFacts(s.idempotent(s.handleQuote)))
 	// Safe: writes nothing, so no Idempotency-Key middleware (ADR 0019).
-	r.Post("/delivery-estimates", s.handleEstimate)
+	r.Method(http.MethodPost, "/delivery-estimates", s.recordsFacts(http.HandlerFunc(s.handleEstimate)))
 	r.Get("/delivery-offers/{offerId}", s.handleGetOffer)
 	r.Method(http.MethodPost, "/promises", s.idempotent(s.handleMakePromise))
 	r.Get("/promises", s.handleListPromises)
