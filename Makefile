@@ -28,6 +28,9 @@ MUTATION_FAST_PKG  := ./internal/domain/*/
 # window rules, percentile, rates. gremlins takes one path per run, so the loop
 # below runs it after the domain packages.
 MUTATION_ANALYTICS_PKG := ./internal/analytics/report/
+# The request-fact hand-off (ADR 0032): the bounded queue, its worker and the recorder.
+# It is application code, so the domain glob does not reach it; it is gated on its own.
+MUTATION_APPLICATION_PKG := ./internal/application/requestfacts/
 # The exhaustive scheduled run — kept in sync with the `mutation` CI job.
 MUTATION_FULL_PKG  := ./internal/domain
 
@@ -50,7 +53,7 @@ help:
 	@echo "                 (testcontainers boots its own Postgres/Kafka; needs only Docker; not in check)"
 	@echo "  bdd            go test ./... -run TestFeatures -v — godog/Gherkin acceptance"
 	@echo "  arch-test      go test ./internal/architecture/... -v — hexagonal fitness"
-	@echo "  mutation       gremlins on every internal/domain/<pkg> and internal/analytics/report in turn — the fast blocking gate"
+	@echo "  mutation       gremlins on every internal/domain/<pkg>, internal/analytics/report and internal/application/requestfacts in turn — the fast blocking gate"
 	@echo "  mutation-full  gremlins on $(MUTATION_FULL_PKG) — the exhaustive scheduled run"
 	@echo "  vuln           govulncheck ./... — supply-chain / stdlib CVE sensor"
 	@echo ""
@@ -123,7 +126,7 @@ mutation:
 		echo "  go install github.com/go-gremlins/gremlins/cmd/gremlins@$(GREMLINS_VERSION)"; \
 		exit 1; \
 	fi
-	@for pkg in $(MUTATION_FAST_PKG) $(MUTATION_ANALYTICS_PKG); do \
+	@for pkg in $(MUTATION_FAST_PKG) $(MUTATION_ANALYTICS_PKG) $(MUTATION_APPLICATION_PKG); do \
 		echo "== gremlins unleash $${pkg%/}"; \
 		$(GREMLINS) unleash "$${pkg%/}" || exit 1; \
 	done

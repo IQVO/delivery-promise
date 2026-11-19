@@ -196,9 +196,9 @@ jobs:
           go-version-file: go.mod
       - name: Install gremlins
         run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
-      - name: Mutation testing (every domain package and the analytics read model)
+      - name: Mutation testing (every domain package, the analytics read model and the request-fact hand-off)
         run: |
-          for pkg in ./internal/domain/*/ ./internal/analytics/report/; do
+          for pkg in ./internal/domain/*/ ./internal/analytics/report/ ./internal/application/requestfacts/; do
             echo "== gremlins unleash ${pkg%/}"
             gremlins unleash "${pkg%/}" || exit 1
           done
