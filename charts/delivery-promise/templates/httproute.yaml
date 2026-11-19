@@ -5,6 +5,10 @@ metadata:
   name: {{ include "delivery-promise.fullname" . }}
   labels:
     {{- include "delivery-promise.labels" . | nindent 4 }}
+  {{- with include "delivery-promise.kongPluginNames" . }}
+  annotations:
+    konghq.com/plugins: {{ . | quote }}
+  {{- end }}
 spec:
   parentRefs:
     {{- range .Values.gatewayApi.parentRefs }}
