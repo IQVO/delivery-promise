@@ -11,7 +11,8 @@ paths:
 
 # Analytics read side (projector + reports)
 
-Record: `docs/adr/0018-analytics-read-side.md`. The read side consumes the facts this context already publishes; do not
+Record: `docs/adr/0018-analytics-read-side.md`; promise coverage per region (the `promiseCoverage` block of
+`/reports/quote-conversion`, `report.PromiseCoverage`, migration `0002_offer_coverage`): `docs/adr/0030-promise-coverage-per-region-in-the-quote-conversion-report.md`. The read side consumes the facts this context already publishes; do not
 change the encoder, the outbox or the `.events`/`.analytics` contracts from here.
 
 - Source: ONLY this context's own two topics, `retailnetwork.delivery-promise.events` and

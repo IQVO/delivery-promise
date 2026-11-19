@@ -147,7 +147,12 @@ func (s *Server) handleQuoteConversion(w http.ResponseWriter, r *http.Request) {
 		writeInternal(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, conversionBody(rg, report.QuoteConversion(days)))
+	buckets, err := s.Reader.PromiseCoverage(r.Context(), rg)
+	if err != nil {
+		writeInternal(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, conversionBody(rg, report.QuoteConversion(days), report.PromiseCoverage(buckets)))
 }
 
 func (s *Server) handleFreshness(w http.ResponseWriter, r *http.Request) {

@@ -86,7 +86,7 @@ Writes ONLY the separate analytical database; never opens the OLTP database. Rea
 
 ## `cmd/dp-reports` (read-only analytics reports, ADR 0018)
 
-`GET /reports/promise-reliability`, `/reports/promise-precision`, `/reports/quote-conversion`, `/reports/freshness`, `/healthz`, `/readyz` over a read-only pool (15s statement timeout). No Kafka, no OLTP database.
+`GET /reports/promise-reliability`, `/reports/promise-precision`, `/reports/quote-conversion`, `/reports/freshness`, `/healthz`, `/readyz` over a read-only pool (15s statement timeout). No Kafka, no OLTP database. `/reports/quote-conversion` also carries the `promiseCoverage` block (ADR 0030); it needs no setting.
 
 | Variable | Default | Required | Meaning | Chart value |
 | --- | --- | --- | --- | --- |

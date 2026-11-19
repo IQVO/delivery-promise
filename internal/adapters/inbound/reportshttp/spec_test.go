@@ -58,7 +58,7 @@ func TestSpecReportsPathsMatchTheRouter(t *testing.T) {
 func TestSpecDocumentsEveryWireField(t *testing.T) {
 	spec := specText(t)
 	for _, v := range []any{reliabilityDayBody{}, reliabilityReportBody{}, brokenByCauseBody{}, latenessBody{}, precisionDayBody{},
-		precisionReportBody{}, windowMinutesBody{}, conversionDayBody{}, conversionReportBody{}, freshnessBody{}} {
+		precisionReportBody{}, windowMinutesBody{}, conversionDayBody{}, conversionReportBody{}, coverageDayBody{}, regionCoverageBody{}, withinBody{}, freshnessBody{}} {
 		typ := reflect.TypeOf(v)
 		for i := range typ.NumField() {
 			name, _, _ := strings.Cut(typ.Field(i).Tag.Get("json"), ",")

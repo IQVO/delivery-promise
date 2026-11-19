@@ -313,7 +313,8 @@ tier (0024), a tracking number belonging to several assignments (0025), the
 carrier-handoff service area promised without a delivery wave (0026), a pickup
 point as the quoted destination (0027), out-of-order capacity and scorecard
 facts never overwriting a newer one (0028), node status and listing
-suppression following "newer time wins" with a terminal retired node (0029).
+suppression following "newer time wins" with a terminal retired node (0029),
+promise coverage per region in the quote-conversion report (0030).
 
 ## License
 

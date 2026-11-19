@@ -98,13 +98,15 @@ type conversionDayBody struct {
 }
 
 type conversionReportBody struct {
-	From string              `json:"from"`
-	To   string              `json:"to"`
-	Days []conversionDayBody `json:"days"`
+	From            string              `json:"from"`
+	To              string              `json:"to"`
+	Days            []conversionDayBody `json:"days"`
+	PromiseCoverage []coverageDayBody   `json:"promiseCoverage"`
 }
 
-func conversionBody(rg report.Range, rows []report.ConversionRow) conversionReportBody {
-	out := conversionReportBody{From: rg.FirstDay(), To: rg.LastDay(), Days: make([]conversionDayBody, 0, len(rows))}
+func conversionBody(rg report.Range, rows []report.ConversionRow, coverage []report.CoverageDay) conversionReportBody {
+	out := conversionReportBody{From: rg.FirstDay(), To: rg.LastDay(), Days: make([]conversionDayBody, 0, len(rows)),
+		PromiseCoverage: coverageBody(coverage)}
 	for _, r := range rows {
 		out.Days = append(out.Days, conversionDayBody{
 			Day: report.FormatDay(r.Day), Tier: r.Tier, OffersQuoted: r.OffersQuoted, PromisesMade: r.PromisesMade, Conversion: r.Conversion,

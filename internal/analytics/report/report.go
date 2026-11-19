@@ -55,6 +55,11 @@ type Event struct {
 	// DeliveryOfferQuoted and PromiseMade.
 	Tier string
 
+	// DeliveryOfferQuoted: Region is RegionOf the destination postal prefix
+	// ("" when the payload has none); the window (DeliverByLatest, TimeZone
+	// below) gives the promised days of the coverage report (ADR 0030).
+	Region string
+
 	// PromiseMade: the terms as made. TimeZone is optional (ADR 0011).
 	Basis             string
 	DeliverByEarliest time.Time
@@ -89,6 +94,10 @@ type Reader interface {
 	PromiseReliability(ctx context.Context, r Range) ([]ReliabilityDay, error)
 	PromisePrecision(ctx context.Context, r Range) ([]PrecisionDay, error)
 	QuoteConversion(ctx context.Context, r Range) ([]ConversionDay, error)
+	// PromiseCoverage is the offers quoted per UTC day, region and promised
+	// days (ADR 0030); the rules (top regions, cumulative counts, shares) are
+	// PromiseCoverage in this package.
+	PromiseCoverage(ctx context.Context, r Range) ([]CoverageBucket, error)
 	// LastEventAt is the CloudEvents time of the newest event the projection
 	// applied (nil while it applied none): the basis of the freshness lag.
 	LastEventAt(ctx context.Context) (*time.Time, error)

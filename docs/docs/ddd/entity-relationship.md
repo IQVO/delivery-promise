@@ -221,6 +221,8 @@ erDiagram
     text tier
     timestamptz quoted_at
     text event_id
+    text region "first 2 characters of the destination postal prefix, empty when absent (0002, ADR 0030)"
+    integer promised_days "local days from the quote day to deliverByLatest, NULL without a window (0002)"
   }
   promises_made {
     text promise_id PK
@@ -263,4 +265,5 @@ Source: `analytics/migrations/0001_promise_facts.up.sql`, `internal/adapters/out
 - Each fact table carries the `event_id` of the event that wrote the row. The tables of promises made, offers quoted and promise judgements are upserts keyed by their id (`ON CONFLICT ... DO UPDATE`); `promise_revisions` (keyed by `promise_id, revision_no`, from `PromiseRevised`) and `promise_unkeepable` (from `PromiseUnkeepable`) are insert-or-ignore.
 - `promise_judgements` takes the verdict from `PromiseKept` or `PromiseBroken`. A CHECK ties the two columns: `cause` is empty exactly when the verdict is `KEPT`.
 - The three derived columns of `promises_made` (`window_minutes`, `exact_day`, `zone_known`) are computed when the fact is applied, so the reports only count and sum them.
+- `offers_quoted.region` and `promised_days` are added by `analytics/migrations/0002_offer_coverage` (ADR 0030) and feed the `promiseCoverage` block of `/reports/quote-conversion`; only the two-character region is stored, never the full postal prefix.
 - Indexes: `idx_offers_quoted_quoted_at`, `idx_promises_made_made_at`, `idx_promise_judgements_judged_at` and `idx_analytics_processed_events_occurred_at`, because the reports filter each fact on its own instant.

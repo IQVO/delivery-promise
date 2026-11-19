@@ -33,10 +33,11 @@ const claimSQL = `
 
 const (
 	upsertOfferSQL = `
-	INSERT INTO offers_quoted (offer_id, tier, quoted_at, event_id)
-	VALUES ($1, $2, $3, $4)
+	INSERT INTO offers_quoted (offer_id, tier, quoted_at, event_id, region, promised_days)
+	VALUES ($1, $2, $3, $4, $5, $6)
 	ON CONFLICT (offer_id) DO UPDATE
-	SET tier = EXCLUDED.tier, quoted_at = EXCLUDED.quoted_at, event_id = EXCLUDED.event_id`
+	SET tier = EXCLUDED.tier, quoted_at = EXCLUDED.quoted_at, event_id = EXCLUDED.event_id,
+	    region = EXCLUDED.region, promised_days = EXCLUDED.promised_days`
 
 	upsertMadeSQL = `
 	INSERT INTO promises_made (promise_id, offer_id, tier, basis, made_at, deliver_by_earliest, deliver_by_latest,
@@ -99,7 +100,8 @@ var errUnknownKind = errors.New("unknown event kind")
 // statement is the SQL and arguments that project one fact.
 func statement(e report.Event) (string, []any, error) {
 	if e.Kind == report.KindDeliveryOfferQuoted {
-		return upsertOfferSQL, []any{e.OfferID, e.Tier, e.At, e.EventID}, nil
+		return upsertOfferSQL, []any{e.OfferID, e.Tier, e.At, e.EventID, e.Region,
+			report.PromisedDays(e.At, e.DeliverByLatest, e.TimeZone)}, nil
 	}
 	if e.Kind == report.KindPromiseMade {
 		w := report.WindowOf(e.DeliverByEarliest, e.DeliverByLatest, e.TimeZone)
