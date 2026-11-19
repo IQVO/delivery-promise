@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/claudioed/delivery-promise/internal/adapters/outbound/postgres/pgtx"
+	"github.com/claudioed/delivery-promise/internal/domain/promise"
 	"github.com/claudioed/delivery-promise/internal/testing/pgtest"
 )
 
@@ -34,6 +35,9 @@ type idemRig struct {
 	calls  atomic.Int32
 	status atomic.Int32
 	panics atomic.Bool
+	// refuse, when set, makes the handler answer that error through the
+	// production writer instead of the plain status.
+	refuse atomic.Pointer[error]
 }
 
 func newIdemRig(t *testing.T) *idemRig {
@@ -55,6 +59,10 @@ func newIdemRig(t *testing.T) *idemRig {
 		}
 		if rig.panics.Load() {
 			panic("handler blew up")
+		}
+		if err := rig.refuse.Load(); err != nil {
+			writeError(w, r, *err)
+			return
 		}
 		writeJSON(w, int(rig.status.Load()), map[string]int{"call": int(n)})
 	})
@@ -141,11 +149,12 @@ func TestAMalformedKeyIsRefusedBeforeTheHandler(t *testing.T) {
 	}
 }
 
-func TestARefusalIsStoredButItsWritesAreRolledBack(t *testing.T) {
+func TestAFinalRefusalIsStoredButItsWritesAreRolledBack(t *testing.T) {
 	g := newIdemRig(t)
-	g.status.Store(http.StatusConflict)
+	var closed error = promise.ErrPromiseClosed // FINAL: the promise is terminal (ADR 0031)
+	g.refuse.Store(&closed)
 	first := g.post("/things/1", "k1", `{}`)
-	g.status.Store(http.StatusCreated)
+	g.refuse.Store(nil)
 	replay := g.post("/things/1", "k1", `{}`)
 	if first.Code != http.StatusConflict || replay.Code != http.StatusConflict || replay.Header().Get(IdempotencyReplayedHeader) != "true" {
 		t.Fatalf("first %d replay %d", first.Code, replay.Code)
