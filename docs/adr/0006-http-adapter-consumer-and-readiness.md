@@ -25,3 +25,7 @@ Accepted (2026-10-23).
 ## Addendum 2026-11-13: current state
 
 The sweeper now runs five passes, not four. `sweepOnce` in `cmd/api/workers.go` runs `ExpireOffers`, `ReleaseExpiredHolds`, `CloseBooks`, `FlagPredictedLate` and `RepriceAtRisk`, in that order. `FlagPredictedLate` was added by ADR 0021 and runs before `RepriceAtRisk` so a promise it flags as unreachable is re-promised in the same sweep. A failing pass still never stops the others.
+
+## Addendum 2026-11-18: a 4xx is no longer always replayed
+
+Point 2 says a 4xx rolls the writes back but is replayed. That now holds only for the FINAL problem types. A RETRYABLE refusal (a full book, a lost optimistic lock, a fact or state not there yet) rolls the whole transaction back, key row included, is not stored, and the same key runs again. The Decision text above is unchanged; [ADR 0031](./0031-every-problem-type-has-a-replay-class.md) holds the rule and the class of every problem type.
