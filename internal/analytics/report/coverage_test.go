@@ -64,6 +64,11 @@ func bucket(day time.Time, region string, promised *int, count int) report.Cover
 	return report.CoverageBucket{Day: day, Region: region, PromisedDays: promised, Count: count}
 }
 
+// coverageOf is the offers-based report: no request fact was projected.
+func coverageOf(in []report.CoverageBucket) []report.CoverageDay {
+	return report.PromiseCoverage(in, nil)
+}
+
 func counts(r report.RegionCoverage) []int {
 	out := []int{}
 	for _, w := range r.Within {
@@ -73,7 +78,7 @@ func counts(r report.RegionCoverage) []int {
 }
 
 func TestPromiseCoverageIsCumulativeOverTheDocumentedDays(t *testing.T) {
-	got := report.PromiseCoverage([]report.CoverageBucket{
+	got := coverageOf([]report.CoverageBucket{
 		bucket(cov, "78", days(0), 1), bucket(cov, "78", days(1), 1), bucket(cov, "78", days(2), 1),
 		bucket(cov, "78", days(3), 1), bucket(cov, "78", days(4), 1), bucket(cov, "78", days(5), 1),
 		bucket(cov, "78", days(6), 1), bucket(cov, "78", nil, 2),
@@ -98,7 +103,7 @@ func TestPromiseCoverageIsCumulativeOverTheDocumentedDays(t *testing.T) {
 }
 
 func TestPromiseCoverageMergesBucketsOfOneRegionAndDay(t *testing.T) {
-	got := report.PromiseCoverage([]report.CoverageBucket{
+	got := coverageOf([]report.CoverageBucket{
 		bucket(cov, "78", days(1), 3), bucket(cov, "78", days(1), 2), bucket(cov, "10", nil, 4),
 	})
 	r := got[0].Regions
@@ -114,7 +119,7 @@ func TestPromiseCoverageMergesBucketsOfOneRegionAndDay(t *testing.T) {
 }
 
 func TestPromiseCoverageRanksByRequestsThenRegion(t *testing.T) {
-	got := report.PromiseCoverage([]report.CoverageBucket{
+	got := coverageOf([]report.CoverageBucket{
 		bucket(cov, "B1", days(1), 2), bucket(cov, "A1", days(1), 2), bucket(cov, "Z9", days(1), 5), bucket(cov, "C1", days(1), 1),
 	})
 	var order []string
@@ -136,7 +141,7 @@ func regionBuckets(day time.Time, n int, requests func(i int) int) []report.Cove
 
 func TestPromiseCoverageFoldsRegionsPastTheTenthIntoOther(t *testing.T) {
 	// 12 regions 00..11 with 12,11,...,1 requests: 10 and 11 (2 and 1) fold.
-	got := report.PromiseCoverage(regionBuckets(cov, 12, func(i int) int { return 12 - i }))
+	got := coverageOf(regionBuckets(cov, 12, func(i int) int { return 12 - i }))
 	regions := got[0].Regions
 	if len(regions) != 11 || regions[9].Region != "09" || regions[10].Region != "other" {
 		t.Fatalf("regions = %+v, want ten regions then other", regions)
@@ -152,7 +157,7 @@ func TestPromiseCoverageFoldsRegionsPastTheTenthIntoOther(t *testing.T) {
 
 func TestPromiseCoverageHasNoOtherRowForTenRegionsOrFewer(t *testing.T) {
 	for _, n := range []int{1, 9, 10} {
-		regions := report.PromiseCoverage(regionBuckets(cov, n, func(int) int { return 1 }))[0].Regions
+		regions := coverageOf(regionBuckets(cov, n, func(int) int { return 1 }))[0].Regions
 		if len(regions) != n {
 			t.Errorf("%d regions -> %d rows %+v, want %d and no other", n, len(regions), regions, n)
 		}
@@ -167,7 +172,7 @@ func TestPromiseCoverageHasNoOtherRowForTenRegionsOrFewer(t *testing.T) {
 func TestPromiseCoverageBoundsEachDayOnItsOwn(t *testing.T) {
 	next := cov.Add(24 * time.Hour)
 	in := append(regionBuckets(next, 11, func(int) int { return 1 }), regionBuckets(cov, 3, func(int) int { return 1 })...)
-	got := report.PromiseCoverage(in)
+	got := coverageOf(in)
 	if len(got) != 2 || !got[0].Day.Equal(cov) || !got[1].Day.Equal(next) {
 		t.Fatalf("days = %+v, want ascending %v then %v", got, cov, next)
 	}
@@ -179,7 +184,7 @@ func TestPromiseCoverageBoundsEachDayOnItsOwn(t *testing.T) {
 func TestPromiseCoverageIgnoresTheLocationOfTheDay(t *testing.T) {
 	loc := time.FixedZone("x", 3600)
 	a := cov.In(loc)
-	got := report.PromiseCoverage([]report.CoverageBucket{bucket(cov, "78", days(1), 1), bucket(a, "78", days(1), 1)})
+	got := coverageOf([]report.CoverageBucket{bucket(cov, "78", days(1), 1), bucket(a, "78", days(1), 1)})
 	if len(got) != 1 || got[0].Regions[0].Requests != 2 || got[0].Day.Location() != time.UTC {
 		t.Fatalf("coverage = %+v, want one UTC day with 2 requests", got)
 	}
@@ -187,7 +192,7 @@ func TestPromiseCoverageIgnoresTheLocationOfTheDay(t *testing.T) {
 
 func TestPromiseCoverageOfNothingIsEmptyNonNil(t *testing.T) {
 	for _, in := range [][]report.CoverageBucket{nil, {}} {
-		if got := report.PromiseCoverage(in); got == nil || len(got) != 0 {
+		if got := coverageOf(in); got == nil || len(got) != 0 {
 			t.Fatalf("PromiseCoverage(%v) = %#v, want empty non-nil", in, got)
 		}
 	}
@@ -195,7 +200,7 @@ func TestPromiseCoverageOfNothingIsEmptyNonNil(t *testing.T) {
 
 func TestTheShareIsNullWithoutRequests(t *testing.T) {
 	// A bucket with no offers counted (never produced by the store) must not divide by zero.
-	got := report.PromiseCoverage([]report.CoverageBucket{bucket(cov, "78", days(1), 0)})
+	got := coverageOf([]report.CoverageBucket{bucket(cov, "78", days(1), 0)})
 	for _, w := range got[0].Regions[0].Within {
 		if w.Share != nil || w.Count != 0 {
 			t.Fatalf("within = %+v, want a null share and no count", w)

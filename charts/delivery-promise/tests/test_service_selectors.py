@@ -67,17 +67,18 @@ ENABLE_EVERYTHING = BASE + [
 API_ENV = (
     "HTTP_ADDR", "LOG_LEVEL", "EVENT_PUBLISHER", "KAFKA_BROKERS", "DATABASE_URL", "MIGRATIONS_DATABASE_URL",
     "DELIVERY_PROMISE_CONSUMER_GROUP", "OUTBOX_MAX_ATTEMPTS", "OUTBOX_RELAY_INTERVAL", "SWEEP_INTERVAL",
-    "SHUTDOWN_DRAIN_DELAY",
+    "SHUTDOWN_DRAIN_DELAY", "DELIVERY_REQUEST_FACTS_ENABLED",
 )
 ALWAYS_ON = {
     "HTTP_ADDR", "LOG_LEVEL", "EVENT_PUBLISHER", "KAFKA_BROKERS", "DATABASE_URL", "MIGRATIONS_DATABASE_URL",
-    "DELIVERY_PROMISE_CONSUMER_GROUP", "OUTBOX_MAX_ATTEMPTS",
+    "DELIVERY_PROMISE_CONSUMER_GROUP", "OUTBOX_MAX_ATTEMPTS", "DELIVERY_REQUEST_FACTS_ENABLED",
 }
 COMPONENT = "app.kubernetes.io/component"
 # The MCP server is read-only: no Kafka, no outbox relay, no consumer, no sweeper.
 MCP_STRAY = {
     "KAFKA_BROKERS", "DELIVERY_PROMISE_CONSUMER_GROUP", "OUTBOX_RELAY_INTERVAL", "OUTBOX_MAX_ATTEMPTS",
-    "SWEEP_INTERVAL", "SHUTDOWN_DRAIN_DELAY", "EVENT_PUBLISHER",
+    "SWEEP_INTERVAL", "SHUTDOWN_DRAIN_DELAY", "EVENT_PUBLISHER", "DELIVERY_REQUEST_FACTS_ENABLED",
+    "DELIVERY_REQUEST_FACTS_QUEUE_SIZE", "DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL",
 }
 # Every env var cmd/mcp reads that has a dedicated chart value.
 MCP_ENV = ("MCP_ADDR", "LOG_LEVEL", "SERVICE_VERSION", "ENVIRONMENT", "DATABASE_URL", "MIGRATIONS_DATABASE_URL")
@@ -360,9 +361,11 @@ def main() -> int:
         failures.append(f"default values must render one Deployment and one Service, got {kinds}")
     dep = next(d for d in defaults if d.get("kind") == "Deployment")
     names = env_names(dep)
-    off = {"OUTBOX_RELAY_INTERVAL", "SWEEP_INTERVAL", "SHUTDOWN_DRAIN_DELAY"}
+    off = {"OUTBOX_RELAY_INTERVAL", "SWEEP_INTERVAL", "SHUTDOWN_DRAIN_DELAY", "DELIVERY_REQUEST_FACTS_QUEUE_SIZE", "DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL"}
     if off & set(names):
         failures.append(f"these must be off with default values: {sorted(off & set(names))}")
+    if env_value(dep, "DELIVERY_REQUEST_FACTS_ENABLED") != "false":
+        failures.append(f"DELIVERY_REQUEST_FACTS_ENABLED must default to false, got {env_value(dep, 'DELIVERY_REQUEST_FACTS_ENABLED')!r}")
     if env_value(dep, "EVENT_PUBLISHER") != "kafka":
         failures.append(f"EVENT_PUBLISHER must always be rendered as kafka, got {env_value(dep, 'EVENT_PUBLISHER')!r}")
     for want in sorted(ALWAYS_ON):

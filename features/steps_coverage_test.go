@@ -241,6 +241,119 @@ func (c *coverageWorld) dayRowsList(tier, day string, offers, promises int) erro
 	return nil
 }
 
+// answer applies count DeliveryRequestAnswered at 10:00Z of day for a
+// destination prefix (ADR 0032); days < 0 is a request answered with no promise.
+func (c *coverageWorld) answer(day, prefix, kind string, days, count int) error {
+	d, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return err
+	}
+	for range count {
+		c.seq++
+		e := report.Event{Kind: report.KindDeliveryRequestAnswered, EventID: fmt.Sprintf("evt-%d", c.seq), At: d.Add(10 * time.Hour),
+			RequestID: fmt.Sprintf("req-%d", c.seq), RequestKind: kind, Items: 1, Region: report.RegionOf(prefix), Answered: days >= 0}
+		if days >= 0 {
+			e.ShortestDays = &days
+		}
+		if _, err := c.store.Apply(context.Background(), e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *coverageWorld) requestsTable(t *godog.Table) error {
+	for _, row := range t.Rows[1:] {
+		days := -1
+		if row.Cells[3].Value != "-" {
+			days, _ = strconv.Atoi(row.Cells[3].Value)
+		}
+		count, _ := strconv.Atoi(row.Cells[4].Value)
+		if err := c.answer(row.Cells[0].Value, row.Cells[1].Value, row.Cells[2].Value, days, count); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *coverageWorld) manyAnsweredRegions(n int, day, counts string) error {
+	per := ints(counts)
+	if len(per) != n {
+		return fmt.Errorf("%d counts for %d regions", len(per), n)
+	}
+	for i, count := range per {
+		if err := c.answer(day, fmt.Sprintf("%02d", i), report.RequestQuote, 1, count); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *coverageWorld) answeredRequests(name, day string, answered, promised int) error {
+	r, err := c.region(day, name)
+	if err != nil {
+		return err
+	}
+	if r["requestsAnswered"] != float64(answered) || r["requestsWithPromise"] != float64(promised) {
+		return fmt.Errorf("region %s = %v, want %d requests answered and %d with a promise", name, r, answered, promised)
+	}
+	return nil
+}
+
+func (c *coverageWorld) requestsWithin(name, day string, a, b, cc, d int) error {
+	r, err := c.region(day, name)
+	if err != nil {
+		return err
+	}
+	got := []int{}
+	for _, w := range r["requestsWithinDays"].([]any) {
+		got = append(got, int(w.(map[string]any)["count"].(float64)))
+	}
+	if want := []int{a, b, cc, d}; !reflect.DeepEqual(got, want) {
+		return fmt.Errorf("region %s request counts = %v, want %v", name, got, want)
+	}
+	return nil
+}
+
+// wantShare compares a JSON share with the scenario's text: a number or null.
+func wantShare(got any, want string) error {
+	if want == "null" {
+		if got != nil {
+			return fmt.Errorf("share = %v, want null", got)
+		}
+		return nil
+	}
+	f, err := strconv.ParseFloat(want, 64)
+	if err != nil {
+		return err
+	}
+	if got != f {
+		return fmt.Errorf("share = %v, want %v", got, f)
+	}
+	return nil
+}
+
+func (c *coverageWorld) requestShareIs(name, day, want string) error {
+	r, err := c.region(day, name)
+	if err != nil {
+		return err
+	}
+	return wantShare(r["requestShare"], want)
+}
+
+func (c *coverageWorld) requestShareWithin(name, day string, days int, want string) error {
+	r, err := c.region(day, name)
+	if err != nil {
+		return err
+	}
+	for _, w := range r["requestsWithinDays"].([]any) {
+		if m := w.(map[string]any); m["days"] == float64(days) {
+			return wantShare(m["share"], want)
+		}
+	}
+	return fmt.Errorf("no %d day threshold in %v", days, r["requestsWithinDays"])
+}
+
 // registerCoverageSteps registers the steps of promise_coverage.feature.
 func registerCoverageSteps(sc *godog.ScenarioContext) {
 	c := &coverageWorld{}
@@ -260,4 +373,10 @@ func registerCoverageSteps(sc *godog.ScenarioContext) {
 	sc.Step(`^the promise coverage is an empty list$`, c.coverageIsEmpty)
 	sc.Step(`^the day rows are an empty list$`, c.dayRowsAreEmpty)
 	sc.Step(`^the day rows list the tier "([^"]*)" on "([^"]*)" with (\d+) offers quoted and (\d+) promises made$`, c.dayRowsList)
+	sc.Step(`^these requests were answered:$`, c.requestsTable)
+	sc.Step(`^(\d+) regions were answered on "([^"]*)" with ([\d, and]+) requests within 1 day$`, c.manyAnsweredRegions)
+	sc.Step(`^region "([^"]*)" of "([^"]*)" answered (\d+) requests, (\d+) with a promise$`, c.answeredRequests)
+	sc.Step(`^the requests of region "([^"]*)" of "([^"]*)" are within 1, 2, 3 and 5 days for (\d+), (\d+), (\d+) and (\d+) requests$`, c.requestsWithin)
+	sc.Step(`^the request share of region "([^"]*)" of "([^"]*)" is ([\d.]+|null)$`, c.requestShareIs)
+	sc.Step(`^the request share of region "([^"]*)" of "([^"]*)" within (\d+) days is ([\d.]+|null)$`, c.requestShareWithin)
 }

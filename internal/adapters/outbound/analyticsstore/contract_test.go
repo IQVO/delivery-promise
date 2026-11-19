@@ -27,6 +27,7 @@ func runContract(t *testing.T, newStore func(t *testing.T) store) {
 	t.Run("promise precision per day and tier", func(t *testing.T) { contractPrecision(t, newStore(t)) })
 	t.Run("quote conversion per day and tier", func(t *testing.T) { contractConversion(t, newStore(t)) })
 	t.Run("promise coverage per day, region and promised days", func(t *testing.T) { contractCoverage(t, newStore(t)) })
+	t.Run("request coverage per day, region, answered flag and promised days", func(t *testing.T) { contractRequests(t, newStore(t)) })
 	t.Run("the freshness basis is the newest CloudEvents time", func(t *testing.T) { contractLastEvent(t, newStore(t)) })
 	t.Run("an invalid fact is rejected and leaves nothing", func(t *testing.T) { contractRejected(t, newStore(t)) })
 }
@@ -153,9 +154,17 @@ func contractEmpty(t *testing.T, s store) {
 	if err != nil || conv == nil || len(conv) != 0 {
 		t.Fatalf("conversion = %#v, %v; want empty non-nil", conv, err)
 	}
+	contractEmptyCoverage(t, s)
+}
+
+func contractEmptyCoverage(t *testing.T, s store) {
 	cov, err := s.PromiseCoverage(ctx, fullRange)
 	if err != nil || cov == nil || len(cov) != 0 {
 		t.Fatalf("coverage = %#v, %v; want empty non-nil", cov, err)
+	}
+	reqs, err := s.RequestCoverage(ctx, fullRange)
+	if err != nil || reqs == nil || len(reqs) != 0 {
+		t.Fatalf("request coverage = %#v, %v; want empty non-nil", reqs, err)
 	}
 	if last, err := s.LastEventAt(ctx); err != nil || last != nil {
 		t.Fatalf("last = %v, %v; want nil", last, err)
@@ -321,6 +330,8 @@ func contractRejected(t *testing.T, s store) {
 		{Kind: report.KindPromiseBroken, EventID: "evt-bad-3", PromiseID: "A", At: nov3, Cause: "EARLY"},
 		{Kind: report.KindPromiseMade, EventID: "evt-bad-4", PromiseID: "A", OfferID: "o", Tier: "NEXT_DAY", Basis: "SCHEDULED",
 			At: nov3, DeliverByEarliest: austinTo, DeliverByLatest: austinFrom},
+		{Kind: report.KindDeliveryRequestAnswered, EventID: "evt-bad-5", At: nov3, RequestID: "r", Region: "787", RequestKind: "QUOTE", Items: 1},
+		{Kind: report.KindDeliveryRequestAnswered, EventID: "evt-bad-6", At: nov3, RequestID: "r", Region: "78", RequestKind: "BATCH", Items: 1},
 	}
 	for _, e := range bad {
 		if applied, err := s.Apply(ctx, e); applied || !errors.Is(err, report.ErrRejected) {
@@ -383,7 +394,7 @@ func contractCoverage(t *testing.T, s store) {
 		{"2026-11-04/9/2", []float64{1}},
 	})
 	// The pure rules over the same buckets: the report body of the day.
-	days := report.PromiseCoverage(got)
+	days := report.PromiseCoverage(got, nil)
 	if len(days) != 2 || days[0].Regions[0].Region != "78" || days[0].Regions[1].Region != "10" ||
 		days[0].Regions[0].Requests != 3 || days[0].Regions[0].Within[0].Count != 1 || days[0].Regions[0].Within[1].Count != 3 {
 		t.Fatalf("coverage report = %+v", days)

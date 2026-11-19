@@ -12,6 +12,7 @@ import (
 	"github.com/claudioed/delivery-promise/internal/domain/offer"
 	"github.com/claudioed/delivery-promise/internal/domain/policy"
 	"github.com/claudioed/delivery-promise/internal/domain/promise"
+	"github.com/claudioed/delivery-promise/internal/domain/requestfact"
 	"github.com/claudioed/delivery-promise/internal/domain/shared"
 )
 
@@ -29,7 +30,8 @@ var streamOf = map[string]string{
 	"PromiseMade": cloudevents.StreamAnalytics, "PromiseConfirmed": cloudevents.StreamAnalytics,
 	"PromiseReleased": cloudevents.StreamAnalytics, "PromiseCancelled": cloudevents.StreamAnalytics,
 	"DeliveryOfferQuoted": cloudevents.StreamAnalytics, "PromisePolicyPublished": cloudevents.StreamAnalytics,
-	"PromiseAtRisk": cloudevents.StreamEvents, "PromiseRevised": cloudevents.StreamEvents,
+	"DeliveryRequestAnswered": cloudevents.StreamAnalytics,
+	"PromiseAtRisk":           cloudevents.StreamEvents, "PromiseRevised": cloudevents.StreamEvents,
 	"PromiseKept": cloudevents.StreamEvents, "PromiseBroken": cloudevents.StreamEvents,
 	"PromiseUnkeepable": cloudevents.StreamEvents, "PromiseBookExhausted": cloudevents.StreamEvents,
 }
@@ -147,6 +149,8 @@ func payload(e shared.Event) (any, error) {
 		return quotedData(ev), nil
 	case policy.PromisePolicyPublished:
 		return policyData(ev), nil
+	case requestfact.DeliveryRequestAnswered:
+		return answeredData(ev), nil
 	}
 	return nil, fmt.Errorf("kafka encoder: no payload mapping for %T", e)
 }
@@ -163,6 +167,20 @@ func quotedData(ev offer.DeliveryOfferQuoted) map[string]any {
 		d["capacityBand"] = ev.CapacityBand
 	}
 	return withConsolidation(withConfidence(withZone(d, ev.Window), ev.Confidence), ev.ConsolidationEligible)
+}
+
+// answeredData is the analytics payload of DeliveryRequestAnswered (ADR 0032):
+// the two-character region, never the prefix; shortestPromisedDays is omitted
+// when no promise was answered, never written as null or zero.
+func answeredData(ev requestfact.DeliveryRequestAnswered) map[string]any {
+	d := map[string]any{
+		"requestId": ev.RequestID, "destinationRegion": ev.Region, "kind": string(ev.Kind),
+		"itemCount": ev.Items, "answered": ev.Answered,
+	}
+	if ev.ShortestPromisedDays != nil {
+		d["shortestPromisedDays"] = *ev.ShortestPromisedDays
+	}
+	return d
 }
 
 func madeData(ev promise.PromiseMade) map[string]any {

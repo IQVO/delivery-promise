@@ -94,6 +94,20 @@ var projectedCases = []projectedCase{
 			e.DeliverByEarliest, e.DeliverByLatest = earliest, latest
 			return e
 		}},
+	{entityDeliveryRequest, "DeliveryRequestAnswered", "req-1", map[string]any{"requestId": "req-1", "destinationRegion": "78", "kind": "ESTIMATE",
+		"itemCount": 12, "answered": true, "shortestPromisedDays": 2},
+		func(e report.Event) report.Event {
+			shortest := 2
+			e.Kind, e.PromiseID, e.Tier = report.KindDeliveryRequestAnswered, "", ""
+			e.RequestID, e.Region, e.RequestKind, e.Items, e.Answered, e.ShortestDays = "req-1", "78", "ESTIMATE", 12, true, &shortest
+			return e
+		}},
+	{entityDeliveryRequest, "DeliveryRequestAnswered", "req-2", map[string]any{"requestId": "req-2", "destinationRegion": "7", "kind": "QUOTE", "itemCount": 1, "answered": false},
+		func(e report.Event) report.Event {
+			e.Kind, e.PromiseID, e.Tier = report.KindDeliveryRequestAnswered, "", ""
+			e.RequestID, e.Region, e.RequestKind, e.Items = "req-2", "7", "QUOTE", 1
+			return e
+		}},
 	{entityPromise, "PromiseMade", "prm-1", map[string]any{"promiseId": "prm-1", "offerId": "off-1", "tier": "NEXT_DAY", "basis": "MEASURED",
 		"deliverByEarliest": earliestJS, "deliverByLatest": latestJS, "timeZone": "America/Chicago", "lines": []any{}},
 		func(e report.Event) report.Event {
@@ -117,7 +131,7 @@ var projectedCases = []projectedCase{
 		}},
 }
 
-func TestAnalyticsConsumerProjectsTheSixTypes(t *testing.T) {
+func TestAnalyticsConsumerProjectsTheSevenTypes(t *testing.T) {
 	base := report.Event{At: eventTime, PromiseID: "prm-1", Tier: "NEXT_DAY"}
 	for _, c := range projectedCases {
 		p, dlq := &fakeProjection{}, &fakeDLQ{}
@@ -134,6 +148,15 @@ func TestAnalyticsConsumerProjectsTheSixTypes(t *testing.T) {
 	}
 }
 
+// requestData is a valid DeliveryRequestAnswered payload with the overrides.
+func requestData(over map[string]any) map[string]any {
+	d := map[string]any{"requestId": "req-1", "destinationRegion": "78", "kind": "QUOTE", "itemCount": 2, "answered": true, "shortestPromisedDays": 1}
+	for k, v := range over {
+		d[k] = v
+	}
+	return d
+}
+
 type poisonCase struct {
 	name string
 	msg  func(t *testing.T) []byte
@@ -147,6 +170,24 @@ var poisonCases = []poisonCase{
 	{"subject is not the aggregate", func(t *testing.T) []byte { return lostEvent(t, "prm-9") }, nil},
 	{"offer subject is not the offerId", func(t *testing.T) []byte {
 		return ownEvent(t, entityDeliveryOffer, "DeliveryOfferQuoted", "prm-1", map[string]any{"offerId": "off-1", "tier": "NEXT_DAY"})
+	}, nil},
+	{"a request fact whose subject is not the requestId", func(t *testing.T) []byte {
+		return ownEvent(t, entityDeliveryRequest, "DeliveryRequestAnswered", "req-9", requestData(nil))
+	}, nil},
+	{"a request fact without a region", func(t *testing.T) []byte {
+		return ownEvent(t, entityDeliveryRequest, "DeliveryRequestAnswered", "req-1", requestData(map[string]any{"destinationRegion": ""}))
+	}, nil},
+	{"a request fact with more of the destination than the region", func(t *testing.T) []byte {
+		return ownEvent(t, entityDeliveryRequest, "DeliveryRequestAnswered", "req-1", requestData(map[string]any{"destinationRegion": "787"}))
+	}, nil},
+	{"a request fact of an unknown kind", func(t *testing.T) []byte {
+		return ownEvent(t, entityDeliveryRequest, "DeliveryRequestAnswered", "req-1", requestData(map[string]any{"kind": "BATCH"}))
+	}, nil},
+	{"a request fact with no item", func(t *testing.T) []byte {
+		return ownEvent(t, entityDeliveryRequest, "DeliveryRequestAnswered", "req-1", requestData(map[string]any{"itemCount": 0}))
+	}, nil},
+	{"a request fact with negative promised days", func(t *testing.T) []byte {
+		return ownEvent(t, entityDeliveryRequest, "DeliveryRequestAnswered", "req-1", requestData(map[string]any{"shortestPromisedDays": -1}))
 	}, nil},
 	{"a required field missing", func(t *testing.T) []byte {
 		return ownEvent(t, entityPromise, "PromiseMade", "prm-1", map[string]any{"promiseId": "prm-1", "offerId": "off-1", "tier": "NEXT_DAY"})

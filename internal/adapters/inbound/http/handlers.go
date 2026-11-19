@@ -20,6 +20,9 @@ func (s *Server) handleQuote(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := s.API.QuoteDeliveryOffers(r.Context(), req.command())
 	respond(w, r, http.StatusOK, res, err)
+	if err == nil {
+		deferFact(r, func() { s.Facts.RecordQuote(req.DestinationPostalPrefix, len(req.Lines), res) })
+	}
 }
 
 // handleEstimate answers POST /delivery-estimates. The route is safe: it is
@@ -33,6 +36,9 @@ func (s *Server) handleEstimate(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := s.API.EstimateDeliveries(r.Context(), req.command())
 	respond(w, r, http.StatusOK, res, err)
+	if err == nil {
+		deferFact(r, func() { s.Facts.RecordEstimate(len(req.Items), res) })
+	}
 }
 
 func (s *Server) handleGetOffer(w http.ResponseWriter, r *http.Request) {

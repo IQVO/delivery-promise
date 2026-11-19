@@ -73,13 +73,23 @@ type Within struct {
 	Share *float64
 }
 
-// RegionCoverage is one region of one day: the offers quoted (Requests), those
-// that carry a promise, and the cumulative counts per CoverageDays.
+// RegionCoverage is one region of one day. The OFFERS-BASED fields (ADR 0030):
+// the offers quoted (Requests), those that carry a promise, and the cumulative
+// counts per CoverageDays. The REQUEST-BASED fields (ADR 0032, best effort, only
+// from the day the fact was switched on): the requests answered, those answered
+// with a promise, the cumulative counts per CoverageDays of their shortest
+// promised days and the share of requests answered with a promise (nil when no
+// request was answered).
 type RegionCoverage struct {
 	Region              string
 	Requests            int
 	AnsweredWithPromise int
 	Within              []Within
+
+	RequestsAnswered    int
+	RequestsWithPromise int
+	RequestsWithin      []Within
+	RequestShare        *float64
 }
 
 // CoverageDay is the coverage of one UTC day: the TopRegions regions with most
@@ -96,10 +106,14 @@ type tally struct {
 	requests int
 	answered int
 	within   []int
+
+	reqAnswered int
+	reqPromised int
+	reqWithin   []int
 }
 
 func newTally(region string) *tally {
-	return &tally{region: region, within: make([]int, len(CoverageDays()))}
+	return &tally{region: region, within: make([]int, len(CoverageDays())), reqWithin: make([]int, len(CoverageDays()))}
 }
 
 // add counts n offers promised days (nil: no promise).
@@ -123,34 +137,53 @@ func (t *tally) merge(o *tally) {
 	for i, n := range o.within {
 		t.within[i] += n
 	}
+	t.reqAnswered += o.reqAnswered
+	t.reqPromised += o.reqPromised
+	for i, n := range o.reqWithin {
+		t.reqWithin[i] += n
+	}
 }
 
 // row is the tally as a RegionCoverage, with the shares.
 func (t *tally) row() RegionCoverage {
-	within := make([]Within, 0, len(t.within))
-	for i, limit := range CoverageDays() {
-		within = append(within, Within{Days: limit, Count: t.within[i], Share: RateOrNil(t.within[i], t.requests)})
+	return RegionCoverage{
+		Region: t.region, Requests: t.requests, AnsweredWithPromise: t.answered, Within: withins(t.within, t.requests),
+		RequestsAnswered: t.reqAnswered, RequestsWithPromise: t.reqPromised, RequestsWithin: withins(t.reqWithin, t.reqAnswered),
+		RequestShare: RateOrNil(t.reqPromised, t.reqAnswered),
 	}
-	return RegionCoverage{Region: t.region, Requests: t.requests, AnsweredWithPromise: t.answered, Within: within}
 }
 
-// PromiseCoverage derives the report of ADR 0030 from the store's buckets: per
-// day (ascending) the top regions by requests, the rest folded into
-// OtherRegion, each with its cumulative counts and shares. A nil input yields
-// an empty, non-nil slice.
-func PromiseCoverage(buckets []CoverageBucket) []CoverageDay {
+// withins are the cumulative counts per CoverageDays and their shares of total.
+func withins(counts []int, total int) []Within {
+	out := make([]Within, 0, len(counts))
+	for i, limit := range CoverageDays() {
+		out = append(out, Within{Days: limit, Count: counts[i], Share: RateOrNil(counts[i], total)})
+	}
+	return out
+}
+
+// PromiseCoverage derives the report of ADR 0030 and ADR 0032 from the store's
+// buckets: per day (ascending) the top regions, the rest folded into
+// OtherRegion, each with its offers-based and its request-based counts and
+// shares. A day or region exists when either kind of bucket has it. Nil inputs
+// yield an empty, non-nil slice.
+func PromiseCoverage(offers []CoverageBucket, requests []RequestBucket) []CoverageDay {
 	byDay := map[int64]map[string]*tally{} // keyed by the Unix instant of the day: time.Time is not a safe map key
-	for _, b := range buckets {
-		key := b.Day.Unix()
+	tallyOf := func(day time.Time, region string) *tally {
+		key := day.Unix()
 		if byDay[key] == nil {
 			byDay[key] = map[string]*tally{}
 		}
-		t := byDay[key][b.Region]
-		if t == nil {
-			t = newTally(b.Region)
-			byDay[key][b.Region] = t
+		if byDay[key][region] == nil {
+			byDay[key][region] = newTally(region)
 		}
-		t.add(b.PromisedDays, b.Count)
+		return byDay[key][region]
+	}
+	for _, b := range offers {
+		tallyOf(b.Day, b.Region).add(b.PromisedDays, b.Count)
+	}
+	for _, b := range requests {
+		tallyOf(b.Day, b.Region).addRequests(b)
 	}
 	out := make([]CoverageDay, 0)
 	for _, key := range slices.Sorted(maps.Keys(byDay)) {
@@ -159,12 +192,14 @@ func PromiseCoverage(buckets []CoverageBucket) []CoverageDay {
 	return out
 }
 
-// rankRegions orders the tallies of one day by requests (most first, ties by
-// region), keeps TopRegions and folds the remainder into OtherRegion.
+// rankRegions orders the tallies of one day by requests answered (ADR 0032,
+// most first), then by offers quoted (ADR 0030), then by region in byte order,
+// keeps TopRegions and folds the remainder into OtherRegion. A day with no
+// request fact ranks exactly as ADR 0030 did.
 func rankRegions(tallies map[string]*tally) []RegionCoverage {
 	ranked := slices.Collect(maps.Values(tallies))
 	slices.SortFunc(ranked, func(a, b *tally) int {
-		return cmp.Or(cmp.Compare(b.requests, a.requests), cmp.Compare(a.region, b.region))
+		return cmp.Or(cmp.Compare(b.reqAnswered, a.reqAnswered), cmp.Compare(b.requests, a.requests), cmp.Compare(a.region, b.region))
 	})
 	keep := min(TopRegions(), len(ranked))
 	out := make([]RegionCoverage, 0)

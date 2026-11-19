@@ -72,3 +72,68 @@ Feature: Promise coverage per region in the quote-conversion report
       | 2026-11-10 | 787    | 1    | 3     |
     When I read the quote-conversion report from "2026-11-10" to "2026-11-10"
     Then the day rows list the tier "NEXT_DAY" on "2026-11-10" with 3 offers quoted and 0 promises made
+
+  # --- Request-level fields (ADR 0032) -----------------------------------
+  # Next to the offers-based fields above, each region row carries the
+  # REQUEST-based ones: the quote and estimate requests answered, with or
+  # without a promise (DeliveryRequestAnswered, best effort, only from the day
+  # the flag was switched on). Nothing above is renamed or removed.
+
+  Scenario: Request share and cumulative counts over the requests answered
+    Given these requests were answered:
+      | day        | prefix | kind     | days | count |
+      | 2026-11-10 | 787    | QUOTE    | 1    | 2     |
+      | 2026-11-10 | 78701  | ESTIMATE | 3    | 1     |
+      | 2026-11-10 | 78     | ESTIMATE | 5    | 1     |
+      | 2026-11-10 | 787    | QUOTE    | -    | 4     |
+    When I read the quote-conversion report from "2026-11-10" to "2026-11-10"
+    Then region "78" of "2026-11-10" answered 8 requests, 4 with a promise
+    And the requests of region "78" of "2026-11-10" are within 1, 2, 3 and 5 days for 2, 2, 3 and 4 requests
+    And the request share of region "78" of "2026-11-10" is 0.5
+    And the request share of region "78" of "2026-11-10" within 3 days is 0.375
+
+  Scenario: A request answered with no promise is counted and lowers the share
+    Given these requests were answered:
+      | day        | prefix | kind  | days | count |
+      | 2026-11-10 | 100    | QUOTE | -    | 1     |
+    When I read the quote-conversion report from "2026-11-10" to "2026-11-10"
+    Then the promise coverage of "2026-11-10" lists the regions "10"
+    And region "10" of "2026-11-10" answered 1 requests, 0 with a promise
+    And the request share of region "10" of "2026-11-10" is 0
+    And region "10" of "2026-11-10" has 0 requests and 0 answered with a promise
+
+  Scenario: Offers-based and request-based fields sit side by side on the same region
+    Given these offers were quoted:
+      | day        | prefix | days | count |
+      | 2026-11-10 | 787    | 1    | 2     |
+    And these requests were answered:
+      | day        | prefix | kind  | days | count |
+      | 2026-11-10 | 787    | QUOTE | 1    | 1     |
+      | 2026-11-10 | 787    | QUOTE | -    | 3     |
+    When I read the quote-conversion report from "2026-11-10" to "2026-11-10"
+    Then region "78" of "2026-11-10" has 2 requests and 2 answered with a promise
+    And region "78" of "2026-11-10" answered 4 requests, 1 with a promise
+    And the request share of region "78" of "2026-11-10" is 0.25
+
+  Scenario: A day with offers and no request facts has a null request share
+    Given these offers were quoted:
+      | day        | prefix | days | count |
+      | 2026-11-10 | 787    | 1    | 2     |
+    When I read the quote-conversion report from "2026-11-10" to "2026-11-10"
+    Then region "78" of "2026-11-10" answered 0 requests, 0 with a promise
+    And the request share of region "78" of "2026-11-10" is null
+    And the requests of region "78" of "2026-11-10" are within 1, 2, 3 and 5 days for 0, 0, 0 and 0 requests
+    And the request share of region "78" of "2026-11-10" within 1 days is null
+
+  Scenario: A day without a request fact or an offer is empty
+    Given these requests were answered:
+      | day        | prefix | kind  | days | count |
+      | 2026-11-10 | 787    | QUOTE | 1    | 1     |
+    When I read the quote-conversion report from "2026-11-11" to "2026-11-12"
+    Then the promise coverage is an empty list
+
+  Scenario: Request facts rank the regions of a day and the tail folds into other
+    Given 12 regions were answered on "2026-11-10" with 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 and 1 requests within 1 day
+    When I read the quote-conversion report from "2026-11-10" to "2026-11-10"
+    Then the promise coverage of "2026-11-10" lists 11 regions ending with "other"
+    And region "other" of "2026-11-10" answered 3 requests, 3 with a promise

@@ -7,8 +7,8 @@ paths:
 
 # Cross-service integration events (Kafka)
 
-delivery-promise PUBLISHES twelve events (six integration events to
-`retailnetwork.delivery-promise.events`, six analytics-only events to
+delivery-promise PUBLISHES thirteen events (six integration events to
+`retailnetwork.delivery-promise.events`, seven analytics-only events to
 `retailnetwork.delivery-promise.analytics`) and CONSUMES 34 integration events from
 the eight producing contexts (ADR 0003, ADR 0004). Never produce or consume a
 `warehouse.*` topic.
@@ -69,6 +69,7 @@ structured content mode. This is a hard rule, not a preference:
 | `com.retailnetwork.commerce.delivery-promise.promise.PromiseCancelled` | `retailnetwork.delivery-promise.analytics` | promiseId |
 | `com.retailnetwork.commerce.delivery-promise.deliveryoffer.DeliveryOfferQuoted` | `retailnetwork.delivery-promise.analytics` | offerId |
 | `com.retailnetwork.commerce.delivery-promise.promisepolicy.PromisePolicyPublished` | `retailnetwork.delivery-promise.analytics` | policyVersion |
+| `com.retailnetwork.commerce.delivery-promise.deliveryrequest.DeliveryRequestAnswered` | `retailnetwork.delivery-promise.analytics` | requestId (best effort, flag `DELIVERY_REQUEST_FACTS_ENABLED`, ADR 0032) |
 
 ### Consumed types
 
