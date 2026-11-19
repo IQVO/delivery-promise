@@ -118,6 +118,9 @@ func (e Event) kindMissing() string {
 	if e.Kind == KindPromiseMade {
 		return e.madeMissing()
 	}
+	if e.Kind == KindDeliveryRequestAnswered {
+		return e.requestMissing()
+	}
 	if e.Kind == KindPromiseRevised {
 		return firstMissing(required{"promiseId", e.PromiseID != ""}, required{"a revisionNo of at least 1", e.RevisionNo >= 1})
 	}

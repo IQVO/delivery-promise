@@ -15,12 +15,13 @@ import (
 	"time"
 )
 
-// Kind is which of the six projected events a fact came from. The names are
+// Kind is which of the seven projected events a fact came from. The names are
 // the CloudEvents event names (the last segment of `type`).
 type Kind string
 
-// The six projected events: two from retailnetwork.delivery-promise.analytics
-// (DeliveryOfferQuoted, PromiseMade), four from retailnetwork.delivery-promise.events.
+// The seven projected events: three from retailnetwork.delivery-promise.analytics
+// (DeliveryOfferQuoted, PromiseMade, DeliveryRequestAnswered), four from
+// retailnetwork.delivery-promise.events.
 const (
 	KindDeliveryOfferQuoted Kind = "DeliveryOfferQuoted"
 	KindPromiseMade         Kind = "PromiseMade"
@@ -28,6 +29,10 @@ const (
 	KindPromiseUnkeepable   Kind = "PromiseUnkeepable"
 	KindPromiseKept         Kind = "PromiseKept"
 	KindPromiseBroken       Kind = "PromiseBroken"
+
+	// KindDeliveryRequestAnswered is the best-effort request-level fact of
+	// ADR 0031: one per quote or estimate answered, with or without a promise.
+	KindDeliveryRequestAnswered Kind = "DeliveryRequestAnswered"
 )
 
 // Verdicts are the judgements promise_judgements records.
@@ -37,7 +42,7 @@ const (
 )
 
 // Event is one decoded analytics fact ready to project. It is the union of the
-// six payloads; only the fields of its Kind are set.
+// seven payloads; only the fields of its Kind are set.
 type Event struct {
 	Kind    Kind
 	EventID string // CloudEvents id: the idempotency key
@@ -65,6 +70,16 @@ type Event struct {
 	DeliverByEarliest time.Time
 	DeliverByLatest   time.Time
 	TimeZone          string
+
+	// DeliveryRequestAnswered (ADR 0031): Region (above) is its
+	// destinationRegion, at most two characters; RequestKind is QUOTE or
+	// ESTIMATE; ShortestDays is the shortest promised days across the answered
+	// options, nil when no promise was answered.
+	RequestID    string
+	RequestKind  string
+	Items        int
+	Answered     bool
+	ShortestDays *int
 
 	// PromiseRevised.
 	RevisionNo int
@@ -98,6 +113,10 @@ type Reader interface {
 	// days (ADR 0030); the rules (top regions, cumulative counts, shares) are
 	// PromiseCoverage in this package.
 	PromiseCoverage(ctx context.Context, r Range) ([]CoverageBucket, error)
+	// RequestCoverage is the request facts (ADR 0031) per UTC day, region,
+	// answered flag and shortest promised days, for the range of their answer
+	// instant. Best effort: only the facts that reached the projection.
+	RequestCoverage(ctx context.Context, r Range) ([]RequestBucket, error)
 	// LastEventAt is the CloudEvents time of the newest event the projection
 	// applied (nil while it applied none): the basis of the freshness lag.
 	LastEventAt(ctx context.Context) (*time.Time, error)

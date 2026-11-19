@@ -89,7 +89,7 @@ func TestAnalyticsConsumerAcknowledgesTheUnprojectedOwnTypesSilently(t *testing.
 	}
 }
 
-// The projected and acknowledged types together are exactly the twelve types
+// The projected and acknowledged types together are exactly the thirteen types
 // this context publishes (ADR 0004), each named by its FULL type string.
 func TestAnalyticsConsumerCoversEveryPublishedType(t *testing.T) {
 	var got []string
@@ -100,7 +100,7 @@ func TestAnalyticsConsumerCoversEveryPublishedType(t *testing.T) {
 		got = append(got, typ)
 	}
 	want := []string{
-		cloudevents.Type("deliveryoffer", "DeliveryOfferQuoted"),
+		cloudevents.Type("deliveryoffer", "DeliveryOfferQuoted"), cloudevents.Type("deliveryrequest", "DeliveryRequestAnswered"),
 		cloudevents.Type("promise", "PromiseAtRisk"), cloudevents.Type("promise", "PromiseBroken"),
 		cloudevents.Type("promise", "PromiseCancelled"), cloudevents.Type("promise", "PromiseConfirmed"),
 		cloudevents.Type("promise", "PromiseKept"), cloudevents.Type("promise", "PromiseMade"),

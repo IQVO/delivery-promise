@@ -24,6 +24,8 @@ type fakeReader struct {
 	conversion  []report.ConversionDay
 	coverage    []report.CoverageBucket
 	coverageErr error
+	requests    []report.RequestBucket
+	requestsErr error
 	last        *time.Time
 	err         error
 	asked       report.Range
@@ -47,6 +49,11 @@ func (f *fakeReader) QuoteConversion(_ context.Context, r report.Range) ([]repor
 func (f *fakeReader) PromiseCoverage(_ context.Context, r report.Range) ([]report.CoverageBucket, error) {
 	f.asked = r
 	return f.coverage, f.coverageErr
+}
+
+func (f *fakeReader) RequestCoverage(_ context.Context, r report.Range) ([]report.RequestBucket, error) {
+	f.asked = r
+	return f.requests, f.requestsErr
 }
 
 func (f *fakeReader) LastEventAt(context.Context) (*time.Time, error) { return f.last, f.err }

@@ -16,18 +16,21 @@ const (
 	entityDeliveryOffer = "deliveryoffer"
 	entityPromiseBook   = "promisebook"
 	entityPromisePolicy = "promisepolicy"
+	// entityDeliveryRequest is the entity of the request-level fact (ADR 0031).
+	entityDeliveryRequest = "deliveryrequest"
 )
 
 // projectedKinds maps the FULL CloudEvents type of each projected event
 // (ADR 0018) to its report.Kind.
 func projectedKinds() map[string]report.Kind {
 	return map[string]report.Kind{
-		cloudevents.Type(entityDeliveryOffer, string(report.KindDeliveryOfferQuoted)): report.KindDeliveryOfferQuoted,
-		cloudevents.Type(entityPromise, string(report.KindPromiseMade)):               report.KindPromiseMade,
-		cloudevents.Type(entityPromise, string(report.KindPromiseRevised)):            report.KindPromiseRevised,
-		cloudevents.Type(entityPromise, string(report.KindPromiseUnkeepable)):         report.KindPromiseUnkeepable,
-		cloudevents.Type(entityPromise, string(report.KindPromiseKept)):               report.KindPromiseKept,
-		cloudevents.Type(entityPromise, string(report.KindPromiseBroken)):             report.KindPromiseBroken,
+		cloudevents.Type(entityDeliveryOffer, string(report.KindDeliveryOfferQuoted)):       report.KindDeliveryOfferQuoted,
+		cloudevents.Type(entityPromise, string(report.KindPromiseMade)):                     report.KindPromiseMade,
+		cloudevents.Type(entityPromise, string(report.KindPromiseRevised)):                  report.KindPromiseRevised,
+		cloudevents.Type(entityPromise, string(report.KindPromiseUnkeepable)):               report.KindPromiseUnkeepable,
+		cloudevents.Type(entityPromise, string(report.KindPromiseKept)):                     report.KindPromiseKept,
+		cloudevents.Type(entityPromise, string(report.KindPromiseBroken)):                   report.KindPromiseBroken,
+		cloudevents.Type(entityDeliveryRequest, string(report.KindDeliveryRequestAnswered)): report.KindDeliveryRequestAnswered,
 	}
 }
 
@@ -60,6 +63,37 @@ type analyticsData struct {
 	RevisionNo        int       `json:"revisionNo"`
 	Cause             string    `json:"cause"`
 	LateByMinutes     int       `json:"lateByMinutes"`
+
+	// DeliveryRequestAnswered (ADR 0031).
+	RequestID            string `json:"requestId"`
+	DestinationRegion    string `json:"destinationRegion"`
+	RequestKind          string `json:"kind"`
+	ItemCount            int    `json:"itemCount"`
+	Answered             bool   `json:"answered"`
+	ShortestPromisedDays *int   `json:"shortestPromisedDays"`
+}
+
+// subject is the aggregate id the CloudEvents subject must equal: the offerId
+// of an offer, the requestId of a request fact, the promiseId of the rest.
+func (d analyticsData) subject(kind report.Kind) string {
+	if kind == report.KindDeliveryOfferQuoted {
+		return d.OfferID
+	}
+	if kind == report.KindDeliveryRequestAnswered {
+		return d.RequestID
+	}
+	return d.PromiseID
+}
+
+// region is the report region of the fact: the first two characters of an
+// offer's destination prefix; a request fact carries the region itself, which
+// is never cut here (a region past two characters is poison, not a prefix to
+// trim).
+func (d analyticsData) region(kind report.Kind) string {
+	if kind == report.KindDeliveryRequestAnswered {
+		return d.DestinationRegion
+	}
+	return report.RegionOf(d.DestinationPrefix)
 }
 
 // toEvent decodes and validates a CloudEvent of a projected kind. Every error
@@ -69,17 +103,14 @@ func toEvent(kind report.Kind, evt ce.Event) (report.Event, error) {
 	if err := evt.DataAs(&d); err != nil {
 		return report.Event{}, fmt.Errorf("decode %s %s data: %w", kind, evt.ID(), err)
 	}
-	subjectOf := d.PromiseID
-	if kind == report.KindDeliveryOfferQuoted {
-		subjectOf = d.OfferID
-	}
-	if subjectOf == "" || subjectOf != evt.Subject() {
+	if subjectOf := d.subject(kind); subjectOf == "" || subjectOf != evt.Subject() {
 		return report.Event{}, fmt.Errorf("%s %s: the aggregate id %q does not match the subject %q", kind, evt.ID(), subjectOf, evt.Subject())
 	}
 	e := report.Event{
 		Kind: kind, EventID: evt.ID(), At: evt.Time().UTC(), PromiseID: d.PromiseID, OfferID: d.OfferID, Tier: d.Tier,
-		Basis: d.Basis, Region: report.RegionOf(d.DestinationPrefix), DeliverByEarliest: d.DeliverByEarliest.UTC(), DeliverByLatest: d.DeliverByLatest.UTC(), TimeZone: d.TimeZone,
+		Basis: d.Basis, Region: d.region(kind), DeliverByEarliest: d.DeliverByEarliest.UTC(), DeliverByLatest: d.DeliverByLatest.UTC(), TimeZone: d.TimeZone,
 		RevisionNo: d.RevisionNo, Cause: d.Cause, LateByMinutes: d.LateByMinutes,
+		RequestID: d.RequestID, RequestKind: d.RequestKind, Items: d.ItemCount, Answered: d.Answered, ShortestDays: d.ShortestPromisedDays,
 	}
 	if err := e.Validate(); err != nil {
 		return report.Event{}, err
