@@ -38,7 +38,7 @@ func (s *Service) rehomeOnLock(ctx context.Context, e FulfillmentLocked) error {
 	w.NodeID, w.PickupDepartureID = e.NodeID, e.PickupDepartureID
 	if ok, err := s.departureKnown(ctx, w.PickupDepartureID); err != nil || !ok {
 		if err == nil {
-			s.Logger.WarnContext(ctx, "locked departure is unknown: the charge stays on the quoted node", "promiseId", e.PromiseID, "nodeId", e.NodeID, "departureId", e.PickupDepartureID)
+			s.Logger.WarnContext(ctx, "locked departure is unknown: the charge stays on the quoted node", "promiseId", sanitizeLog(e.PromiseID), "nodeId", sanitizeLog(e.NodeID), "departureId", sanitizeLog(e.PickupDepartureID))
 		}
 		return err
 	}
@@ -62,7 +62,7 @@ func (s *Service) reownAt(ctx context.Context, p *promise.Promise, nodeID string
 	}
 	lines, err := promise.ChooseOwners(p.Lines(), stock)
 	if errors.Is(err, promise.ErrGroupSpansNodes) {
-		s.Logger.WarnContext(ctx, "no single owner at the locked node covers the lines: the charge stays on the quoted node", "promiseId", string(p.ID()), "nodeId", nodeID, "error", err)
+		s.Logger.WarnContext(ctx, "no single owner at the locked node covers the lines: the charge stays on the quoted node", "promiseId", sanitizeLog(string(p.ID())), "nodeId", sanitizeLog(nodeID), "error", sanitizeErr(err))
 		return nil, false, nil
 	}
 	return lines, err == nil, err
@@ -91,7 +91,7 @@ func (s *Service) moveChargeTo(ctx context.Context, p *promise.Promise, w shared
 	newID := search.BookIDFor(w, old.CutoffAt())
 	events, err := s.moveCapacity(ctx, p, search.Candidate{BookID: string(newID), Witness: w, ShipBy: old.CutoffAt()}, pol)
 	if errors.Is(err, book.ErrPromiseCapacityExhausted) || errors.Is(err, book.ErrBookClosed) {
-		s.Logger.WarnContext(ctx, "locked node cannot take the charge: it stays on the quoted node", "promiseId", string(p.ID()), "nodeId", w.NodeID, "error", err)
+		s.Logger.WarnContext(ctx, "locked node cannot take the charge: it stays on the quoted node", "promiseId", sanitizeLog(string(p.ID())), "nodeId", sanitizeLog(w.NodeID), "error", sanitizeErr(err))
 		return nil
 	}
 	if err != nil {

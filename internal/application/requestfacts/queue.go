@@ -152,5 +152,5 @@ func (q *Queue) drop(ctx context.Context, reason string, cause error) {
 	if cause != nil {
 		attrs = append(attrs, "error", cause)
 	}
-	q.logger.Warn("request fact dropped (best effort, no response was affected)", attrs...)
+	q.logger.Warn("request fact dropped (best effort, no response was affected)", sanitizeArgs(attrs)...)
 }

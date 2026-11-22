@@ -92,7 +92,7 @@ func sweepOnce(ctx context.Context, s sweeper, logger *slog.Logger) {
 		n, err := p.run(ctx, defaultSweepBatch)
 		switch {
 		case err != nil && ctx.Err() == nil:
-			logger.Error("sweep pass failed", "pass", p.name, "error", err)
+			logger.Error("sweep pass failed", "pass", p.name, "error", sanitizeErr(err))
 		case n > 0:
 			logger.Info("sweep pass", "pass", p.name, "count", n)
 		}
