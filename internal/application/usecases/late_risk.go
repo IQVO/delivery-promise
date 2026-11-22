@@ -34,7 +34,7 @@ func (s *Service) FlagPredictedLate(ctx context.Context, limit int) (int, error)
 		for _, id := range ids {
 			ok, err := s.flagIfPredictedLate(ctx, v, id)
 			if err != nil {
-				s.Logger.WarnContext(ctx, "late-risk check failed; the next sweep retries", "promiseId", id, "error", err)
+				s.Logger.WarnContext(ctx, "late-risk check failed; the next sweep retries", "promiseId", sanitizeLog(string(id)), "error", sanitizeErr(err))
 			}
 			if ok {
 				flagged++
@@ -84,8 +84,8 @@ func (s *Service) flagIfPredictedLate(ctx context.Context, v *pathView, id promi
 	})
 	if flagged {
 		s.LateRisk.PredictedLateFlagged(ctx)
-		s.Logger.InfoContext(ctx, "promise flagged predicted late", "promiseId", id, "departureId", risk.LateDepartureID,
-			"expectedArrival", risk.LateExpected.UTC().Format(time.RFC3339), "projectedStationArrival", risk.Projected.UTC().Format(time.RFC3339))
+		s.Logger.InfoContext(ctx, "promise flagged predicted late", "promiseId", sanitizeLog(string(id)), "departureId", sanitizeLog(risk.LateDepartureID),
+			"expectedArrival", sanitizeLog(risk.LateExpected.UTC().Format(time.RFC3339)), "projectedStationArrival", sanitizeLog(risk.Projected.UTC().Format(time.RFC3339)))
 	}
 	return flagged, err
 }
@@ -108,12 +108,12 @@ func (s *Service) holdsPredictedLate(ctx context.Context, view func() (*pathView
 	}
 	v, err := view()
 	if err != nil {
-		s.Logger.WarnContext(ctx, "reachability check failed; the promise is re-promised", "promiseId", id, "error", err)
+		s.Logger.WarnContext(ctx, "reachability check failed; the promise is re-promised", "promiseId", sanitizeLog(string(id)), "error", sanitizeErr(err))
 		return false
 	}
 	reachable, err := v.reachable(ctx, p)
 	if err != nil {
-		s.Logger.WarnContext(ctx, "reachability check failed; the promise is re-promised", "promiseId", id, "error", err)
+		s.Logger.WarnContext(ctx, "reachability check failed; the promise is re-promised", "promiseId", sanitizeLog(string(id)), "error", sanitizeErr(err))
 		return false
 	}
 	return reachable

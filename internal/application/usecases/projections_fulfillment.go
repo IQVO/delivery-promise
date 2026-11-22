@@ -136,7 +136,7 @@ func (s *Service) OnCustomerOrderPlaced(ctx context.Context, m Meta, e CustomerO
 		for _, g := range e.Groups {
 			p, err := s.Promises.Get(ctx, promise.ID(g.PromiseID))
 			if notFound(err) {
-				s.Logger.WarnContext(ctx, "order placed with an unknown promise", "orderId", e.OrderID, "promiseId", g.PromiseID)
+				s.Logger.WarnContext(ctx, "order placed with an unknown promise", "orderId", sanitizeLog(e.OrderID), "promiseId", sanitizeLog(g.PromiseID))
 				continue
 			}
 			if err != nil {
@@ -144,7 +144,7 @@ func (s *Service) OnCustomerOrderPlaced(ctx context.Context, m Meta, e CustomerO
 			}
 			err = s.confirm(ctx, p, e.OrderID, g.GroupNo)
 			if errors.Is(err, promise.ErrPromiseHoldExpired) || errors.Is(err, promise.ErrPromiseClosed) {
-				s.Logger.WarnContext(ctx, "order placed on a dead promise", "orderId", e.OrderID, "promiseId", g.PromiseID, "error", err)
+				s.Logger.WarnContext(ctx, "order placed on a dead promise", "orderId", sanitizeLog(e.OrderID), "promiseId", sanitizeLog(g.PromiseID), "error", sanitizeErr(err))
 				continue
 			}
 			if err != nil {

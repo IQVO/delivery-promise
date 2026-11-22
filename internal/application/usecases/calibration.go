@@ -43,7 +43,7 @@ func (s *Service) calibrationBufferOf(ctx context.Context, pol *policy.Policy, n
 	}
 	segments, err := s.Calibration.Segments(ctx, pol.CalibrationWindowDays(), now)
 	if err != nil {
-		s.Logger.WarnContext(ctx, "calibration read model unreadable: quoting without a buffer", "error", err)
+		s.Logger.WarnContext(ctx, "calibration read model unreadable: quoting without a buffer", "error", sanitizeErr(err))
 		return nil
 	}
 	answers := make(map[readmodel.CalibrationKey]search.Calibration, len(segments))

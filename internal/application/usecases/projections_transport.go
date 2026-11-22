@@ -183,7 +183,7 @@ func (s *Service) assignmentRiskVia(ctx context.Context, m Meta, assignmentID, t
 			return nil, err
 		}
 		if len(ids) == 0 { // an unknown tracking number and no assignment: nothing to flag
-			s.Logger.WarnContext(ctx, "risk for a package no assignment owns", "trackingNumber", trackingNumber, "reason", reason)
+			s.Logger.WarnContext(ctx, "risk for a package no assignment owns", "trackingNumber", sanitizeLog(trackingNumber), "reason", sanitizeLog(reason))
 			return nil, nil
 		}
 		var flagged []promise.ID
@@ -201,7 +201,7 @@ func (s *Service) assignmentRiskVia(ctx context.Context, m Meta, assignmentID, t
 func (s *Service) flagAssignment(ctx context.Context, assignmentID, reason string, nodes, departures []string) ([]promise.ID, error) {
 	a, err := s.Shipments.GetAssignment(ctx, assignmentID)
 	if notFound(err) {
-		s.Logger.WarnContext(ctx, "risk for an assignment whose lock was not seen", "assignmentId", assignmentID, "reason", reason)
+		s.Logger.WarnContext(ctx, "risk for an assignment whose lock was not seen", "assignmentId", sanitizeLog(assignmentID), "reason", sanitizeLog(reason))
 		return nil, nil
 	}
 	if err != nil {

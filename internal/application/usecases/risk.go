@@ -61,7 +61,7 @@ func (s *Service) flagAtRisk(ctx context.Context, ids []promise.ID, reason strin
 func (s *Service) ReviseAll(ctx context.Context, ids []promise.ID) {
 	for _, id := range ids {
 		if err := s.ReviseAtRisk(ctx, id); err != nil {
-			s.Logger.WarnContext(ctx, "re-promise failed; the sweeper retries", "promiseId", id, "error", err)
+			s.Logger.WarnContext(ctx, "re-promise failed; the sweeper retries", "promiseId", sanitizeLog(string(id)), "error", sanitizeErr(err))
 		}
 	}
 }

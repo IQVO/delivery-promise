@@ -45,7 +45,7 @@ func (s *Service) OnNodeTierEligibilityChanged(ctx context.Context, m Meta, e No
 	if reason := e.ignoredReason(); reason != "" {
 		s.Metrics.TierEligibilityIgnored(ctx, reason)
 		s.Logger.WarnContext(ctx, "ignoring a "+tierEligibilityEvent+" that cannot be applied",
-			"reason", reason, "event_id", m.ID, "nodeId", e.NodeID, "tier", e.Tier)
+			"reason", sanitizeLog(reason), "event_id", sanitizeLog(m.ID), "nodeId", sanitizeLog(e.NodeID), "tier", sanitizeLog(e.Tier))
 		return nil
 	}
 	return s.project(ctx, m, func(ctx context.Context) error {
@@ -56,7 +56,7 @@ func (s *Service) OnNodeTierEligibilityChanged(ctx context.Context, m Meta, e No
 			return err
 		}
 		if !applied {
-			s.Logger.DebugContext(ctx, "stale "+tierEligibilityEvent+" dropped", "nodeId", e.NodeID, "tier", e.Tier, "changedAt", e.ChangedAt)
+			s.Logger.DebugContext(ctx, "stale "+tierEligibilityEvent+" dropped", "nodeId", sanitizeLog(e.NodeID), "tier", sanitizeLog(e.Tier), "changedAt", e.ChangedAt)
 		}
 		return nil
 	})
