@@ -7,12 +7,14 @@ info:
     ADR 0003).
 
 
-    **Published.** Twelve events through a **transactional outbox** (the aggregate rows and the already-encoded events are
+    **Published.** Thirteen events through a **transactional outbox** (the aggregate rows and the already-encoded events are
     written in ONE database transaction and an always-on relay drains them to Kafka, at-least-once, the CloudEvents `id` is
     stored with the outbox row). Six integration events go to `retailnetwork.delivery-promise.events` (PromiseAtRisk, PromiseRevised,
-    PromiseKept, PromiseBroken, PromiseUnkeepable, PromiseBookExhausted); six analytics-only events go ONLY to `retailnetwork.delivery-promise.analytics`
-    (PromiseMade, PromiseConfirmed, PromiseReleased, PromiseCancelled, DeliveryOfferQuoted, PromisePolicyPublished). The types
-    are catalogued in ADR 0004.
+    PromiseKept, PromiseBroken, PromiseUnkeepable, PromiseBookExhausted); seven analytics-only events go ONLY to `retailnetwork.delivery-promise.analytics`
+    (PromiseMade, PromiseConfirmed, PromiseReleased, PromiseCancelled, DeliveryOfferQuoted, PromisePolicyPublished,
+    DeliveryRequestAnswered). DeliveryRequestAnswered is the one BEST-EFFORT fact: it is not written in the transaction of
+    any request but by a background worker from a bounded in-memory queue, only when DELIVERY_REQUEST_FACTS_ENABLED is true,
+    and a fact that does not fit or cannot be stored is dropped and counted (ADR 0032). The types are catalogued in ADR 0004.
 
 
     **Consumed.** Events of eight producers, kept as event-fed local read models or driving RepromiseOnRisk, JudgeOnDelivery
@@ -24,7 +26,7 @@ info:
 
 
     **Own events, read back for analytics (ADR 0018).** The analytics projector (`cmd/dp-projector`) reads this context''s
-    OWN two topics in the fixed group `delivery-promise-analytics` and projects DeliveryOfferQuoted and PromiseMade (from
+    OWN two topics in the fixed group `delivery-promise-analytics` and projects DeliveryOfferQuoted, PromiseMade and DeliveryRequestAnswered (from
     `.analytics`) and PromiseRevised, PromiseUnkeepable, PromiseKept and PromiseBroken (from `.events`) into a separate
     analytical database. It dedupes on the CloudEvents `id` in the same transaction as the projection, dead-letters only
     deterministic poison to `retailnetwork.delivery-promise.analytics.dlq` and retries transient failures without a bound.
@@ -35,7 +37,7 @@ info:
     charset=UTF-8`. `specversion`, `id`, `source` (`/retailnetwork/delivery-promise`), `type`, `subject` (the aggregate root
     id), `time`, `datacontenttype` (`application/json`) and `dataschema` (`urn:retailnetwork:delivery-promise:<stream>:<EventName>:v1`)
     are all required. Kafka key = the subject. Type = `com.retailnetwork.commerce.delivery-promise.<entity>.<EventName>` with
-    entity `promise`, `promisebook`, `deliveryoffer` or `promisepolicy`. A breaking payload change is a new `.v2` type, never
+    entity `promise`, `promisebook`, `deliveryoffer`, `promisepolicy` or `deliveryrequest`. A breaking payload change is a new `.v2` type, never
     a mutation.
 
 
@@ -58,6 +60,8 @@ info:
     description: Events raised by the deliveryoffer aggregate.
   - name: promisepolicy
     description: Events raised by the promisepolicy aggregate.
+  - name: deliveryrequest
+    description: Best-effort facts about answered delivery requests (quotes and estimates), not an aggregate (ADR 0032).
   - name: consumed-customer-ordering
     description: Events consumed from customer-ordering.
   - name: consumed-last-mile-delivery
@@ -121,6 +125,8 @@ channels:
         $ref: '#/components/messages/DeliveryOfferQuoted'
       PromisePolicyPublished:
         $ref: '#/components/messages/PromisePolicyPublished'
+      DeliveryRequestAnswered:
+        $ref: '#/components/messages/DeliveryRequestAnswered'
   customerOrderingEvents:
     address: retailnetwork.customer-ordering.events
     title: customer-ordering integration topic (consumed)
@@ -278,9 +284,10 @@ operations:
     channel:
       $ref: '#/channels/deliveryPromiseAnalytics'
     title: Publish delivery-promise analytics events
-    summary: Publish the 6 analytics events through the transactional outbox.
+    summary: Publish the 7 analytics events through the transactional outbox.
     description: The service sends PromiseMade, PromiseConfirmed, PromiseReleased, PromiseCancelled, DeliveryOfferQuoted,
-      PromisePolicyPublished to `retailnetwork.delivery-promise.analytics`. Consumers route on the full `type`.
+      PromisePolicyPublished, DeliveryRequestAnswered to `retailnetwork.delivery-promise.analytics`. Consumers route on the full `type`.
+      DeliveryRequestAnswered is raised only while DELIVERY_REQUEST_FACTS_ENABLED is true, best effort (ADR 0032).
     tags:
     - name: delivery-promise
     messages:
@@ -290,6 +297,7 @@ operations:
     - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromiseCancelled'
     - $ref: '#/channels/deliveryPromiseAnalytics/messages/DeliveryOfferQuoted'
     - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromisePolicyPublished'
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/DeliveryRequestAnswered'
   projectOwnEventsForAnalytics:
     action: receive
     channel:
@@ -312,7 +320,7 @@ operations:
     channel:
       $ref: '#/channels/deliveryPromiseAnalytics'
     title: Project this context's own analytics-only events into the analytical database
-    summary: The analytics projector reads back two of the events this service publishes on its analytics topic (ADR 0018).
+    summary: The analytics projector reads back three of the events this service publishes on its analytics topic (ADR 0018).
     description: Inbound adapter internal/adapters/inbound/kafka/analytics_consumer.go, run by cmd/dp-projector in the consumer
       group ANALYTICS_CONSUMER_GROUP (default delivery-promise-analytics), the same group as projectOwnEventsForAnalytics.
       Dispatches on the full `type`; PromiseConfirmed, PromiseReleased, PromiseCancelled and PromisePolicyPublished are
@@ -322,6 +330,7 @@ operations:
     messages:
     - $ref: '#/channels/deliveryPromiseAnalytics/messages/DeliveryOfferQuoted'
     - $ref: '#/channels/deliveryPromiseAnalytics/messages/PromiseMade'
+    - $ref: '#/channels/deliveryPromiseAnalytics/messages/DeliveryRequestAnswered'
   receiveCustomerOrderingEvents:
     action: receive
     channel:
@@ -825,6 +834,62 @@ components:
             policyVersion: v3
             expiresAt: '2026-10-22T19:15:00Z'
             capacityBand: TIGHT
+    DeliveryRequestAnswered:
+      name: DeliveryRequestAnswered
+      title: Delivery request answered
+      summary: A quote or an estimate was answered, with or without a promise (best effort).
+      contentType: application/cloudevents+json
+      description: '`type` = `com.retailnetwork.commerce.delivery-promise.deliveryrequest.DeliveryRequestAnswered`; `dataschema`
+        = `urn:retailnetwork:delivery-promise:analytics:DeliveryRequestAnswered:v1`; subject and key = the requestId, a fresh
+        opaque id minted for the fact. Topic: retailnetwork.delivery-promise.analytics. ANALYTICS ONLY: no integration consumer reads
+        it, only this context''s own projector (ADR 0032). One per quote (`POST /delivery-quotes`) or estimate (`POST /delivery-estimates`)
+        answered with HTTP 200, including a request answered with NO feasible promise, which publishes nothing else; a replayed
+        Idempotency-Key and a refused request raise none. BEST EFFORT BY DESIGN: it is raised only while DELIVERY_REQUEST_FACTS_ENABLED
+        is true (default false), after the response was written, from a bounded in-memory queue drained by one background
+        worker that stores one outbox row per fact in its own short transaction; a fact that does not fit the queue or cannot
+        be stored is dropped and counted, never retried, and never changes a response. A coverage share therefore tolerates a
+        bounded loss. No PII: the region is the first two characters of the destination postal prefix, no address and no
+        shopper id.'
+      tags:
+      - name: deliveryrequest
+      payload:
+        $ref: '#/components/schemas/DeliveryRequestAnsweredEvent'
+      examples:
+      - name: deliveryRequestAnswered
+        summary: An estimate of 12 items was answered, the shortest promise being two days out.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a000d
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.deliveryrequest.DeliveryRequestAnswered
+          subject: 4f1c2a9e-6f6a-4b1e-8d0e-3a1b7c9d2e10
+          time: '2026-10-22T19:05:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:analytics:DeliveryRequestAnswered:v1
+          data:
+            requestId: 4f1c2a9e-6f6a-4b1e-8d0e-3a1b7c9d2e10
+            destinationRegion: '78'
+            kind: ESTIMATE
+            itemCount: 12
+            answered: true
+            shortestPromisedDays: 2
+      - name: deliveryRequestAnsweredWithoutPromise
+        summary: A quote was answered with no feasible offer.
+        payload:
+          specversion: '1.0'
+          id: 7c1d3e52-0b6a-4f0e-9a41-5d2e8f3a000e
+          source: /retailnetwork/delivery-promise
+          type: com.retailnetwork.commerce.delivery-promise.deliveryrequest.DeliveryRequestAnswered
+          subject: 9a7e3c10-52d4-4f43-bb0a-0c2f6f7a8b11
+          time: '2026-10-22T19:06:00Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:delivery-promise:analytics:DeliveryRequestAnswered:v1
+          data:
+            requestId: 9a7e3c10-52d4-4f43-bb0a-0c2f6f7a8b11
+            destinationRegion: '10'
+            kind: QUOTE
+            itemCount: 1
+            answered: false
     PromisePolicyPublished:
       name: PromisePolicyPublished
       title: Promise policy published
@@ -2445,6 +2510,50 @@ components:
                   (ADR 0023): AMPLE below 60% of the share used by provisional plus confirmed holds, TIGHT from 60% to below
                   85%, SCARCE from 85%. Optional and additive; omitted when the book has no finite capacity, never an empty
                   string. Consumers decode tolerantly and ignore it.'
+    DeliveryRequestAnsweredEvent:
+      allOf:
+      - $ref: '#/components/schemas/CloudEventEnvelope'
+      - type: object
+        properties:
+          data:
+            type: object
+            required:
+            - requestId
+            - destinationRegion
+            - kind
+            - itemCount
+            - answered
+            properties:
+              requestId:
+                type: string
+                minLength: 1
+                maxLength: 64
+                description: A fresh opaque id of the fact, also the CloudEvents subject. It identifies no shopper, order or cart.
+              destinationRegion:
+                type: string
+                minLength: 1
+                maxLength: 2
+                description: The first two characters of the destination postal prefix of the request (all of it when shorter), as
+                  sent. Never more of the destination than that.
+              kind:
+                type: string
+                enum:
+                - QUOTE
+                - ESTIMATE
+                description: Which request was answered, POST /delivery-quotes or POST /delivery-estimates.
+              itemCount:
+                type: integer
+                minimum: 1
+                description: How many items (quote lines, estimate items) the request asked about.
+              answered:
+                type: boolean
+                description: Whether at least one promise (an offer, an estimate option) was answered.
+              shortestPromisedDays:
+                type: integer
+                minimum: 0
+                description: The fewest promised days across the answered options, counted in local calendar days from the day of the
+                  answer to the day of the latest delivery in the window's time zone (UTC without one), never below 0. Optional, omitted
+                  (never null) when no promise was answered.
     PromisePolicyPublishedEvent:
       allOf:
       - $ref: '#/components/schemas/CloudEventEnvelope'

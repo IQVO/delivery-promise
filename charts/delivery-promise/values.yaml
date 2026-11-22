@@ -119,6 +119,21 @@ config:
   # (Go duration, "0" disables). Empty = not rendered; the binary defaults to 5s.
   # The grace period below must exceed it plus 40s.
   shutdownDrainDelay: ""
+  # DELIVERY_REQUEST_FACTS_ENABLED (ADR 0032): record one best-effort
+  # DeliveryRequestAnswered fact per quote or estimate answered with 200, for the
+  # request-level fields of promiseCoverage in the quote-conversion report. OFF
+  # by default: nothing changes on deploy until it is switched on. The facts are
+  # handed to a bounded in-memory queue after the response is written and stored
+  # by one background worker; a full queue or a failed write drops the fact and
+  # counts it (deliverypromise_request_facts_dropped_total), never changes a
+  # response. Not a required value: leaving it out means false.
+  requestFactsEnabled: false
+  # DELIVERY_REQUEST_FACTS_QUEUE_SIZE: capacity of that queue, 1 to 100000. Empty
+  # = not rendered; the binary defaults to 1000.
+  requestFactsQueueSize: ""
+  # DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL: how often the worker drains the queue
+  # (Go duration or plain seconds). Empty = not rendered; the binary defaults to 1s.
+  requestFactsFlushInterval: ""
 
 # The chart refuses to render unless database.url or database.existingSecret is
 # set. Postgres is the only runtime: cmd/api has no in-memory mode and exits at
@@ -296,6 +311,12 @@ a2a:
       cpu: 100m
       memory: 128Mi
 
+# capacity step 3 (warehouse-infra ADR 0012): true (with mcp.enabled and a2a.enabled) runs cmd/mcp and cmd/a2a as
+# two containers of one <release>-agents Deployment. Off by default; warehouse-infra switches it on.
+agents:
+  colocate: false
+  strategy: {}   # {} = k8s default (RollingUpdate); {type: Recreate} only when no surge slot is free
+
 # web/ (delivery_promise_mfe, ADR 0008): the Module Federation remote served
 # by its own nginx pod, reached through warehouse-infra's Nginx web gateway
 # at /mfes/delivery-promise/. Never routed by this chart; ClusterIP only.
@@ -382,3 +403,18 @@ analytics:
       requests:
         cpu: 100m
         memory: 128Mi
+
+# Kong plugins rendered by THIS chart (kong-plugins.yaml) and attached to
+# every HTTPRoute of this chart via the konghq.com/plugins annotation. Fleet decision
+# 2026-10-13: Kong configuration belongs to the application charts, not
+# warehouse-infra Terraform. Defaults off; warehouse-infra's values switch
+# them on. NO auth plugin here, ever.
+kongPlugins:
+  cors:
+    enabled: false
+    origin: "http://localhost"
+  prometheus:
+    enabled: false
+  opentelemetry:
+    enabled: false
+    tracesEndpoint: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"

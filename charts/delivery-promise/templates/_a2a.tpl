@@ -10,6 +10,15 @@ Kong HTTPRoute (a2a-route.yaml).
 {{- include "delivery-promise.fullname" . }}-a2a
 {{- end }}
 
+{{/* agents.colocate (warehouse-infra ADR 0012): "true" iff colocate, mcp and a2a are all on; else empty. */}}
+{{- define "delivery-promise.agentsColocated" -}}
+{{- if and (.Values.agents | default dict).colocate .Values.mcp.enabled .Values.a2a.enabled }}true{{ end -}}
+{{- end }}
+
+{{- define "delivery-promise.agentsFullname" -}}
+{{- printf "%s-agents" (include "delivery-promise.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{/*
 a2a.extraEnv may not bring back an in-memory, log or permissive mode (no
 *_MODE variable at all), may not give the read-only agent the write side's
@@ -18,7 +27,7 @@ chart renders from a dedicated value, so nothing is set twice.
 */}}
 {{- define "delivery-promise.requireCleanA2AExtraEnv" -}}
 {{- $dedicated := list "A2A_ADDR" "A2A_AGENT_URL" "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "LOG_LEVEL" "ENVIRONMENT" "SERVICE_VERSION" "OTEL_SERVICE_NAME" "OTEL_EXPORTER_OTLP_ENDPOINT" -}}
-{{- $writeSide := list "KAFKA_BROKERS" "EVENT_PUBLISHER" "DELIVERY_PROMISE_CONSUMER_GROUP" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SWEEP_INTERVAL" "SHUTDOWN_DRAIN_DELAY" -}}
+{{- $writeSide := list "KAFKA_BROKERS" "EVENT_PUBLISHER" "DELIVERY_PROMISE_CONSUMER_GROUP" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SWEEP_INTERVAL" "SHUTDOWN_DRAIN_DELAY" "DELIVERY_REQUEST_FACTS_ENABLED" "DELIVERY_REQUEST_FACTS_QUEUE_SIZE" "DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL" -}}
 {{- range .Values.a2a.extraEnv -}}
 {{- $name := toString .name -}}
 {{- if hasSuffix "_MODE" $name -}}

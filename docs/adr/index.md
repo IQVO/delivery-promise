@@ -39,3 +39,8 @@ The decisions of `delivery-promise`, in the order they were taken. The ADR bodie
 | [0025](./0025-a-tracking-number-may-belong-to-several-assignments.md) | A tracking number may belong to several assignments | Accepted (2026-11-10) |
 | [0026](./0026-a-carrier-handoff-service-area-is-promised-without-a-delivery-wave.md) | A carrier-handoff service area is promised without a delivery wave | Accepted (2026-11-13) |
 | [0027](./0027-a-pickup-point-as-the-quoted-destination.md) | A pickup point as the quoted destination | Accepted (2026-11-13) |
+| [0028](./0028-out-of-order-capacity-and-scorecard-facts-never-overwrite-a-newer-one.md) | Out-of-order capacity and scorecard facts never overwrite a newer one | Accepted (2026-11-14) |
+| [0029](./0029-node-status-and-listing-suppression-newer-time-wins-retired-is-terminal.md) | Node status and listing suppression follow "newer time wins", and a retired node is terminal | Accepted (2026-11-15) |
+| [0030](./0030-promise-coverage-per-region-in-the-quote-conversion-report.md) | Promise coverage per region in the quote-conversion report | Accepted (2026-11-18) |
+| [0031](./0031-every-problem-type-has-a-replay-class.md) | Every problem type has a replay class; a retryable refusal is not stored under its Idempotency-Key | Accepted (2026-11-18) |
+| [0032](./0032-request-level-promise-coverage-from-a-best-effort-fact.md) | Request-level promise coverage from a best-effort fact | Accepted (2026-11-19) |

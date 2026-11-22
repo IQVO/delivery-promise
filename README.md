@@ -101,12 +101,12 @@ entity `promise`, `promisebook`, `deliveryoffer` or `promisepolicy`
 (ADR 0004). Published events go through the **transactional outbox**
 (ADR 0005). Contract: [`apis/asyncapi.yaml`](apis/asyncapi.yaml).
 
-**Published** — twelve events:
+**Published** — thirteen events:
 
 | Topic | Events |
 |---|---|
 | `retailnetwork.delivery-promise.events` (integration) | `PromiseAtRisk`, `PromiseRevised`, `PromiseKept`, `PromiseBroken`, `PromiseUnkeepable`, `PromiseBookExhausted` |
-| `retailnetwork.delivery-promise.analytics` (analytics only) | `PromiseMade`, `PromiseConfirmed`, `PromiseReleased`, `PromiseCancelled`, `DeliveryOfferQuoted`, `PromisePolicyPublished` |
+| `retailnetwork.delivery-promise.analytics` (analytics only) | `PromiseMade`, `PromiseConfirmed`, `PromiseReleased`, `PromiseCancelled`, `DeliveryOfferQuoted`, `PromisePolicyPublished`, `DeliveryRequestAnswered` (best effort, only with `DELIVERY_REQUEST_FACTS_ENABLED=true`, ADR 0032) |
 
 **Consumed** — 39 event types from eight producer topics (ADR 0003), kept as
 event-fed local read models or driving RepromiseOnRisk, JudgeOnDelivery and
@@ -153,6 +153,9 @@ need only `DATABASE_URL` — they never dial Kafka.
 | `HTTP_ADDR` | `:8080` | Listen address |
 | `SWEEP_INTERVAL` | `15s` | How often the sweeper runs its five passes (Go duration or seconds) |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Poll interval of the relay (Go duration or seconds) |
+| `DELIVERY_REQUEST_FACTS_ENABLED` | `false` | Records one best-effort `DeliveryRequestAnswered` fact per answered quote or estimate (ADR 0032); off unless `true`, a value that is not a boolean is off with a warning |
+| `DELIVERY_REQUEST_FACTS_QUEUE_SIZE` | `1000` | Capacity of the in-memory queue of those facts, 1 to 100000; a full queue drops the newest fact and counts it |
+| `DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL` | `1s` | How often the single background worker writes the queued facts (Go duration or seconds) |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row; `0` = unlimited (ADR 0005) |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait between flipping `/readyz` to 503 and closing the listener; `0` disables |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
@@ -182,7 +185,10 @@ Contract: [`apis/openapi.yaml`](apis/openapi.yaml). Errors are RFC 9457
 `offer-not-quotable`, `nominal-basis-not-allowed-for-tier`,
 `idempotency-key-reused`, `validation-failed` (422). Every state-changing
 POST takes an `Idempotency-Key`; a repeat with the same key and body replays
-the first response (`POST /promises/{promiseId}/cancellations` requires it).
+the first response when it is final: a 2xx, or a refusal the same request cannot pass later. A refusal that depends
+on state that can change (`not-found`, `promise-capacity-exhausted`, `book-closed`, `offer-not-quotable`,
+`illegal-transition`, `concurrent-update`, `group-spans-nodes`) is not stored: the key is released and a retry under
+the same key runs again (ADR 0031; `POST /promises/{promiseId}/cancellations` requires the key).
 
 | Route | Use case |
 | --- | --- |
@@ -295,7 +301,7 @@ on pre-commit and `make check` on pre-push.
 
 ## Architecture Decision Records
 
-Index: [`docs/adr/index.md`](docs/adr/index.md) — 27 ADRs (0001–0027): the
+Index: [`docs/adr/index.md`](docs/adr/index.md) — 29 ADRs (0001–0029): the
 bounded context (0001), the aggregates, invariants and numbered assumptions
 (0002), consumed contracts and local read models (0003), the CloudEvents
 catalogue (0004), the outbox relay (0005), the HTTP adapter, consumer,
@@ -311,7 +317,11 @@ judgement (0020), the late-path sweep (0021), node eligibility for fast-tier
 candidates (0022), the capacity band on offers (0023), the opt-in consolidated
 tier (0024), a tracking number belonging to several assignments (0025), the
 carrier-handoff service area promised without a delivery wave (0026), a pickup
-point as the quoted destination (0027).
+point as the quoted destination (0027), out-of-order capacity and scorecard
+facts never overwriting a newer one (0028), node status and listing
+suppression following "newer time wins" with a terminal retired node (0029),
+promise coverage per region in the quote-conversion report (0030), request-level
+promise coverage from a best-effort fact (0032).
 
 ## License
 

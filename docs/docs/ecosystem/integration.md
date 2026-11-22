@@ -74,7 +74,7 @@ Types are `com.retailnetwork.<tier>.<producer>.<entity>.<Event>` with tier `logi
 
 ## Downstream: what Delivery Promise publishes
 
-Through the transactional outbox and the always-on relay, at-least-once, key = aggregate root id, stable CloudEvents `id` on retry. Twelve types, full catalogue on [Events](/docs/api-reference/events).
+Through the transactional outbox and the always-on relay, at-least-once, key = aggregate root id, stable CloudEvents `id` on retry. Thirteen types, full catalogue on [Events](/docs/api-reference/events).
 
 | Topic | Events | Consumers found in code |
 | --- | --- | --- |

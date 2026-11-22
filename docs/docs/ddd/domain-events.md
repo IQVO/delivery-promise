@@ -30,6 +30,8 @@ flowchart LR
   P --> cn(["PromiseCancelled"]):::evt
   B --> ex(["PromiseBookExhausted"]):::evt
   PP --> pp(["PromisePolicyPublished"]):::evt
+  RQ["DeliveryRequest (best-effort fact)"]:::agg
+  RQ --> ra(["DeliveryRequestAnswered"]):::evt
   ar --> CO["customer-ordering"]:::ext
   rv --> CO
   rv --> OS["order-sourcing"]:::ext
@@ -47,7 +49,7 @@ Source: aggregates `internal/domain/{offer,promise,book,policy}`; consumers veri
 
 | Event | Aggregate | Meaning | Raised by | Recipients |
 | --- | --- | --- | --- | --- |
-| `DeliveryOfferQuoted` | DeliveryOffer | An offer was persisted with its window and witness, the optional `capacityBand` of its book at quote time (ADR 0023) and, for a `CONSOLIDATED` offer, `consolidationEligible` (ADR 0024). One per offer, so one quote can raise several. | `QuoteDeliveryOffers` | none (analytics: quote-to-order conversion per tier and node) |
+| `DeliveryOfferQuoted` | DeliveryOffer | An offer was persisted with its window and witness, the optional `capacityBand` of its book at quote time (ADR 0023) and, for a `CONSOLIDATED` offer, `consolidationEligible` (ADR 0024). One per offer, so one quote can raise several. | `QuoteDeliveryOffers` | none (analytics: quote-to-order conversion per tier and node; promise coverage per region from `destinationPostalPrefix`, `deliverByLatest` and `timeZone`, ADR 0030) |
 | `PromiseMade` | Promise | A provisional promise holds capacity; the offer is consumed. A `CONSOLIDATED` promise also carries `consolidationEligible` (ADR 0024). | `MakePromise` | none (analytics) |
 | `PromiseConfirmed` | Promise | The order was placed; the hold became confirmed. A repeated confirm raises nothing. | `ConfirmPromise` | none (analytics) |
 | `PromiseReleased` | Promise | A provisional promise's hold expired and was returned (`reason: HOLD_EXPIRED`). | `ReleaseExpiredHolds` | none (analytics: hold leakage) |
@@ -59,6 +61,7 @@ Source: aggregates `internal/domain/{offer,promise,book,policy}`; consumers veri
 | `PromiseBroken` | Promise | Delivered late, lost or returned, with cause `LATE`, `LOST` or `RETURNED` and minutes late. | `JudgePromise` | customer-ordering, node-performance |
 | `PromiseBookExhausted` | PromiseBook | A hold brought the node's cutoff to its share; later quotes find no room there. | `MakePromise` | order-sourcing |
 | `PromisePolicyPublished` | PromisePolicy | A new immutable policy version is current. | `PublishPromisePolicy` | none (analytics) |
+| `DeliveryRequestAnswered` | none (a best-effort fact, not an aggregate; entity `deliveryrequest`) | A quote or an estimate was answered with 200, with or without a promise: `kind`, the destination region (first two characters of the postal prefix only), item count, whether a promise came back and the shortest promised day count. Handed over AFTER the response through a bounded queue, dropped and counted when it is full or the write fails, and raised only while `DELIVERY_REQUEST_FACTS_ENABLED=true` (ADR 0032). | the REST adapter of `QuoteDeliveryOffers` and `EstimateDeliveries`, after the response | none (analytics) |
 
 Every state change of a promise raises exactly one event, with the single exception of the idempotent repeat of a confirm. The state machine is on [Aggregate design canvas](/docs/ddd/aggregate-design-canvas).
 
@@ -68,17 +71,17 @@ Each consumed event updates a read model (never an aggregate directly) or runs a
 
 | Event (producer) | Reaction | Policy or projection |
 | --- | --- | --- |
-| `NodeRegistered`, `NodeOperationalProfileDeclared`, `NodeActivated`, `NodeSuspended`, `NodeRetired` (node-topology) | upsert the node and profile; a suspended or retired node leaves the candidate set | projection `rm_nodes` |
+| `NodeRegistered`, `NodeOperationalProfileDeclared`, `NodeActivated`, `NodeSuspended`, `NodeRetired` (node-topology) | upsert the node and profile; a suspended or retired node leaves the candidate set; `NodeActivated` / `NodeSuspended` older than the stored `StateAt` is dropped and an equal instant applies; `RETIRED` is terminal: no later status fact revives the node (ADR 0029) | projection `rm_nodes` |
 | `LaneOpened`, `LaneClosed`, `ServiceAreaAssigned`, `RegionDefined` (node-topology) | upsert lane, service area, region | projections |
-| `CatalogItemCreated`, `CatalogItemDiscontinued`, `ListingCreated`, `ListingAvailabilityChanged`, `ListingSuppressed`, `ListingRestored` (offer-availability) | upsert item and listing | projections |
-| `DepartureScheduled`, `DepartureCapacityChanged` (linehaul) | upsert the departure and its remaining packages | projection `rm_departures` |
+| `CatalogItemCreated`, `CatalogItemDiscontinued`, `ListingCreated`, `ListingAvailabilityChanged`, `ListingSuppressed`, `ListingRestored` (offer-availability) | upsert item and listing; `ListingSuppressed` / `ListingRestored` older than the stored `SuppressedAt` is dropped, an equal instant applies (ADR 0029) | projections |
+| `DepartureScheduled`, `DepartureCapacityChanged` (linehaul) | upsert the departure and its remaining packages; a capacity event older than the stored `CapacityAt` is dropped, an equal instant applies (ADR 0028) | projection `rm_departures` |
 | `LoadDeparted`, `LoadArrived` (linehaul) | `LoadDeparted` opens the load's pairing row and `LoadArrived` pairs it into one measured-transit observation; `LoadArrived` also records the arrival of the load's departure (needs a `departureId`) | projections `rm_load_transit_open`, `rm_transit_actuals` ([ADR 0014](/docs/adr/0014-measured-transit-basis)), `rm_departure_arrival` for the late-risk sweep ([ADR 0021](/docs/adr/0021-a-sweep-flags-promises-whose-locked-path-is-running-late)) |
 | `DepartureCancelled` (linehaul) | mark the departure unscheduled; flag promises whose witness uses it | `RepromiseOnRisk` |
 | `BookingMoved`, `BookingFailed` (linehaul) | flag promises that rode the booking | `RepromiseOnRisk` |
-| `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged` (last-mile) | upsert the wave | projection `rm_waves` |
+| `DeliveryWaveScheduled`, `DeliveryWaveCapacityChanged` (last-mile) | upsert the wave; a capacity event older than the stored `CapacityAt` is dropped, an equal instant applies (ADR 0028) | projection `rm_waves` |
 | `DeliveryWaveCancelled` (last-mile) | mark cancelled; flag promises whose witness wave it is | `RepromiseOnRisk` |
 | `PackageInductionDeferred` (last-mile) | flag the promise | `RepromiseOnRisk` |
-| `NodeScorecardUpdated` (node-performance) | upsert the grade | projection `rm_scorecards` |
+| `NodeScorecardUpdated` (node-performance) | upsert the grade when `computedAt` is not older than the stored one (ADR 0028) | projection `rm_scorecards` |
 | `NodeTierEligibilityChanged` (node-performance) | upsert the (node, tier) fact when `changedAt` is not older than the stored one; unknown tier or missing field is ignored and counted | projection `rm_node_tier_eligibility` |
 | `FulfillmentLocked`, `FulfillmentShipped` (order-sourcing) | record the assignment, then the packages; may complete the facts for judging | `JudgeOnDelivery` |
 | `FulfillmentUnsourceable` (order-sourcing) | flag the promise at risk and re-promise excluding the listed nodes | `RepromiseOnRisk` |

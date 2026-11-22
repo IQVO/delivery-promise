@@ -2,7 +2,7 @@ package kafka
 
 // The analytics projector's consumer (ADR 0018): it reads this context's OWN
 // two topics (retailnetwork.delivery-promise.events and .analytics) under one
-// fixed, env-supplied consumer group and folds the six projected event types
+// fixed, env-supplied consumer group and folds the seven projected event types
 // into the analytical model through report.Projection. It shares the
 // at-least-once run loop of the domain consumer, with a different delivery
 // policy:

@@ -11,13 +11,14 @@ paths:
 
 # Analytics read side (projector + reports)
 
-Record: `docs/adr/0018-analytics-read-side.md`. The read side consumes the facts this context already publishes; do not
+Record: `docs/adr/0018-analytics-read-side.md`; promise coverage per region (the `promiseCoverage` block of
+`/reports/quote-conversion`, `report.PromiseCoverage`, migration `0002_offer_coverage`): `docs/adr/0030-promise-coverage-per-region-in-the-quote-conversion-report.md`; request-level fields of the same block (`requestsAnswered`, `requestsWithPromise`, `requestsWithinDays`, `requestShare`, the best-effort `DeliveryRequestAnswered` fact, migration `0003_request_facts`): `docs/adr/0032-request-level-promise-coverage-from-a-best-effort-fact.md`. The read side consumes the facts this context already publishes; do not
 change the encoder, the outbox or the `.events`/`.analytics` contracts from here.
 
 - Source: ONLY this context's own two topics, `retailnetwork.delivery-promise.events` and
-  `retailnetwork.delivery-promise.analytics` (`OwnTopics()`), never a sibling's topic. Six projected types, dispatched on
+  `retailnetwork.delivery-promise.analytics` (`OwnTopics()`), never a sibling's topic. Seven projected types, dispatched on
   the FULL CloudEvents `type` (`internal/adapters/inbound/kafka/analytics_decode.go`): DeliveryOfferQuoted, PromiseMade,
-  PromiseRevised, PromiseUnkeepable, PromiseKept, PromiseBroken. The other six own types are acknowledged silently;
+  PromiseRevised, PromiseUnkeepable, PromiseKept, PromiseBroken, DeliveryRequestAnswered (a best-effort fact: a request-based share rests on the requests recorded, ADR 0032). The other six own types are acknowledged silently;
   anything else (and non-CloudEvents) is skipped with a sampled WARN.
 - `cmd/dp-projector` is the ONLY writer of the SEPARATE analytical database (`ANALYTICS_DATABASE_URL`, `KAFKA_BROKERS`,
   `ANALYTICS_CONSUMER_GROUP` default `delivery-promise-analytics`, `ADMIN_ADDR` `:8091`). It never opens the OLTP

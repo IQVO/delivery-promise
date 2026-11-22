@@ -26,6 +26,9 @@ Source: `cmd/api/config.go`, `cmd/api/telemetry.go`, `cmd/api/workers.go`, `cmd/
 | `DELIVERY_PROMISE_CONSUMER_GROUP` | none | **yes** | Stable consumer group of the inbound consumer of the eight producer topics. Never derive it from the pod name. |
 | `EVENT_PUBLISHER` | empty (means `kafka`) | no | Only `kafka` (or empty) is accepted; any other value is a boot error (`EVENT_PUBLISHER=<x> is not supported`). The log sink does not exist. |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | no | Poll interval of the outbox relay. |
+| `DELIVERY_REQUEST_FACTS_ENABLED` | `false` | no | Switches on the best-effort request-level coverage fact (ADR 0032): one `DeliveryRequestAnswered` analytics event per quote or estimate answered with 200, handed over after the response through a bounded in-memory queue and one background worker. Unset, empty or not a boolean (a typo logs a warning) is off. Chart value `config.requestFactsEnabled`, default `false`. |
+| `DELIVERY_REQUEST_FACTS_QUEUE_SIZE` | `1000` | no | Capacity of that queue, 1 to 100000; a value out of range warns and takes the default. A full queue drops the newest fact and counts it (`deliverypromise_request_facts_dropped_total{reason="queue_full"}`). Chart value `config.requestFactsQueueSize`. |
+| `DELIVERY_REQUEST_FACTS_FLUSH_INTERVAL` | `1s` | no | How often the worker drains the queue, one outbox row per fact in its own short transaction (Go duration or seconds). Chart value `config.requestFactsFlushInterval`. |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | no | Failures before the relay excludes an outbox row. `0` means unlimited; a negative or unparsable value warns and falls back to 20, so a typo never removes the cap. |
 | `SWEEP_INTERVAL` | `15s` | no | How often the clock-driven sweeper runs its five passes (batch of 100 each). |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | no | Wait between flipping `/readyz` to 503 and closing the listener. `0` disables the wait; a negative or unparsable value warns and uses 5s. |
@@ -86,7 +89,7 @@ Writes ONLY the separate analytical database; never opens the OLTP database. Rea
 
 ## `cmd/dp-reports` (read-only analytics reports, ADR 0018)
 
-`GET /reports/promise-reliability`, `/reports/promise-precision`, `/reports/quote-conversion`, `/reports/freshness`, `/healthz`, `/readyz` over a read-only pool (15s statement timeout). No Kafka, no OLTP database.
+`GET /reports/promise-reliability`, `/reports/promise-precision`, `/reports/quote-conversion`, `/reports/freshness`, `/healthz`, `/readyz` over a read-only pool (15s statement timeout). No Kafka, no OLTP database. `/reports/quote-conversion` also carries the `promiseCoverage` block (ADR 0030); it needs no setting. Its request-based fields (`requestsAnswered`, `requestsWithPromise`, `requestsWithinDays`, `requestShare`, ADR 0032) are `0`/`null` until `cmd/api` runs with `DELIVERY_REQUEST_FACTS_ENABLED=true`; deploy `cmd/dp-projector` before `cmd/dp-reports` and before switching the flag on.
 
 | Variable | Default | Required | Meaning | Chart value |
 | --- | --- | --- | --- | --- |

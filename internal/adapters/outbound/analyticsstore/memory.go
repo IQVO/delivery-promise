@@ -22,14 +22,17 @@ type MemoryStore struct {
 	revisions  map[memRevision]bool
 	unkeepable map[string]bool
 	judgements map[string]memJudgement
+	requests   map[string]memRequest // request facts by request id (ADR 0032)
 	// Fail, when set, is returned by the next Apply (and cleared), to drive
 	// the consumer's transient and rejection paths.
 	Fail error
 }
 
 type memOffer struct {
-	tier string
-	at   time.Time
+	tier   string
+	at     time.Time
+	region string
+	days   *int // promised days (ADR 0030), nil without a latest delivery
 }
 
 type memMade struct {
@@ -52,7 +55,8 @@ type memJudgement struct {
 // NewMemoryStore returns an empty twin.
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{processed: map[string]time.Time{}, offers: map[string]memOffer{}, made: map[string]memMade{},
-		revisions: map[memRevision]bool{}, unkeepable: map[string]bool{}, judgements: map[string]memJudgement{}}
+		revisions: map[memRevision]bool{}, unkeepable: map[string]bool{}, judgements: map[string]memJudgement{},
+		requests: map[string]memRequest{}}
 }
 
 var (
@@ -82,10 +86,13 @@ func (m *MemoryStore) Apply(_ context.Context, e report.Event) (bool, error) {
 	at := e.At.UTC()
 	switch e.Kind {
 	case report.KindDeliveryOfferQuoted:
-		m.offers[e.OfferID] = memOffer{tier: e.Tier, at: at}
+		m.offers[e.OfferID] = memOffer{tier: e.Tier, at: at, region: e.Region,
+			days: report.PromisedDays(e.At, e.DeliverByLatest, e.TimeZone)}
 	case report.KindPromiseMade:
 		m.made[e.PromiseID] = memMade{tier: e.Tier, basis: e.Basis, at: at,
 			window: report.WindowOf(e.DeliverByEarliest, e.DeliverByLatest, e.TimeZone)}
+	case report.KindDeliveryRequestAnswered:
+		m.applyRequest(e)
 	case report.KindPromiseRevised:
 		m.revisions[memRevision{e.PromiseID, e.RevisionNo}] = true
 	case report.KindPromiseUnkeepable:

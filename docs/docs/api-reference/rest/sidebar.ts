@@ -145,7 +145,7 @@ const sidebar: SidebarsConfig = {
         {
           type: "doc",
           id: "api-reference/rest/get-quote-conversion-report",
-          label: "Offers quoted against promises made, per day and tier",
+          label: "Offers quoted against promises made, per day and tier, and promise coverage per region",
           className: "api-method get",
         },
         {

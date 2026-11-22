@@ -57,4 +57,7 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	registerCalibrationSteps(sc, w)
 	registerConsolidatedSteps(sc, w)
 	registerRulesSteps(sc, w)
+	registerStaleFactSteps(sc, w)
+	registerCoverageSteps(sc)
+	registerRequestFactSteps(sc, w)
 }

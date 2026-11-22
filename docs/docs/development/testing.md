@@ -24,22 +24,28 @@ About 80 test files. The domain packages (`book`, `calendar`, `offer`, `policy`,
 
 ## Godog features
 
-Six files, 52 scenarios (`features/*.feature`, counted by `Scenario` and `Scenario Outline`):
+Ten files, **135 scenario definitions** (`git grep -c -E "^[[:space:]]*Scenario" -- 'features/*.feature'`, which counts `Scenario` and `Scenario Outline`); the runner executes them as **161 scenarios** because the Examples rows of the Outlines expand (the `161 scenarios (161 passed)` line of `go test ./features -run TestFeatures -count=1 -v`).
 
-| File | Scenarios | Covers |
+| File | Definitions | Covers |
 | --- | --- | --- |
-| `quoting.feature` | 9 | the witness-path search, tiers, constraints |
+| `quote_rules.feature` | 29 | QuoteDeliveryOffers rules: scorecard handicap, offer expiry and policy knobs, packages per order, constraint naming, delivery wave rule, SAME_DAY, shipment grouping, tier order deadline |
+| `lifecycle_rules.feature` | 25 | promise lifecycle: hold expiry sweep and confirm, cancel, flag at risk and re-promise, predicted late (ADR 0021), judgement, shared tracking numbers (ADR 0025), projection guards |
+| `capacity_rules.feature` | 18 | PromiseBook: book share, hold, exhaustion, release, close at cutoff, and the availability a quote sells (ADR 0015) |
 | `promises.feature` | 13 | make, confirm, hold expiry, capacity, revisions |
-| `keeping.feature` | 9 | judging kept or broken, re-promising on risk |
 | `rest.feature` | 11 | the REST contract through the real router |
+| `quoting.feature` | 9 | the witness-path search, tiers, constraints |
+| `keeping.feature` | 9 | judging kept or broken, re-promising on risk |
 | `calibration.feature` | 5 | promise calibration (ADR 0020) |
 | `consolidated.feature` | 5 | the opt-in consolidated tier (ADR 0024) |
+| `stale_facts_rules.feature` | 11 | capacity facts, node status and listing suppression that arrive out of order never overwrite a newer one; a retired node is terminal (ADR 0028, ADR 0029) |
+
+The three `*_rules.feature` files pin rules the context's documentation states (ADR 0002, 0003, 0015, 0021, 0022, 0025). A scenario that describes a documented rule the code does not yet honour is tagged `@known-bug`: it is excluded by default (`BDD_TAGS` defaults to `~@known-bug`) and runs alone with `BDD_TAGS=@known-bug`, where it must fail. No scenario carries the tag today.
 
 The runner is `features/features_test.go` (`TestFeatures`, `Paths: "."`, `Strict: true`, so an undefined step fails); steps live in `features/steps_*_test.go`. No Go file may sit at the repository root (`TestNoGoFilesAtRepoRoot`).
 
 ## Integration tests
 
-Ten files tagged `integration`: the Postgres adapter (`main_integration_test.go`, `repositories_integration_test.go`, `outbox_integration_test.go`, `outbox_trace_integration_test.go`, `window_time_zone_integration_test.go`), the idempotency middleware (`internal/adapters/inbound/http/idempotency_integration_test.go`) and the three binaries (`cmd/api/main_integration_test.go`, `cmd/api/e2e_integration_test.go`, `cmd/mcp/main_integration_test.go`, `cmd/a2a/main_integration_test.go`). `cmd/api/e2e_integration_test.go` boots the real entry point on testcontainers Postgres and Kafka, proves the outbox publishes, and stops Kafka to prove `/readyz` goes 503 naming kafka while `/healthz` stays 200 and a write is still accepted.
+Ten files tagged `integration`: the Postgres adapter (`main_integration_test.go`, `repositories_integration_test.go`, `outbox_integration_test.go`, `outbox_trace_integration_test.go`, `window_time_zone_integration_test.go`), the idempotency middleware (`internal/adapters/inbound/http/idempotency_integration_test.go`, the replay-class template `idempotency_replay_classes_integration_test.go` and `idempotency_replay_extra_integration_test.go`, and `cmd/api/idempotency_replay_integration_test.go`: a refused `concurrent-update` and a full book through the real router release their key, ADR 0031) and the three binaries (`cmd/api/main_integration_test.go`, `cmd/api/e2e_integration_test.go`, `cmd/mcp/main_integration_test.go`, `cmd/a2a/main_integration_test.go`). `cmd/api/e2e_integration_test.go` boots the real entry point on testcontainers Postgres and Kafka, proves the outbox publishes, and stops Kafka to prove `/readyz` goes 503 naming kafka while `/healthz` stays 200 and a write is still accepted.
 
 ## Contract tests
 

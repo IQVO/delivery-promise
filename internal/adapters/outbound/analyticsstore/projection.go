@@ -33,10 +33,19 @@ const claimSQL = `
 
 const (
 	upsertOfferSQL = `
-	INSERT INTO offers_quoted (offer_id, tier, quoted_at, event_id)
-	VALUES ($1, $2, $3, $4)
+	INSERT INTO offers_quoted (offer_id, tier, quoted_at, event_id, region, promised_days)
+	VALUES ($1, $2, $3, $4, $5, $6)
 	ON CONFLICT (offer_id) DO UPDATE
-	SET tier = EXCLUDED.tier, quoted_at = EXCLUDED.quoted_at, event_id = EXCLUDED.event_id`
+	SET tier = EXCLUDED.tier, quoted_at = EXCLUDED.quoted_at, event_id = EXCLUDED.event_id,
+	    region = EXCLUDED.region, promised_days = EXCLUDED.promised_days`
+
+	// A request fact is immutable once published: a repeat of the request id
+	// (the producer mints it once) changes nothing.
+	insertRequestSQL = `
+	INSERT INTO requests_answered (request_id, request_kind, region, item_count, answered_with_promise,
+	                               shortest_promised_days, answered_at, event_id)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	ON CONFLICT (request_id) DO NOTHING`
 
 	upsertMadeSQL = `
 	INSERT INTO promises_made (promise_id, offer_id, tier, basis, made_at, deliver_by_earliest, deliver_by_latest,
@@ -99,7 +108,11 @@ var errUnknownKind = errors.New("unknown event kind")
 // statement is the SQL and arguments that project one fact.
 func statement(e report.Event) (string, []any, error) {
 	if e.Kind == report.KindDeliveryOfferQuoted {
-		return upsertOfferSQL, []any{e.OfferID, e.Tier, e.At, e.EventID}, nil
+		return upsertOfferSQL, []any{e.OfferID, e.Tier, e.At, e.EventID, e.Region,
+			report.PromisedDays(e.At, e.DeliverByLatest, e.TimeZone)}, nil
+	}
+	if e.Kind == report.KindDeliveryRequestAnswered {
+		return insertRequestSQL, []any{e.RequestID, e.RequestKind, e.Region, e.Items, e.Answered, e.ShortestDays, e.At, e.EventID}, nil
 	}
 	if e.Kind == report.KindPromiseMade {
 		w := report.WindowOf(e.DeliverByEarliest, e.DeliverByLatest, e.TimeZone)

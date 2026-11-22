@@ -26,6 +26,8 @@ func runContract(t *testing.T, newStore func(t *testing.T) store) {
 	t.Run("promise reliability per day, tier and basis", func(t *testing.T) { contractReliability(t, newStore(t)) })
 	t.Run("promise precision per day and tier", func(t *testing.T) { contractPrecision(t, newStore(t)) })
 	t.Run("quote conversion per day and tier", func(t *testing.T) { contractConversion(t, newStore(t)) })
+	t.Run("promise coverage per day, region and promised days", func(t *testing.T) { contractCoverage(t, newStore(t)) })
+	t.Run("request coverage per day, region, answered flag and promised days", func(t *testing.T) { contractRequests(t, newStore(t)) })
 	t.Run("the freshness basis is the newest CloudEvents time", func(t *testing.T) { contractLastEvent(t, newStore(t)) })
 	t.Run("an invalid fact is rejected and leaves nothing", func(t *testing.T) { contractRejected(t, newStore(t)) })
 }
@@ -151,6 +153,18 @@ func contractEmpty(t *testing.T, s store) {
 	conv, err := s.QuoteConversion(ctx, fullRange)
 	if err != nil || conv == nil || len(conv) != 0 {
 		t.Fatalf("conversion = %#v, %v; want empty non-nil", conv, err)
+	}
+	contractEmptyCoverage(t, s)
+}
+
+func contractEmptyCoverage(t *testing.T, s store) {
+	cov, err := s.PromiseCoverage(ctx, fullRange)
+	if err != nil || cov == nil || len(cov) != 0 {
+		t.Fatalf("coverage = %#v, %v; want empty non-nil", cov, err)
+	}
+	reqs, err := s.RequestCoverage(ctx, fullRange)
+	if err != nil || reqs == nil || len(reqs) != 0 {
+		t.Fatalf("request coverage = %#v, %v; want empty non-nil", reqs, err)
 	}
 	if last, err := s.LastEventAt(ctx); err != nil || last != nil {
 		t.Fatalf("last = %v, %v; want nil", last, err)
@@ -316,6 +330,8 @@ func contractRejected(t *testing.T, s store) {
 		{Kind: report.KindPromiseBroken, EventID: "evt-bad-3", PromiseID: "A", At: nov3, Cause: "EARLY"},
 		{Kind: report.KindPromiseMade, EventID: "evt-bad-4", PromiseID: "A", OfferID: "o", Tier: "NEXT_DAY", Basis: "SCHEDULED",
 			At: nov3, DeliverByEarliest: austinTo, DeliverByLatest: austinFrom},
+		{Kind: report.KindDeliveryRequestAnswered, EventID: "evt-bad-5", At: nov3, RequestID: "r", Region: "787", RequestKind: "QUOTE", Items: 1},
+		{Kind: report.KindDeliveryRequestAnswered, EventID: "evt-bad-6", At: nov3, RequestID: "r", Region: "78", RequestKind: "BATCH", Items: 1},
 	}
 	for _, e := range bad {
 		if applied, err := s.Apply(ctx, e); applied || !errors.Is(err, report.ErrRejected) {
@@ -324,5 +340,63 @@ func contractRejected(t *testing.T, s store) {
 	}
 	if last, err := s.LastEventAt(ctx); err != nil || last != nil {
 		t.Fatalf("a rejected fact must leave no mark, last = %v, %v", last, err)
+	}
+}
+
+// quotedTo applies a DeliveryOfferQuoted the way the decoder builds it: the
+// region is the first two characters of the destination prefix and the window
+// ends at latest (zero: the payload carried none).
+func (sd *seeder) quotedTo(offer, prefix string, at, latest time.Time, zone string) {
+	sd.t.Helper()
+	sd.apply(report.Event{Kind: report.KindDeliveryOfferQuoted, At: at, OfferID: offer, Tier: "NEXT_DAY",
+		Region: report.RegionOf(prefix), DeliverByLatest: latest, TimeZone: zone})
+}
+
+// coverageRows renders the buckets as "day/region/promisedDays" (-1: no promise) and the count.
+func coverageRows(buckets []report.CoverageBucket) []row {
+	out := []row{}
+	for _, b := range buckets {
+		days := -1
+		if b.PromisedDays != nil {
+			days = *b.PromisedDays
+		}
+		out = append(out, row{dayKey(b.Day, b.Region, fmt.Sprint(days)), []float64{float64(b.Count)}})
+	}
+	return out
+}
+
+func contractCoverage(t *testing.T, s store) {
+	sd := &seeder{t: t, s: s}
+	at := nov3.Add(15 * time.Hour) // 10:00 in Chicago on 11-03
+	// Chicago station: the latest is read in its zone.
+	sd.quotedTo("C1", "787", at, nov3.Add(72*time.Hour), chicago)                 // two local days out (CST)
+	sd.quotedTo("C2", "78701", at, nov3.Add(72*time.Hour), chicago)               // same region from a longer prefix
+	sd.quotedTo("C3", "78", at.Add(time.Minute), nov3.Add(15*time.Hour), chicago) // same local day: 0
+	sd.quotedTo("C4", "10", at, nov3.Add(30*time.Hour), "")                       // no zone: UTC, 1 day
+	sd.quotedTo("C5", "10", at, time.Time{}, chicago)                             // no latest delivery: no promise
+	sd.quotedTo("C6", "9", nov4.Add(time.Hour), nov4.Add(5*24*time.Hour), "")
+	// Left out: no destination prefix, and outside the range.
+	sd.quotedTo("C7", "", at, nov3.Add(48*time.Hour), chicago)
+	sd.quotedTo("C8", "78", fullRange.To, nov3.Add(48*time.Hour), chicago)
+	sd.quotedTo("C9", "78", nov3.Add(-time.Second), nov3.Add(48*time.Hour), chicago)
+	// An offer re-applied under a new event id keeps ONE row with the newest facts.
+	sd.quotedTo("C6", "9", nov4.Add(time.Hour), nov4.Add(2*24*time.Hour), "")
+	got, err := s.PromiseCoverage(ctx, fullRange)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// count per day/region/promised days; no promise sorts first.
+	sameRows(t, "coverage", coverageRows(got), []row{
+		{"2026-11-03/10/-1", []float64{1}},
+		{"2026-11-03/10/1", []float64{1}},
+		{"2026-11-03/78/0", []float64{1}},
+		{"2026-11-03/78/2", []float64{2}},
+		{"2026-11-04/9/2", []float64{1}},
+	})
+	// The pure rules over the same buckets: the report body of the day.
+	days := report.PromiseCoverage(got, nil)
+	if len(days) != 2 || days[0].Regions[0].Region != "78" || days[0].Regions[1].Region != "10" ||
+		days[0].Regions[0].Requests != 3 || days[0].Regions[0].Within[0].Count != 1 || days[0].Regions[0].Within[1].Count != 3 {
+		t.Fatalf("coverage report = %+v", days)
 	}
 }

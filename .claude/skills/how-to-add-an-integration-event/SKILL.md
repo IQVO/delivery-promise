@@ -5,7 +5,7 @@ description: Publish or consume a cross-service Kafka event in this service: Clo
 
 # How to add an integration event
 
-delivery-promise publishes twelve events (six on `.events`, six analytics-only on
+delivery-promise publishes thirteen events (six on `.events`, seven analytics-only on
 `.analytics`) and consumes 34 (ADR 0003, ADR 0004). The envelope is CloudEvents 1.0
 only; read `.claude/rules/integration-events.md` and
 `.claude/rules/fleet/cloudevents.md` first. The worked example is `PromiseKept`.

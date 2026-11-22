@@ -3,6 +3,7 @@ package usecases
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/claudioed/delivery-promise/internal/application/repository"
 	"github.com/claudioed/delivery-promise/internal/domain/promise"
@@ -19,13 +20,13 @@ func (s *Service) OnDepartureScheduled(ctx context.Context, m Meta, e DepartureS
 		if err != nil && !notFound(err) {
 			return err
 		}
-		remaining := e.CapacityPackages
+		remaining, capacityAt := e.CapacityPackages, m.Time.UTC()
 		if err == nil {
-			remaining = d.Remaining
+			remaining, capacityAt = d.Remaining, d.CapacityAt
 		}
 		return s.Network.PutDeparture(ctx, search.Departure{
 			ID: e.DepartureID, LaneID: e.LaneID, Kind: e.Kind, Origin: e.OriginNodeID, Dest: e.DestinationNodeID, CutoffAt: e.CutoffAt.UTC(),
-			DepartsAt: e.DepartsAt.UTC(), ArrivesAt: e.ArrivesAt.UTC(), Remaining: remaining, Cancelled: d.Cancelled, Scheduled: true,
+			DepartsAt: e.DepartsAt.UTC(), ArrivesAt: e.ArrivesAt.UTC(), Remaining: remaining, CapacityAt: capacityAt, Cancelled: d.Cancelled, Scheduled: true,
 		})
 	})
 }
@@ -37,7 +38,10 @@ func (s *Service) OnDepartureCapacityChanged(ctx context.Context, m Meta, e Depa
 		if err != nil && !notFound(err) {
 			return err
 		}
-		d.ID, d.Remaining = e.DepartureID, e.RemainingPackages
+		if staleFact(d.CapacityAt, m.Time) {
+			return nil
+		}
+		d.ID, d.Remaining, d.CapacityAt = e.DepartureID, e.RemainingPackages, m.Time.UTC()
 		return s.Network.PutDeparture(ctx, d)
 	})
 }
@@ -110,13 +114,13 @@ func (s *Service) OnWaveScheduled(ctx context.Context, m Meta, e WaveScheduled) 
 		if err != nil && !notFound(err) {
 			return err
 		}
-		remaining := e.StopCapacity
+		remaining, capacityAt := e.StopCapacity, m.Time.UTC()
 		if err == nil {
-			remaining = w.Remaining
+			remaining, capacityAt = w.Remaining, w.CapacityAt
 		}
 		return s.Network.PutWave(ctx, search.Wave{
 			ID: e.WaveID, Station: e.StationNodeID, InductCutoffAt: e.InductCutoffAt.UTC(), WindowStart: e.WindowStart.UTC(),
-			WindowEnd: e.WindowEnd.UTC(), Remaining: remaining, Cancelled: w.Cancelled, Scheduled: true,
+			WindowEnd: e.WindowEnd.UTC(), Remaining: remaining, CapacityAt: capacityAt, Cancelled: w.Cancelled, Scheduled: true,
 		})
 	})
 }
@@ -128,7 +132,10 @@ func (s *Service) OnWaveCapacityChanged(ctx context.Context, m Meta, e WaveCapac
 		if err != nil && !notFound(err) {
 			return err
 		}
-		w.ID, w.Remaining = e.WaveID, e.RemainingStops
+		if staleFact(w.CapacityAt, m.Time) {
+			return nil
+		}
+		w.ID, w.Remaining, w.CapacityAt = e.WaveID, e.RemainingStops, m.Time.UTC()
 		return s.Network.PutWave(ctx, w)
 	})
 }
@@ -215,4 +222,15 @@ func union(a, b []string) []string {
 		}
 	}
 	return out
+}
+
+// staleFact reports whether a fact stamped at `at` (the CloudEvents time) is
+// older than the one the row already holds (newer time wins; an equal instant
+// is the later delivery of the same fact and applies, as ADR 0022 does for
+// tier eligibility). A zero instant on either side carries no ordering, so the
+// fact applies: older producers and rows written before the stamp existed.
+// Used for the capacity facts (ADR 0028), the node status and the listing
+// suppression (ADR 0029).
+func staleFact(stored, at time.Time) bool {
+	return !stored.IsZero() && !at.IsZero() && at.Before(stored)
 }
