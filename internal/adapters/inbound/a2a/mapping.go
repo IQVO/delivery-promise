@@ -62,7 +62,7 @@ func problemFromUseCase(err error) *problem {
 	case errors.Is(err, shared.ErrValidation):
 		return newProblem(http.StatusUnprocessableEntity, "validation-failed", "Validation failed", err.Error())
 	default:
-		slog.Error("a2a skill failed", "error", err)
+		slog.Error("a2a skill failed", "error", logReplacer.Replace(err.Error()))
 		return newProblem(http.StatusInternalServerError, "internal-error", "Internal server error",
 			"the skill failed; see the server logs")
 	}
