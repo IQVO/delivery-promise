@@ -10,6 +10,15 @@ Kong HTTPRoute (a2a-route.yaml).
 {{- include "delivery-promise.fullname" . }}-a2a
 {{- end }}
 
+{{/* agents.colocate (warehouse-infra ADR 0012): "true" iff colocate, mcp and a2a are all on; else empty. */}}
+{{- define "delivery-promise.agentsColocated" -}}
+{{- if and (.Values.agents | default dict).colocate .Values.mcp.enabled .Values.a2a.enabled }}true{{ end -}}
+{{- end }}
+
+{{- define "delivery-promise.agentsFullname" -}}
+{{- printf "%s-agents" (include "delivery-promise.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{/*
 a2a.extraEnv may not bring back an in-memory, log or permissive mode (no
 *_MODE variable at all), may not give the read-only agent the write side's
