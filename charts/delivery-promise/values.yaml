@@ -245,11 +245,15 @@ mcp:
     type: ClusterIP
     port: 8090
     targetPort: 8090
-  # Kong exposure: /api/mcp/delivery-promise -> Service :8090, prefix
+  # Agent Router exposure: /api/mcp/delivery-promise -> Service :8090, prefix
   # rewritten to /mcp. Needs the Gateway parentRef from warehouse-infra.
   route:
     enabled: false
     path: "/api/mcp/delivery-promise"
+    # Route timeout (HTTPRoute rule timeouts.request). "0s" disables it: Envoy's 15s
+    # default would cut MCP Streamable HTTP responses that stream over SSE.
+    timeouts:
+      request: "0s"
     parentRefs:
       - name: ""
         namespace: ""
@@ -279,7 +283,7 @@ a2a:
   # Absolute URL advertised on the Agent Card (A2A_AGENT_URL). Empty defaults
   # to this release's in-cluster Service DNS
   # (http://<release>-a2a.<namespace>.svc.cluster.local:8093/); warehouse-infra
-  # can override it with the Kong URL when the agent must be reachable
+  # can override it with the Agent Router URL when the agent must be reachable
   # off-cluster.
   agentUrl: ""
   # SERVICE_VERSION (default: the image tag) / ENVIRONMENT (default: the
@@ -291,13 +295,17 @@ a2a:
     type: ClusterIP
     port: 8093
     targetPort: 8093
-  # Kong exposure: /api/a2a/delivery-promise -> Service :8093, prefix
+  # Agent Router exposure: /api/a2a/delivery-promise -> Service :8093, prefix
   # rewritten to / (the JSON-RPC root; the well-known agent card stays
   # reachable under the same prefix). Needs the Gateway parentRef from
   # warehouse-infra.
   route:
     enabled: false
     path: "/api/a2a/delivery-promise"
+    # Route timeout (HTTPRoute rule timeouts.request). "0s" disables it: Envoy's 15s
+    # default would cut long A2A calls and streamed (SSE) responses.
+    timeouts:
+      request: "0s"
     parentRefs:
       - name: ""
         namespace: ""
